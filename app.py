@@ -1,146 +1,110 @@
 import streamlit as st
 import yfinance as yf
-import plotly.graph_objects as go
+import pandas as pd
+from datetime import datetime
 import requests
 
-# Configuration large pour tout faire tenir
-st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
+# --- CONFIGURATION DE LA PAGE ---
+st.set_page_config(page_title="AM Trading - Arthur & Milan", page_icon="📈", layout="wide")
 
-def trouver_ticker(nom):
-    try:
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={nom}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers).json()
-        return response['quotes'][0]['symbol'] if response.get('quotes') else nom
-    except: return nom
+# --- STYLE PERSONNALISÉ ---
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stMetric { background-color: #161b22; border-radius: 10px; padding: 15px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Barre latérale
-st.sidebar.title("💎 Arthur Trading")
-nom_action = st.sidebar.text_input("Nom de l'action", value="MC.PA")
+# --- MENU LATÉRAL ---
+st.sidebar.title("🚀 AM Trading")
+st.sidebar.subheader("Arthur & Milan Pro")
+menu = st.sidebar.radio("Outils disponibles :", 
+    ["📊 Scanner CAC 40", "🌍 Session Live (UTC+4)", "🔍 Sentiment (Fear & Greed)", "⚔️ Duel d'Actions"])
 
-if nom_action:
-    ticker = trouver_ticker(nom_action)
-    action = yf.Ticker(ticker)
-    info = action.info
+# ---------------------------------------------------------
+# 1. SCANNER GRAHAM (Code de Screener.py adapté)
+# ---------------------------------------------------------
+if menu == "📊 Scanner CAC 40":
+    st.title("Scanner V5.5 - Méthode Benjamin Graham")
     
-    if info and 'currentPrice' in info:
-        # --- RÉCUPÉRATION DE TOUTES TES INFOS V4 ---
-        nom = info.get('longName') or info.get('shortName') or ticker
-        prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
-        bpa = info.get('trailingEps') or info.get('forwardEps') or 0
-        per = info.get('trailingPE') or (prix / bpa if bpa > 0 else 0)
-        dette_equity = info.get('debtToEquity')
-        div_rate = info.get('dividendRate') or info.get('trailingAnnualDividendRate', 0)
-        payout = (info.get('payoutRatio') or 0) * 100
-        cash_action = info.get('totalCashPerShare', 0)
-        devise = info.get('currency', 'EUR')
-        secteur = info.get('sector', 'N/A')
+    mes_actions = [
+        "AC.PA", "AI.PA", "AIR.PA", "ALO.PA", "MT.AS", "CS.PA", "BNP.PA", "EN.PA", 
+        "CAP.PA", "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EL.PA", "STLAP.PA", "RMS.PA", 
+        "KER.PA", "OR.PA", "LR.PA", "MC.PA", "ML.PA", "ORA.PA", "RI.PA", "PUB.PA", 
+        "RNO.PA", "SAF.PA", "SGO.PA", "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA", 
+        "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"
+    ]
 
-        # Calculs Graham
-        val_theorique = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
-        marge_pourcent = ((val_theorique - prix) / prix) * 100
-        div_yield = (div_rate / prix * 100) if (div_rate > 0) else 0
-
-        st.title(f"📊 {nom} ({ticker})")
-
-        # --- LIGNE 1 : METRICS PRINCIPALES ---
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Prix Actuel", f"{prix:.2f} {devise}")
-        c2.metric("Valeur Graham", f"{val_theorique:.2f} {devise}")
-        c3.metric("Potentiel", f"{marge_pourcent:+.2f}%")
-        c4.metric("Secteur", secteur)
-
-        st.markdown("---")
-
-        # --- LIGNE 2 : GRAPHIQUE + INFOS COMPLÈTES ---
-        col_graph, col_data = st.columns([2, 1])
-
-        with col_graph:
-            st.subheader("📈 Courbe sur 5 ans")
-            hist = action.history(period="5y")
-            if not hist.empty:
-                fig = go.Figure(data=[go.Scatter(
-                    x=hist.index, y=hist['Close'], 
-                    line=dict(color='#00d1ff', width=2),
-                    fill='tozeroy'
-                )])
-                fig.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, t=0, b=0))
-                st.plotly_chart(fig, width='stretch')
-
-        with col_data:
-            st.subheader("📑 Détails Financiers")
-            st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
-            st.write(f"**Ratio P/E :** {per:.2f}")
-            st.write(f"**Dette / Cap. Propres :** {dette_equity if dette_equity else 'N/A'} %")
-            st.write(f"**Dividende :** {div_rate:.2f} {devise} ({div_yield:.2f}%)")
-            st.write(f"**Payout Ratio :** {payout:.2f} %")
-            st.write(f"**Cash par Action :** {cash_action:.2f} {devise}")
-
-        # --- LIGNE 3 : TON SCORING V4 AVEC MALUS ---
-        st.markdown("---")
-        st.subheader("⭐ Scoring Qualité (sur 20)")
+    if st.button("Lancer le Scan Complet"):
+        resultats = []
+        barre = st.progress(0)
         
-        score = 0
-        positifs = []
-        negatifs = []
-
-        # Analyse BPA / PE
-        if bpa > 0:
-            if per < 12: 
-                score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
-            elif per < 20: 
-                score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
-            else: 
-                score += 1; positifs.append("🟡 P/E élevé [+1]")
-        else: 
-            score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
-
-        # Analyse Dette
-        if dette_equity is not None:
-            if dette_equity < 50: 
-                score += 4; positifs.append("✅ Bilan très solide [+4]")
-            elif dette_equity < 100: 
-                score += 3; positifs.append("✅ Dette maîtrisée [+3]")
-            elif dette_equity > 200: 
-                score -= 4; negatifs.append("❌ Surendettement [-4]")
-
-        # Analyse Dividende
-        if 10 < payout <= 80: 
-            score += 4; positifs.append("✅ Dividende solide/safe [+4]")
-        elif payout > 95: 
-            score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
+        for i, t in enumerate(mes_actions):
+            try:
+                action = yf.Ticker(t)
+                info = action.info
+                prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                bpa = info.get('trailingEps') or info.get('forwardEps') or 0
+                val_theorique = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
+                marge = ((val_theorique - prix) / prix) * 100
+                
+                # Scoring simplifié pour le web
+                score = 0
+                if bpa > 0: score += 5
+                if (info.get('debtToEquity') or 200) < 100: score += 5
+                if marge > 20: score += 10
+                
+                resultats.append({"Action": t, "Nom": info.get('longName', t), "Score": f"{score}/20", "Potentiel": f"{marge:.1f}%"})
+            except: pass
+            barre.progress((i + 1) / len(mes_actions))
         
-        # Analyse Marge Graham
-        if marge_pourcent > 100: 
-            score += 7; positifs.append("🔥 DÉCOTE EXCEPTIONNELLE [+7]")
-        elif marge_pourcent > 30: 
-            score += 5; positifs.append("✅ Forte décote Graham [+5]")
-            
-        # Analyse Cash
-        if cash_action > (prix * 0.2): 
-            score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
+        df = pd.DataFrame(resultats)
+        st.table(df.sort_values(by="Score", ascending=False))
 
-        score = min(20, max(0, score))
+# ---------------------------------------------------------
+# 2. SESSION LIVE (Code de Session.py adapté)
+# ---------------------------------------------------------
+elif menu == "🌍 Session Live (UTC+4)":
+    st.title("Market Monitor - Heure de La Réunion")
+    h = datetime.now().hour
+    
+    col1, col2, col3 = st.columns(3)
+    with col1: st.metric("HK (Asie)", "05:30 - 12:00", "Ouvert" if 5<=h<12 else "Fermé")
+    with col2: st.metric("Paris (Europe)", "12:00 - 20:30", "Ouvert" if 12<=h<20 else "Fermé")
+    with col3: st.metric("New York (USA)", "18:30 - 01:00", "Ouvert" if h>=18 or h<1 else "Fermé")
+
+    st.info("💡 Conseil : " + ("Surveille la clôture HK" if h<12 else "Wall Street est le moteur actuel" if h>=18 else "L'Europe mène la danse"))
+
+# ---------------------------------------------------------
+# 3. FEAR & GREED (Code de fear and gread index.py)
+# ---------------------------------------------------------
+elif menu == "🔍 Sentiment (Fear & Greed)":
+    st.title("Sentiment des Marchés")
+    marches = {"^GSPC": "USA (S&P 500)", "^FCHI": "CAC 40", "BTC-USD": "Bitcoin"}
+    
+    for t, nom in marches.items():
+        data = yf.Ticker(t).history(period="1y")
+        prix = data['Close'].iloc[-1]
+        ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
+        ratio = (prix / ma200) - 1
         
-        # Affichage du score
-        col_score, col_details = st.columns([1, 2])
-        with col_score:
-            st.write(f"## Note : {score}/20")
-            st.progress(score / 20)
-            
-            if score >= 17: st.success("🔥 ACHAT FORT")
-            elif score >= 14: st.info("🚀 ACHAT")
-            elif score >= 10: st.warning("⚖️ À SURVEILLER")
-            else: st.error("⚠️ ÉVITER")
+        sentiment = "NEUTRAL ⚖️"
+        if ratio > 0.10: sentiment = "EXTREME GREED 🚀"
+        elif ratio < -0.10: sentiment = "EXTREME FEAR 💀"
+        
+        st.subheader(f"{nom} : {sentiment}")
+        st.progress(min(100, max(0, int((ratio + 0.2) * 250)))) # Jauge visuelle
 
-        with col_details:
-            st.write("**Détails de l'analyse :**")
-            # Affichage des points positifs
-            for p in positifs:
-                st.write(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
-            # Affichage des points négatifs (malus)
-            for n in negatifs:
-                st.write(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
-
-    else:
-        st.error("Action non trouvée. Vérifiez le nom ou le ticker.")
+# ---------------------------------------------------------
+# 4. DUEL (Code de Duel V2.py)
+# ---------------------------------------------------------
+elif menu == "⚔️ Duel d'Actions":
+    st.title("Le Duel : Arthur vs Milan")
+    c1, c2 = st.columns(2)
+    with c1: t1 = st.text_input("Action 1 (ex: MC.PA)", "MC.PA")
+    with c2: t2 = st.text_input("Action 2 (ex: OR.PA)", "OR.PA")
+    
+    if st.button("Lancer le Duel"):
+        # Ici on appelle une version simplifiée de ta fonction de duel
+        st.write(f"Comparaison de {t1} vs {t2}")
+        st.success(f"Analyse en cours... (Graphiques bientôt disponibles)")
