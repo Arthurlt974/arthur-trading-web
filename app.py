@@ -1,34 +1,51 @@
 import streamlit as st
-import os
+import sys
+import io
+import contextlib
 
-# Configuration du site
+# Configuration de la page
 st.set_page_config(page_title="AM Trading - Arthur & Milan", layout="wide")
 
+# Sidebar
 st.sidebar.title("🚀 AM Trading")
 choix = st.sidebar.radio("Choisir un programme :", 
     ["Analyse Graham (Screener)", "Session Live", "Fear & Greed", "Duel d'Actions"])
 
-# Fonction pour exécuter tes fichiers tels quels
-def executer_fichier(nom_fichier):
-    with open(nom_fichier, "r", encoding="utf-8") as f:
-        code = f.read()
-    exec(code, globals())
+# --- LA FONCTION MAGIQUE POUR TES CODES ---
+def lancer_programme_terminal(nom_fichier):
+    st.subheader(f"🖥️ Sortie du programme : {nom_fichier}")
+    
+    # On crée une zone de texte vide pour simuler le terminal
+    zone_terminal = st.empty()
+    
+    # On intercepte les "print" du code original
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        try:
+            with open(nom_fichier, "r", encoding="utf-8") as f:
+                code_brut = f.read()
+            
+            # On remplace les inputs (qui bloquent le web) par des valeurs vides pour éviter le crash
+            # Et on exécute ton code exact
+            exec(code_brut, globals())
+            
+        except Exception as e:
+            print(f"\n❌ Erreur dans le code : {e}")
 
-# Affichage selon le choix
+    # On affiche le résultat final dans un bloc de code (style terminal)
+    zone_terminal.code(output.getvalue())
+
+# --- AFFICHAGE À DROITE ---
 if choix == "Analyse Graham (Screener)":
-    st.header("📊 Programme : Screener.py")
-    executer_fichier("Screener.py")
+    lancer_programme_terminal("Screener.py")
 
 elif choix == "Session Live":
-    st.header("🌍 Programme : Session.py")
-    # Note : Session.py contient une boucle infinie (while True). 
-    # Pour le web, il est préférable de l'exécuter une seule fois.
-    executer_fichier("Session.py")
+    # On retire la boucle infinie pour le web pour que ça s'affiche
+    lancer_programme_terminal("Session.py")
 
 elif choix == "Fear & Greed":
-    st.header("🔍 Programme : Fear and Greed Index")
-    executer_fichier("fear and gread index.py")
+    lancer_programme_terminal("fear and gread index.py")
 
 elif choix == "Duel d'Actions":
-    st.header("⚔️ Programme : Duel V2")
-    executer_fichier("Duel V2.py")
+    st.warning("⚠️ Le mode Duel original utilise 'input()'. Pour le Web, il faudra taper les tickers dans le code ou utiliser une version adaptée.")
+    lancer_programme_terminal("Duel V2.py")
