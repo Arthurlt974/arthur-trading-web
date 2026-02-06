@@ -101,7 +101,7 @@ if nom_action:
 
         if dette_equity is not None:
             if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
-            elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+            elif借ette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
             elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
 
         if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
@@ -128,7 +128,7 @@ if nom_action:
             for p in positifs: st.write(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.write(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
-        # --- SECTION COMPARATIF SECTEUR (DANS LA BOUCLE IF INFO) ---
+        # --- SECTION COMPARATIF SECTEUR ---
         st.markdown("---")
         st.subheader(f"🏢 Comparatif du secteur : {secteur}")
 
@@ -144,10 +144,11 @@ if nom_action:
                         r_prix = rival_info.get('currentPrice', 1)
                         r_bpa = rival_info.get('trailingEps', 0)
                         
-                        # Fix pour le rendement cohérent
+                        # --- FIX RENDEMENT COHÉRENT ---
                         r_yield_raw = rival_info.get('dividendYield')
                         if r_yield_raw is not None:
-                            r_yield = r_yield_raw if r_yield_raw > 1 else r_yield_raw * 100
+                            # Seuil : si > 0.2 (20%), on considère que c'est déjà un %
+                            r_yield = r_yield_raw if r_yield_raw > 0.2 else r_yield_raw * 100
                         else: r_yield = 0
                         
                         donnees_comp.append({
