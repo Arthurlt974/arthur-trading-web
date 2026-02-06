@@ -5,4 +5,3 @@ feedparser
 plotly
 pandas
 requests
-streamlit_autorefresh
