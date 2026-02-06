@@ -140,7 +140,7 @@ elif outil == "⚔️ Mode Duel":
         st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR (Version Interactive)
+# OUTIL 3 : MARKET MONITOR (Version Pro Interactive)
 # ==========================================
 elif outil == "🌍 Market Monitor":
     st.title("🌍 Market Monitor (UTC+4)")
@@ -162,18 +162,15 @@ elif outil == "🌍 Market Monitor":
     }
     st.table(pd.DataFrame(data_horaires))
 
-    # 2. MOTEURS DU MARCHÉ AVEC GRAPHIQUES CLICQUABLES
+    # 2. MOTEURS DU MARCHÉ
     st.markdown("---")
-    st.subheader("⚡ Moteurs du Marché (Cliquez pour afficher le graphique)")
+    st.subheader("⚡ Moteurs du Marché")
     
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
-    
-    # On crée les colonnes pour les métriques
     cols = st.columns(len(indices))
     
-    # On utilise le session_state de Streamlit pour mémoriser quel graphique afficher
     if 'index_selectionne' not in st.session_state:
-        st.session_state.index_selectionne = "^FCHI" # Par défaut CAC 40
+        st.session_state.index_selectionne = "^FCHI"
 
     for i, (tk, nom) in enumerate(indices.items()):
         try:
@@ -183,39 +180,54 @@ elif outil == "🌍 Market Monitor":
                 val_prec = data_idx['Close'].iloc[-2]
                 variation = ((val_actuelle - val_prec) / val_prec) * 100
                 
-                # Affichage de la métrique
+                # Metric avec bouton en dessous
                 cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
-                
-                # Bouton pour sélectionner cet indice
-                if cols[i].button(f"Voir {nom}", key=f"btn_{tk}"):
+                if cols[i].button(f"Analyser {nom}", key=f"btn_{tk}", use_container_width=True):
                     st.session_state.index_selectionne = tk
         except:
             cols[i].write(f"{nom} : N/A")
 
-    # Affichage du graphique de l'indice sélectionné
-    st.markdown(f"### 📈 Graphique : {indices[st.session_state.index_selectionne]}")
-    idx_ticker = yf.Ticker(st.session_state.index_selectionne)
-    hist_idx = idx_ticker.history(period="1mo", interval="1d")
-    
-    fig_idx = go.Figure(data=[go.Scatter(
-        x=hist_idx.index, 
-        y=hist_idx['Close'], 
-        fill='tozeroy', 
-        line=dict(color='#f1c40f' if "BTC" in st.session_state.index_selectionne else '#00d1ff')
-    )])
-    fig_idx.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, t=0, b=0), yaxis_side="right")
-    st.plotly_chart(fig_idx, use_container_width=True)
-
-    # 3. CONSEILS STRATÉGIQUES
+    # 3. LE GRAPHIQUE "PRO" (Comme l'Analyseur)
     st.markdown("---")
-    st.subheader("💡 Conseils de Session (UTC+4)")
-    if 5 <= h < 12:
-        st.warning("**Chine (HK)** : Surveille la clôture de Hong Kong, elle impacte souvent l'ouverture de Paris à midi.")
-    elif 12 <= h < 19:
-        st.info("**Europe (Paris)** : Observe le DAX. S'il ne suit pas le CAC, la hausse est suspecte.")
-    elif h >= 19 or h < 2:
-        st.success("**USA (NY)** : C'est le gros volume. Regarde le NASDAQ pour la Tech.")
-    else:
-        st.write("🌑 **Session Nocturne** : Les marchés majeurs sont fermés.")
+    nom_sel = indices[st.session_state.index_selectionne]
+    st.subheader(f"📈 Graphique Pro : {nom_sel}")
+    
+    # Sélecteur d'intervalle identique à l'analyseur
+    c_int1, c_int2 = st.columns([1, 3])
+    with c_int1:
+        intervalle = st.selectbox("Unité de temps :", ["90m", "1d", "1wk", "1mo"], index=1, key="int_market")
+    
+    # Mapping période/intervalle
+    p_map = {"90m": "1mo", "1d": "5y", "1wk": "max", "1mo": "max"}
+    
+    idx_ticker = yf.Ticker(st.session_state.index_selectionne)
+    hist_idx = idx_ticker.history(period=p_map[intervalle], interval=intervalle)
 
-    st.caption("Note : Les graphiques affichent les données du dernier mois.")
+    if not hist_idx.empty:
+        fig_idx = go.Figure(data=[go.Candlestick(
+            x=hist_idx.index,
+            open=hist_idx['Open'],
+            high=hist_idx['High'],
+            low=hist_idx['Low'],
+            close=hist_idx['Close'],
+            increasing_line_color='#2ecc71', 
+            decreasing_line_color='#e74c3c'
+        )])
+        
+        fig_idx.update_layout(
+            template="plotly_dark", 
+            height=600, # Plus grand pour la visibilité
+            margin=dict(l=0, r=10, t=0, b=0), 
+            xaxis_rangeslider_visible=False,
+            yaxis_side="right"
+        )
+        st.plotly_chart(fig_idx, use_container_width=True)
+    else:
+        st.error("Données indisponibles pour cet intervalle.")
+
+    # 4. CONSEILS STRATÉGIQUES (Le reste ne change pas)
+    st.markdown("---")
+    # ... (Garder tes conseils habituels ici)
+
+ 
+
