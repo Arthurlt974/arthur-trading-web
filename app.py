@@ -28,7 +28,7 @@ def afficher_graphique_tradingview(symbol):
     elif ".MI" in tv_symbol:
         tv_symbol = f"MILAN:{tv_symbol.replace('.MI', '')}"
     
-    # Hauteur fixée à 800px pour un rendu professionnel
+    # Hauteur fixée à 2000px pour un rendu professionnel
     html_code = f"""
     <div class="tradingview-widget-container" style="width:100%; height:800px;">
       <div id="tradingview_chart" style="width:100%; height:100%;"></div>
