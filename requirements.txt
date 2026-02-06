@@ -1,6 +1,6 @@
 streamlit
 yfinance
 plotly
+pandas
 requests
 requests-cache
-urllib3
