@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import requests
+import pandas as pd
 
 # Dictionnaire des concurrents par secteur (Tu peux en ajouter d'autres !)
 CONCURRENTS = {
