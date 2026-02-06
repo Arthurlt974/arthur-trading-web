@@ -9,6 +9,16 @@ import time
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
 
+# FORCE LE CSS POUR LES IFRAMES (Composants HTML)
+st.markdown("""
+    <style>
+    iframe {
+        min-height: 800px !important;
+        height: 800px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Dictionnaire des concurrents
 CONCURRENTS = {
     "Consumer Cyclical": ["RMS.PA", "KER.PA", "OR.PA", "CAP.PA"],
@@ -18,7 +28,7 @@ CONCURRENTS = {
     "Technology": ["STMPA.PA", "DSY.PA", "WLN.PA"]
 }
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW (FORCE CARRE / LARGE) ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW (FORMAT CARRÉ / GRAND) ---
 def afficher_graphique_tradingview(symbol):
     tv_symbol = symbol.upper()
     if ".PA" in tv_symbol:
@@ -28,12 +38,11 @@ def afficher_graphique_tradingview(symbol):
     elif ".MI" in tv_symbol:
         tv_symbol = f"MILAN:{tv_symbol.replace('.MI', '')}"
     
-    # ID unique pour forcer le rafraîchissement
     chart_id = f"tv_chart_{int(time.time())}"
     
-    # Force la hauteur à 1000px pour un rendu massif
+    # On force la hauteur à 800px ici aussi
     html_code = f"""
-    <div id="wrapper_{chart_id}" style="width:100%; height:1000px; background-color: #131722; border-radius: 8px; overflow: hidden;">
+    <div style="width:100%; height:800px; background-color: #131722;">
       <div id="{chart_id}" style="width:100%; height:100%;"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
       <script type="text/javascript">
@@ -55,7 +64,7 @@ def afficher_graphique_tradingview(symbol):
       </script>
     </div>
     """
-    components.html(html_code, height=1010, scrolling=False)
+    components.html(html_code, height=800)
 
 def trouver_ticker(nom):
     try:
@@ -100,10 +109,9 @@ if nom_action:
 
         st.markdown("---")
 
-        # --- LE GRAPHIQUE FORCE EN FORMAT LARGE/CARRE ---
+        # --- AFFICHAGE DU GRAPHIQUE ---
         st.subheader("📈 Vue Graphique Étendue")
-        with st.container():
-            afficher_graphique_tradingview(ticker)
+        afficher_graphique_tradingview(ticker)
 
         st.markdown("---")
 
@@ -131,20 +139,13 @@ if nom_action:
             else: score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
 
             if dette_equity is not None:
-                if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
+                if dette_equity < 50: score += 4; positifs.append("✅ Bilan solide [+4]")
                 elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
                 elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
-
-            if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende safe [+4]")
-            elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
-            
-            if marge_pourcent > 30: score += 5; positifs.append("✅ Décote Graham [+5]")
-            if cash_action > (prix * 0.2): score += 2; positifs.append("💰 Bonus : Cash abondant [+2]")
 
             score = min(20, max(0, score))
             st.write(f"## Note : {score}/20")
             st.progress(score / 20)
-            
             for p in positifs: st.write(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.write(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
