@@ -148,7 +148,7 @@ elif outil == "⚔️ Mode Duel":
         st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR (Version Pro Interactive)
+# OUTIL 3 : MARKET MONITOR (Version 100% Miroir de l'Analyseur)
 # ==========================================
 elif outil == "🌍 Market Monitor":
     st.title("🌍 Market Monitor (UTC+4)")
@@ -188,51 +188,78 @@ elif outil == "🌍 Market Monitor":
                 val_prec = data_idx['Close'].iloc[-2]
                 variation = ((val_actuelle - val_prec) / val_prec) * 100
                 
-                # Metric avec bouton en dessous
                 cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
                 if cols[i].button(f"Analyser {nom}", key=f"btn_{tk}", use_container_width=True):
                     st.session_state.index_selectionne = tk
         except:
             cols[i].write(f"{nom} : N/A")
 
-    # 3. LE GRAPHIQUE "PRO" (Comme l'Analyseur)
+    # 3. LE GRAPHIQUE INTERACTIF (Identique à l'Analyseur)
     st.markdown("---")
     nom_sel = indices[st.session_state.index_selectionne]
-    st.subheader(f"📈 Graphique Pro : {nom_sel}")
+    st.subheader(f"📈 Graphique : {nom_sel}")
     
-    # Sélecteur d'intervalle identique à l'analyseur
-    c_int1, c_int2 = st.columns([1, 3])
-    with c_int1:
-        intervalle = st.selectbox("Unité de temps :", ["90m", "1d", "1wk", "1mo"], index=1, key="int_market")
+    # Sélecteur de style comme l'Analyseur
+    mode_graph_mkt = st.radio("Style de graphique :", ["Débutant (Ligne)", "Pro (Bougies)"], horizontal=True, key="mode_mkt")
+
+    col_g_mkt, col_i_mkt = st.columns([3, 1])
     
-    # Mapping période/intervalle
-    p_map = {"90m": "1mo", "1d": "5y", "1wk": "max", "1mo": "max"}
-    
+    # Choix de l'intervalle si mode Pro
+    with col_i_mkt:
+        if mode_graph_mkt == "Pro (Bougies)":
+            intervalle_mkt = st.selectbox("Unité de temps :", ["90m", "1d", "1wk", "1mo"], index=1, key="int_mkt")
+            p_map_mkt = {"90m": "1mo", "1d": "5y", "1wk": "max", "1mo": "max"}
+            periode_mkt = p_map_mkt[intervalle_mkt]
+        else:
+            periode_mkt = "5y"
+            intervalle_mkt = "1d"
+
+    # Récupération des données
     idx_ticker = yf.Ticker(st.session_state.index_selectionne)
-    hist_idx = idx_ticker.history(period=p_map[intervalle], interval=intervalle)
+    hist_idx = idx_ticker.history(period=periode_mkt, interval=intervalle_mkt)
 
     if not hist_idx.empty:
-        fig_idx = go.Figure(data=[go.Candlestick(
-            x=hist_idx.index,
-            open=hist_idx['Open'],
-            high=hist_idx['High'],
-            low=hist_idx['Low'],
-            close=hist_idx['Close'],
-            increasing_line_color='#2ecc71', 
-            decreasing_line_color='#e74c3c'
-        )])
+        if mode_graph_mkt == "Pro (Bougies)":
+            fig_idx = go.Figure(data=[go.Candlestick(
+                x=hist_idx.index,
+                open=hist_idx['Open'],
+                high=hist_idx['High'],
+                low=hist_idx['Low'],
+                close=hist_idx['Close'],
+                increasing_line_color='#2ecc71', 
+                decreasing_line_color='#e74c3c'
+            )])
+        else:
+            fig_idx = go.Figure(data=[go.Scatter(
+                x=hist_idx.index, 
+                y=hist_idx['Close'], 
+                fill='tozeroy', 
+                line=dict(color='#00d1ff')
+            )])
         
         fig_idx.update_layout(
             template="plotly_dark", 
-            height=600, # Plus grand pour la visibilité
+            height=600, 
             margin=dict(l=0, r=10, t=0, b=0), 
             xaxis_rangeslider_visible=False,
             yaxis_side="right"
         )
         st.plotly_chart(fig_idx, use_container_width=True)
     else:
-        st.error("Données indisponibles pour cet intervalle.")
+        st.error("Données indisponibles.")
 
+    # 4. CONSEILS STRATÉGIQUES
+    st.markdown("---")
+    st.subheader("💡 Conseils de Session (UTC+4)")
+    if 12 <= h < 19:
+        st.info("**Europe (Paris)** : Observe le DAX. S'il ne suit pas le CAC, la hausse est suspecte. Le 'Gap' de midi est souvent testé.")
+    elif h >= 19 or h < 2:
+        st.success("**USA (NY)** : Gros volumes. Regarde le NASDAQ pour la Tech. Attention aux retournements après 22h.")
+    else:
+        st.write("🌑 **Session Nocturne** : Marchés calmes, idéal pour l'analyse fondamentale.")
+
+    
+ 
     # 4. CONSEILS STRATÉGIQUES (Le reste ne change pas)
     st.markdown("---")
     # ... (Garder tes conseils habituels ici)
