@@ -22,7 +22,7 @@ outil = st.sidebar.radio("Choisir un outil :",
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO (Inchangé)
+# OUTIL 1 : ANALYSEUR PRO
 # ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
@@ -36,6 +36,7 @@ if outil == "📊 Analyseur Pro":
         devise = info.get('currency', 'EUR')
         secteur = info.get('sector', 'N/A')
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
+        
         per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
         dette_equity = info.get('debtToEquity')
         div_rate = info.get('dividendRate') or info.get('trailingAnnualDividendRate') or 0
@@ -54,12 +55,12 @@ if outil == "📊 Analyseur Pro":
         c4.metric("Secteur", secteur)
 
         st.markdown("---")
-        mode_graph = st.radio("Style de graphique :", ["Débutant (Ligne)", "Pro (Bougies)"], horizontal=True)
+        mode_graph = st.radio("Style :", ["Débutant (Ligne)", "Pro (Bougies)"], horizontal=True)
 
         col_graph, col_data = st.columns([2, 1])
         with col_graph:
             if mode_graph == "Pro (Bougies)":
-                choix_int = st.selectbox("Unité de la bougie :", ["90m", "1d", "1wk", "1mo"], index=1)
+                choix_int = st.selectbox("Unité :", ["90m", "1d", "1wk", "1mo"], index=1)
                 p = {"90m": "1mo", "1d": "5y", "1wk": "max", "1mo": "max"}[choix_int]
                 hist = action.history(period=p, interval=choix_int)
                 fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
@@ -67,54 +68,46 @@ if outil == "📊 Analyseur Pro":
                 hist = action.history(period="5y")
                 fig = go.Figure(data=[go.Scatter(x=hist.index, y=hist['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
             
-            fig.update_layout(template="plotly_dark", height=500, margin=dict(l=0, r=10, t=0, b=0), xaxis_rangeslider_visible=False, yaxis_side="right")
+            fig.update_layout(template="plotly_dark", height=500, xaxis_rangeslider_visible=False, yaxis_side="right")
             st.plotly_chart(fig, use_container_width=True)
 
         with col_data:
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
-            st.write(f"**Dette/Equity :** {dette_equity if ajoute := dette_equity else 'N/A'} %")
+            # Ligne corrigée ici :
+            st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
             st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
             st.write(f"**Payout Ratio :** {payout:.2f} %")
-            st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # Scoring
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
         score = 0
         positifs, negatifs = [], []
 
         if bpa > 0:
-            if per < 12: score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
+            if per < 12: score += 5; positifs.append("✅ P/E attractif [+5]")
             elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
             else: score += 1; positifs.append("🟡 P/E élevé [+1]")
         else: score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
 
         if dette_equity is not None:
-            if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
-            elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+            if dette_equity < 50: score += 4; positifs.append("✅ Bilan solide [+4]")
             elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
 
-        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
-        elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
-        if marge_pourcent > 30: score += 5; positifs.append("✅ Forte décote Graham [+5]")
-        if cash_action > (prix * 0.15): score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
-
+        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende safe [+4]")
+        if marge_pourcent > 30: score += 5; positifs.append("✅ Décote Graham [+5]")
+        
         score_f = min(20, max(0, score))
-        c_s, c_d = st.columns([1, 2])
-        with c_s:
-            st.write(f"## Note : {score_f}/20")
-            st.progress(score_f / 20)
-            if score_f >= 15: st.success("🚀 ACHAT FORT")
-            elif score_f >= 10: st.info("⚖️ À SURVEILLER")
-            else: st.error("⚠️ ÉVITER")
-        with c_d:
+        cs, cd = st.columns([1, 2])
+        cs.write(f"## Note : {score_f}/20")
+        cs.progress(score_f / 20)
+        with cd:
             for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;font-weight:bold;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (Inchangé)
+# OUTIL 2 : MODE DUEL
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
@@ -138,23 +131,21 @@ elif outil == "⚔️ Mode Duel":
         })
         st.table(df)
         m1, m2 = ((d1['valeur']-d1['prix'])/d1['prix']), ((d2['valeur']-d2['prix'])/d2['prix'])
-        gagnant = d1['nom'] if m1 > m2 else d2['nom']
-        st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
+        st.success(f"🏆 Gagnant (Graham) : {d1['nom'] if m1 > m2 else d2['nom']}")
 
 # ==========================================
 # OUTIL 3 : MARKET MONITOR (Correction Heure)
 # ==========================================
 elif outil == "🌍 Market Monitor":
-    # CORRECTION HEURE REUNION (UTC+4)
+    # Forcer l'heure Réunion (UTC+4)
     maintenant = datetime.utcnow() + timedelta(hours=4)
     h = maintenant.hour
     
     st.title("🌍 Market Monitor (UTC+4)")
-    st.subheader(f"🕒 Heure actuelle aux Avirons : {maintenant.strftime('%H:%M:%S')}")
+    st.subheader(f"🕒 Heure actuelle : {maintenant.strftime('%H:%M:%S')}")
 
     # 1. TABLEAU DES HORAIRES
-    st.markdown("### 🕒 Statut des Bourses")
-    data_horaires = {
+    data_h = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
         "Ouverture (REU)": ["05:30", "12:00", "18:30"],
         "Statut": [
@@ -163,51 +154,36 @@ elif outil == "🌍 Market Monitor":
             "🟢 OUVERT" if (h >= 18 or h < 1) else "🔴 FERMÉ"
         ]
     }
-    st.table(pd.DataFrame(data_horaires))
+    st.table(pd.DataFrame(data_h))
 
-    # 2. MOTEURS DU MARCHÉ
-    st.markdown("---")
-    st.subheader("⚡ Moteurs du Marché (Cliquez pour analyser)")
+    # 2. INDICES ET GRAPHIQUE
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
     cols = st.columns(len(indices))
     
-    if 'index_selectionne' not in st.session_state:
-        st.session_state.index_selectionne = "^FCHI"
+    if 'idx_sel' not in st.session_state: st.session_state.idx_sel = "^FCHI"
 
     for i, (tk, nom) in enumerate(indices.items()):
-        try:
-            data_idx = yf.Ticker(tk).history(period="2d")
-            if not data_idx.empty:
-                val_actuelle = data_idx['Close'].iloc[-1]
-                val_prec = data_idx['Close'].iloc[-2]
-                variation = ((val_actuelle - val_prec) / val_prec) * 100
-                cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
-                if cols[i].button(f"Zoom {nom}", key=f"btn_{tk}", use_container_width=True):
-                    st.session_state.index_selectionne = tk
-        except: pass
+        d = yf.Ticker(tk).history(period="2d")
+        if not d.empty:
+            c, o = d['Close'].iloc[-1], d['Open'].iloc[-1]
+            var = ((c - o) / o) * 100
+            cols[i].metric(nom, f"{c:,.2f}", f"{var:+.2f}%")
+            if cols[i].button(f"Zoom {nom}", key=tk): st.session_state.idx_sel = tk
 
-    # 3. LE GRAPHIQUE INTERACTIF
     st.markdown("---")
-    nom_sel = indices[st.session_state.index_selectionne]
-    mode_graph_mkt = st.radio("Style :", ["Ligne", "Bougies"], horizontal=True, key="mode_mkt")
-
-    col_g_mkt, col_i_mkt = st.columns([3, 1])
-    with col_i_mkt:
-        intervalle_mkt = st.selectbox("Unité :", ["90m", "1d", "1wk"], index=1) if mode_graph_mkt == "Bougies" else "1d"
+    mode_mkt = st.radio("Style :", ["Ligne", "Bougies"], horizontal=True, key="m_mkt")
+    hist_mkt = yf.Ticker(st.session_state.idx_sel).history(period="1mo", interval="1d")
     
-    p_map = {"90m": "1mo", "1d": "5y", "1wk": "max"}
-    hist_idx = yf.Ticker(st.session_state.index_selectionne).history(period=p_map.get(intervalle_mkt, "5y"), interval=intervalle_mkt)
-
-    if mode_graph_mkt == "Bougies":
-        fig_idx = go.Figure(data=[go.Candlestick(x=hist_idx.index, open=hist_idx['Open'], high=hist_idx['High'], low=hist_idx['Low'], close=hist_idx['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
+    if mode_mkt == "Bougies":
+        fig_m = go.Figure(data=[go.Candlestick(x=hist_mkt.index, open=hist_mkt['Open'], high=hist_mkt['High'], low=hist_mkt['Low'], close=hist_mkt['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
     else:
-        fig_idx = go.Figure(data=[go.Scatter(x=hist_idx.index, y=hist_idx['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
+        fig_m = go.Figure(data=[go.Scatter(x=hist_mkt.index, y=hist_mkt['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
     
-    fig_idx.update_layout(template="plotly_dark", height=500, xaxis_rangeslider_visible=False, yaxis_side="right")
-    st.plotly_chart(fig_idx, use_container_width=True)
+    fig_m.update_layout(template="plotly_dark", height=450, xaxis_rangeslider_visible=False, yaxis_side="right")
+    st.plotly_chart(fig_m, use_container_width=True)
 
-    # 4. CONSEILS
+    # 3. CONSEILS
     st.markdown("---")
-    if 12 <= h < 19: st.info("💡 **Europe** : Session en cours. Attention à la volatilité à l'ouverture US (18h30).")
-    elif h >= 18 or h < 1: st.success("💡 **USA** : Session majeure. Surveille le NASDAQ.")
-    else: st.warning("🌑 Marchés fermés ou session Asie.")
+    if 12 <= h < 19: st.info("💡 **Europe** : Session en cours. Surveille la volatilité à l'ouverture US.")
+    elif h >= 18 or h < 1: st.success("💡 **USA** : Session majeure. Regarde le NASDAQ pour la Tech.")
+    else: st.warning("🌑 Marchés calmes. Idéal pour l'analyse.")
