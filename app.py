@@ -6,7 +6,7 @@ import requests
 from datetime import datetime
 
 # --- CONFIGURATION GLOBALE ---
-st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
+st.set_page_config(page_title="AM-Trading Hub", layout="wide")
 
 def trouver_ticker(nom):
     try:
