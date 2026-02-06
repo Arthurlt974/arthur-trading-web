@@ -2,19 +2,9 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import requests
-import pandas as pd
-import plotly.express as px
 
-# --- CONFIGURATION ET DICTIONNAIRES ---
+# Configuration large pour tout faire tenir
 st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
-
-CONCURRENTS = {
-    "Consumer Cyclical": ["RMS.PA", "KER.PA", "OR.PA", "CAP.PA"], # Luxe et Conso
-    "Financial Services": ["GLE.PA", "ACA.PA", "CS.PA"],          # Banques
-    "Industrials": ["SAF.PA", "HO.PA", "AIR.PA"],                 # Aéro et Industrie
-    "Energy": ["BP.L", "SHEL.L", "ENI.MI"],                       # Énergie
-    "Technology": ["STMPA.PA", "DSY.PA", "WLN.PA"]                # Tech
-}
 
 def trouver_ticker(nom):
     try:
@@ -24,7 +14,7 @@ def trouver_ticker(nom):
         return response['quotes'][0]['symbol'] if response.get('quotes') else nom
     except: return nom
 
-# --- BARRE LATÉRALE ---
+# Barre latérale
 st.sidebar.title("💎 Arthur Trading")
 nom_action = st.sidebar.text_input("Nom de l'action", value="MC.PA")
 
@@ -34,7 +24,7 @@ if nom_action:
     info = action.info
     
     if info and 'currentPrice' in info:
-        # --- RÉCUPÉRATION DES INFOS ---
+        # --- RÉCUPÉRATION DE TOUTES TES INFOS V4 ---
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
@@ -75,7 +65,7 @@ if nom_action:
                     fill='tozeroy'
                 )])
                 fig.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, t=0, b=0))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
         with col_data:
             st.subheader("📑 Détails Financiers")
@@ -86,38 +76,58 @@ if nom_action:
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash par Action :** {cash_action:.2f} {devise}")
 
-        # --- LIGNE 3 : SCORING ---
+        # --- LIGNE 3 : TON SCORING V4 AVEC MALUS ---
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
         
         score = 0
-        positifs, negatifs = [], []
+        positifs = []
+        negatifs = []
 
+        # Analyse BPA / PE
         if bpa > 0:
-            if per < 12: score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
-            elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
-            else: score += 1; positifs.append("🟡 P/E élevé [+1]")
-        else: score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
+            if per < 12: 
+                score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
+            elif per < 20: 
+                score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
+            else: 
+                score += 1; positifs.append("🟡 P/E élevé [+1]")
+        else: 
+            score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
 
+        # Analyse Dette
         if dette_equity is not None:
-            if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
-            elif ette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
-            elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
+            if dette_equity < 50: 
+                score += 4; positifs.append("✅ Bilan très solide [+4]")
+            elif dette_equity < 100: 
+                score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+            elif dette_equity > 200: 
+                score -= 4; negatifs.append("❌ Surendettement [-4]")
 
-        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
-        elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
+        # Analyse Dividende
+        if 10 < payout <= 80: 
+            score += 4; positifs.append("✅ Dividende solide/safe [+4]")
+        elif payout > 95: 
+            score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
         
-        if marge_pourcent > 100: score += 7; positifs.append("🔥 DÉCOTE EXCEPTIONNELLE [+7]")
-        elif marge_pourcent > 30: score += 5; positifs.append("✅ Forte décote Graham [+5]")
+        # Analyse Marge Graham
+        if marge_pourcent > 100: 
+            score += 7; positifs.append("🔥 DÉCOTE EXCEPTIONNELLE [+7]")
+        elif marge_pourcent > 30: 
+            score += 5; positifs.append("✅ Forte décote Graham [+5]")
             
-        if cash_action > (prix * 0.2): score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
+        # Analyse Cash
+        if cash_action > (prix * 0.2): 
+            score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
 
         score = min(20, max(0, score))
         
+        # Affichage du score
         col_score, col_details = st.columns([1, 2])
         with col_score:
             st.write(f"## Note : {score}/20")
             st.progress(score / 20)
+            
             if score >= 17: st.success("🔥 ACHAT FORT")
             elif score >= 14: st.info("🚀 ACHAT")
             elif score >= 10: st.warning("⚖️ À SURVEILLER")
@@ -125,51 +135,12 @@ if nom_action:
 
         with col_details:
             st.write("**Détails de l'analyse :**")
-            for p in positifs: st.write(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
-            for n in negatifs: st.write(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
-
-        # --- SECTION COMPARATIF SECTEUR ---
-        st.markdown("---")
-        st.subheader(f"🏢 Comparatif du secteur : {secteur}")
-
-        liste_rivaux = CONCURRENTS.get(secteur, [])
-        if liste_rivaux:
-            tous_les_tickers = list(set([ticker] + liste_rivaux))
-            donnees_comp = []
-
-            with st.spinner('Chargement du comparatif...'):
-                for t in tous_les_tickers:
-                    try:
-                        rival_info = yf.Ticker(t).info
-                        r_prix = rival_info.get('currentPrice', 1)
-                        r_bpa = rival_info.get('trailingEps', 0)
-                        
-                        # --- FIX RENDEMENT COHÉRENT ---
-                        r_yield_raw = rival_info.get('dividendYield')
-                        if r_yield_raw is not None:
-                            # Seuil : si > 0.2 (20%), on considère que c'est déjà un %
-                            r_yield = r_yield_raw if r_yield_raw > 0.2 else r_yield_raw * 100
-                        else: r_yield = 0
-                        
-                        donnees_comp.append({
-                            "Action": rival_info.get('shortName', t),
-                            "Ticker": t,
-                            "Prix": f"{r_prix:.2f} {devise}",
-                            "P/E Ratio": round(r_prix / r_bpa, 2) if r_bpa > 0 else 0,
-                            "Rendement": f"{r_yield:.2f} %",
-                            "Dette/Equity": f"{rival_info.get('debtToEquity', 0)} %"
-                        })
-                    except: continue
-
-            df_comp = pd.DataFrame(donnees_comp)
-            st.dataframe(df_comp, use_container_width=True)
-
-            fig_comp = px.bar(df_comp, x='Action', y='P/E Ratio', color='Action', 
-                             title="Comparaison des Valorisations (P/E Ratio)",
-                             template="plotly_dark")
-            st.plotly_chart(fig_comp, use_container_width=True)
-        else:
-            st.info("ℹ️ Pas de concurrents répertoriés pour ce secteur spécifique.")
+            # Affichage des points positifs
+            for p in positifs:
+                st.write(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
+            # Affichage des points négatifs (malus)
+            for n in negatifs:
+                st.write(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
     else:
         st.error("Action non trouvée. Vérifiez le nom ou le ticker.")
