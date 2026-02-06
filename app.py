@@ -1,24 +1,36 @@
 import streamlit as st
 import yfinance as yf
-import plotly.graph_objects as go
 import requests
 import streamlit.components.v1 as components
+import pandas as pd
+import plotly.express as px
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
 
+# Dictionnaire des concurrents par secteur
+CONCURRENTS = {
+    "Consumer Cyclical": ["RMS.PA", "KER.PA", "OR.PA", "CAP.PA"],
+    "Financial Services": ["GLE.PA", "ACA.PA", "CS.PA"],
+    "Industrials": ["SAF.PA", "HO.PA", "AIR.PA"],
+    "Energy": ["BP.L", "SHEL.L", "ENI.MI"],
+    "Technology": ["STMPA.PA", "DSY.PA", "WLN.PA"]
+}
+
 # --- FONCTION GRAPHIQUE TRADINGVIEW ---
 def afficher_graphique_tradingview(symbol):
-    # Adaptation du ticker pour TradingView (ex: MC.PA -> EURONEXT:MC)
-    tv_symbol = symbol.replace(".PA", "").replace(".L", "")
-    if ".PA" in symbol:
-        tv_symbol = f"EURONEXT:{tv_symbol}"
-    elif ".L" in symbol:
-        tv_symbol = f"LSE:{tv_symbol}"
+    # Traduction propre des tickers Yahoo -> TradingView
+    tv_symbol = symbol.upper()
+    if ".PA" in tv_symbol:
+        tv_symbol = f"EURONEXT:{tv_symbol.replace('.PA', '')}"
+    elif ".L" in tv_symbol:
+        tv_symbol = f"LSE:{tv_symbol.replace('.L', '')}"
+    elif ".MI" in tv_symbol:
+        tv_symbol = f"MILAN:{tv_symbol.replace('.MI', '')}"
+    # Si c'est une action US, TradingView n'a pas besoin de préfixe particulier
     
-    # Code HTML pour un graphique qui prend 100% de la largeur
     html_code = f"""
-    <div class="tradingview-widget-container" style="width:100%; height:600px;">
+    <div class="tradingview-widget-container" style="width:100%; height:500px;">
       <div id="tradingview_chart" style="width:100%; height:100%;"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
       <script type="text/javascript">
@@ -40,7 +52,7 @@ def afficher_graphique_tradingview(symbol):
       </script>
     </div>
     """
-    components.html(html_code, height=600, scrolling=False)
+    components.html(html_code, height=500)
 
 def trouver_ticker(nom):
     try:
@@ -89,12 +101,12 @@ if nom_action:
         st.markdown("---")
 
         # --- GRAPHIQUE INTERACTIF LARGE ---
-        st.subheader(f"📈 Graphique Interactif Professionnel")
+        st.subheader("📈 Graphique Interactif Professionnel")
         afficher_graphique_tradingview(ticker)
 
         st.markdown("---")
 
-        # --- DÉTAILS ET SCORING CÔTE À CÔTE ---
+        # --- DÉTAILS ET SCORING ---
         col_data, col_score_ui = st.columns([1, 1])
 
         with col_data:
@@ -139,9 +151,31 @@ if nom_action:
             elif score >= 10: st.warning("⚖️ À SURVEILLER")
             else: st.error("⚠️ ÉVITER")
 
-            st.write("**Détails de l'analyse :**")
             for p in positifs: st.write(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.write(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
+        # --- SECTION COMPARATIF SECTEUR ---
+        st.markdown("---")
+        st.subheader(f"🏢 Comparatif du secteur : {secteur}")
+        liste_rivaux = CONCURRENTS.get(secteur, [])
+        if liste_rivaux:
+            tous_les_tickers = list(set([ticker] + liste_rivaux))
+            donnees_comp = []
+            for t in tous_les_tickers:
+                try:
+                    rival_info = yf.Ticker(t).info
+                    r_prix = rival_info.get('currentPrice', 1)
+                    r_bpa = rival_info.get('trailingEps', 0)
+                    r_yield_raw = rival_info.get('dividendYield')
+                    r_yield = (r_yield_raw if r_yield_raw and r_yield_raw > 0.2 else (r_yield_raw * 100 if r_yield_raw else 0))
+                    donnees_comp.append({
+                        "Action": rival_info.get('shortName', t),
+                        "P/E Ratio": round(r_prix / r_bpa, 2) if r_bpa > 0 else 0,
+                        "Rendement": f"{r_yield:.2f} %",
+                        "Dette/Equity": f"{rival_info.get('debtToEquity', 0)} %"
+                    })
+                except: continue
+            df_comp = pd.DataFrame(donnees_comp)
+            st.table(df_comp)
     else:
         st.error("Action non trouvée. Vérifiez le nom ou le ticker.")
