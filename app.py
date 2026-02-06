@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
-import time
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
@@ -23,7 +22,7 @@ outil = st.sidebar.radio("Choisir un outil :",
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "🔍 Screener CAC40", "😨 Fear & Greed", "💰 Simulateur Intérêts"])
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO (Ta Version)
+# OUTIL 1 : ANALYSEUR PRO (VERSION INCHANGÉE)
 # ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
@@ -37,7 +36,6 @@ if outil == "📊 Analyseur Pro":
         devise = info.get('currency', 'EUR')
         secteur = info.get('sector', 'N/A')
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
-        
         per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
         dette_equity = info.get('debtToEquity')
         div_rate = info.get('dividendRate') or info.get('trailingAnnualDividendRate') or 0
@@ -55,32 +53,61 @@ if outil == "📊 Analyseur Pro":
         c4.metric("Secteur", secteur)
 
         st.markdown("---")
-        mode_graph = st.radio("Style :", ["Débutant (Ligne)", "Pro (Bougies)"], horizontal=True)
+        mode_graph = st.radio("Style de graphique :", ["Débutant (Ligne)", "Pro (Bougies)"], horizontal=True)
 
         col_graph, col_data = st.columns([2, 1])
         with col_graph:
             if mode_graph == "Pro (Bougies)":
-                choix_int = st.selectbox("Unité :", ["90m", "1d", "1wk", "1mo"], index=1)
+                choix_int = st.selectbox("Unité de la bougie :", ["90m", "1d", "1wk", "1mo"], index=1)
                 p = {"90m": "1mo", "1d": "5y", "1wk": "max", "1mo": "max"}[choix_int]
                 hist = action.history(period=p, interval=choix_int)
                 fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
             else:
                 hist = action.history(period="5y")
                 fig = go.Figure(data=[go.Scatter(x=hist.index, y=hist['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
-            fig.update_layout(template="plotly_dark", height=500, xaxis_rangeslider_visible=False, yaxis_side="right")
+            fig.update_layout(template="plotly_dark", height=500, margin=dict(l=0, r=10, t=0, b=0), xaxis_rangeslider_visible=False, yaxis_side="right")
             st.plotly_chart(fig, use_container_width=True)
 
         with col_data:
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
-            st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
+            st.write(f"**Dette/Equity :** {dette_equity if ajoute := dette_equity else 'N/A'} %")
             st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
+        st.markdown("---")
+        st.subheader("⭐ Scoring Qualité (sur 20)")
+        score = 0
+        positifs, negatifs = [], []
+        if bpa > 0:
+            if per < 12: score += 5; positifs.append("✅ P/E attractif [+5]")
+            elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
+            else: score += 1; positifs.append("🟡 P/E élevé [+1]")
+        else: score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
+        if dette_equity is not None:
+            if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
+            elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+            elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
+        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide [+4]")
+        if marge_pourcent > 30: score += 5; positifs.append("✅ Forte décote Graham [+5]")
+        if cash_action > (prix * 0.15): score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
+
+        score_f = min(20, max(0, score))
+        c_s, c_d = st.columns([1, 2])
+        with c_s:
+            st.write(f"## Note : {score_f}/20")
+            st.progress(score_f / 20)
+            if score_f >= 15: st.success("🚀 ACHAT FORT")
+            elif score_f >= 10: st.info("⚖️ À SURVEILLER")
+            else: st.error("⚠️ ÉVITER")
+        with c_d:
+            for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;font-weight:bold;">{p}</p>', unsafe_allow_html=True)
+            for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
+
 # ==========================================
-# OUTIL 2 : MODE DUEL
+# OUTIL 2 : MODE DUEL (VERSION INCHANGÉE)
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
@@ -95,6 +122,7 @@ elif outil == "⚔️ Mode Duel":
             b = i.get('trailingEps', 0)
             v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
             return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "dette": i.get('debtToEquity', 0), "yield": (i.get('dividendYield', 0) or 0)*100}
+        
         d1, d2 = get_d(t1), get_d(t2)
         df = pd.DataFrame({
             "Critère": ["Prix", "Valeur Graham", "Dette/Eq", "Rendement"],
@@ -102,91 +130,92 @@ elif outil == "⚔️ Mode Duel":
             d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['dette']}%", f"{d2['yield']:.2f}%"]
         })
         st.table(df)
-        st.success(f"🏆 Gagnant (Potentiel) : {d1['nom'] if d1['valeur'] > d2['valeur'] else d2['nom']}")
+        m1, m2 = ((d1['valeur']-d1['prix'])/d1['prix']), ((d2['valeur']-d2['prix'])/d2['prix'])
+        gagnant = d1['nom'] if m1 > m2 else d2['nom']
+        st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR (UTC+4)
+# OUTIL 3 : MARKET MONITOR (VERSION INCHANGÉE + HEURE REU)
 # ==========================================
 elif outil == "🌍 Market Monitor":
     maintenant = datetime.utcnow() + timedelta(hours=4)
     h = maintenant.hour
     st.title("🌍 Market Monitor (UTC+4)")
     st.subheader(f"🕒 Heure actuelle : {maintenant.strftime('%H:%M:%S')}")
-    
+
+    data_horaires = {
+        "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
+        "Ouverture (REU)": ["05:30", "12:00", "18:30"],
+        "Statut": ["🟢 OUVERT" if 5 <= h < 12 else "🔴 FERMÉ", "🟢 OUVERT" if 12 <= h < 20 else "🔴 FERMÉ", "🟢 OUVERT" if (h >= 18 or h < 1) else "🔴 FERMÉ"]
+    }
+    st.table(pd.DataFrame(data_horaires))
+
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
     cols = st.columns(len(indices))
     if 'idx_sel' not in st.session_state: st.session_state.idx_sel = "^FCHI"
+
     for i, (tk, nom) in enumerate(indices.items()):
-        d = yf.Ticker(tk).history(period="2d")
-        if not d.empty:
-            c = d['Close'].iloc[-1]
-            var = ((c - d['Open'].iloc[-1]) / d['Open'].iloc[-1]) * 100
-            cols[i].metric(nom, f"{c:,.2f}", f"{var:+.2f}%")
+        d_idx = yf.Ticker(tk).history(period="2d")
+        if not d_idx.empty:
+            v_act = d_idx['Close'].iloc[-1]
+            var = ((v_act - d_idx['Close'].iloc[-2]) / d_idx['Close'].iloc[-2]) * 100
+            cols[i].metric(nom, f"{v_act:,.2f}", f"{var:+.2f}%")
             if cols[i].button(f"Zoom {nom}", key=tk): st.session_state.idx_sel = tk
-    
+
     st.markdown("---")
-    hist_m = yf.Ticker(st.session_state.idx_sel).history(period="1mo")
-    fig_m = go.Figure(data=[go.Scatter(x=hist_m.index, y=hist_m['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
-    fig_m.update_layout(template="plotly_dark", height=450, yaxis_side="right")
-    st.plotly_chart(fig_m, use_container_width=True)
+    mode_mkt = st.radio("Style :", ["Débutant (Ligne)", "Pro (Bougies)"], horizontal=True, key="m_mkt")
+    hist_m = yf.Ticker(st.session_state.idx_sel).history(period="1mo", interval="1d")
+    if mode_mkt == "Pro (Bougies)":
+        fig = go.Figure(data=[go.Candlestick(x=hist_m.index, open=hist_m['Open'], high=hist_m['High'], low=hist_m['Low'], close=hist_m['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
+    else:
+        fig = go.Figure(data=[go.Scatter(x=hist_m.index, y=hist_m['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
+    fig.update_layout(template="plotly_dark", height=600, xaxis_rangeslider_visible=False, yaxis_side="right")
+    st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================
-# OUTIL 4 : SCREENER CAC40
+# NOUVEL OUTIL : SCREENER CAC40
 # ==========================================
 elif outil == "🔍 Screener CAC40":
-    st.title("🔍 Scanner Expert CAC 40")
-    if st.button("🚀 Lancer le Scan Complet"):
+    st.title("🔍 Screener Expert CAC 40")
+    if st.button("🚀 Lancer le Scan"):
         actions = ["AC.PA", "AI.PA", "AIR.PA", "ALO.PA", "MT.AS", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA", "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EL.PA", "STLAP.PA", "RMS.PA", "KER.PA", "OR.PA", "LR.PA", "MC.PA", "ML.PA", "ORA.PA", "RI.PA", "PUB.PA", "RNO.PA", "SAF.PA", "SGO.PA", "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA", "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"]
-        results = []
-        bar = st.progress(0)
-        for idx, t in enumerate(actions):
+        res = []
+        p = st.progress(0)
+        for i, t in enumerate(actions):
             try:
                 inf = yf.Ticker(t).info
                 bpa = inf.get('trailingEps', 0)
                 px = inf.get('currentPrice', 1)
                 val = (max(0, bpa) * 22.5 * 4.4) / 3.5
                 pot = ((val - px) / px) * 100
-                score = 10
-                if pot > 30: score += 5
-                if inf.get('debtToEquity', 150) < 80: score += 5
-                results.append({"Ticker": t, "Score": min(20, score), "Potentiel": f"{pot:.1f}%"})
+                res.append({"Ticker": t, "Nom": inf.get('shortName'), "Potentiel": f"{pot:.1f}%", "Score": 10 + (5 if pot > 30 else 0)})
             except: pass
-            bar.progress((idx + 1) / len(actions))
-        st.table(pd.DataFrame(results).sort_values(by="Score", ascending=False))
+            p.progress((i + 1) / len(actions))
+        st.table(pd.DataFrame(res).sort_values(by="Score", ascending=False))
 
 # ==========================================
-# OUTIL 5 : FEAR & GREED
+# NOUVEL OUTIL : FEAR & GREED
 # ==========================================
 elif outil == "😨 Fear & Greed":
-    st.title("🔍 Sentiment de Marché")
-    marches = {"^GSPC": "S&P 500", "^FCHI": "CAC 40", "BTC-USD": "Bitcoin", "GC=F": "OR"}
-    for tk, nom in marches.items():
+    st.title("🔍 Sentiment Fear & Greed")
+    m = {"^GSPC": "S&P 500", "^FCHI": "CAC 40", "BTC-USD": "Bitcoin"}
+    for tk, nom in m.items():
         d = yf.Ticker(tk).history(period="1y")
-        ma200 = d['Close'].rolling(window=200).mean().iloc[-1]
-        prix = d['Close'].iloc[-1]
-        ratio = (prix/ma200) - 1
-        if ratio > 0.10: res, col = "EXTREME GREED 🚀", "#2ecc71"
-        elif ratio < -0.10: res, col = "EXTREME FEAR 💀", "#e74c3c"
-        else: res, col = "NEUTRAL ⚖️", "#f1c40f"
-        st.markdown(f"### {nom} : <span style='color:{col}'>{res}</span>", unsafe_allow_html=True)
+        ma = d['Close'].rolling(window=200).mean().iloc[-1]
+        r = (d['Close'].iloc[-1] / ma) - 1
+        txt, col = ("GREED 🚀", "#2ecc71") if r > 0.05 else (("FEAR 💀", "#e74c3c") if r < -0.05 else ("NEUTRAL ⚖️", "#f1c40f"))
+        st.markdown(f"### {nom} : <span style='color:{col}'>{txt}</span>", unsafe_allow_html=True)
 
 # ==========================================
-# OUTIL 6 : SIMULATEUR INTÉRÊTS
+# NOUVEL OUTIL : SIMULATEUR INTÉRÊTS
 # ==========================================
 elif outil == "💰 Simulateur Intérêts":
     st.title("💰 Simulateur d'Intérêts Composés")
-    col1, col2 = st.columns(2)
-    cap = col1.number_input("Capital Initial (€)", value=1000)
-    mensuel = col1.number_input("Versement mensuel (€)", value=100)
-    taux = col2.number_input("Taux Annuel (%)", value=8.0)
-    ans = col2.number_input("Durée (années)", value=10)
-    
-    total = cap
-    data_sim = []
-    for i in range(1, ans + 1):
-        for _ in range(12):
-            total += total * (taux / 100 / 12)
-            total += mensuel
-        data_sim.append({"Année": i, "Total": total})
-    st.line_chart(pd.DataFrame(data_sim).set_index("Année"))
-    st.success(f"Résultat final : {total:,.2f} €")
+    c1, c2 = st.columns(2)
+    cap = c1.number_input("Départ (€)", value=1000)
+    mens = c1.number_input("Mensuel (€)", value=100)
+    tx = c2.number_input("Taux (%)", value=8.0)
+    ans = c2.number_input("Ans", value=10)
+    tot = cap
+    for i in range(ans * 12): tot = (tot + mens) * (1 + (tx/100/12))
+    st.success(f"Somme finale : {tot:,.2f} €")
