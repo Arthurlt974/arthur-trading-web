@@ -3,12 +3,11 @@ import yfinance as yf
 import plotly.graph_objects as go
 import pandas as pd
 import requests
+import feedparser # <--- Nouvel import indispensable
 from datetime import datetime, timedelta
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
-
-# On a supprimé toute la partie "session" et "requests-cache" qui causait l'erreur
 
 def trouver_ticker(nom):
     try:
@@ -29,8 +28,6 @@ outil = st.sidebar.radio("Choisir un outil :",
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
     ticker = trouver_ticker(nom_entree)
-    
-    # On appelle Ticker normalement sans session
     action = yf.Ticker(ticker)
     info = action.info
 
@@ -120,26 +117,21 @@ if outil == "📊 Analyseur Pro":
             for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;font-weight:bold;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
-  # ==========================================
-        # SECTION : ACTUALITÉS (Alternative Google News)
         # ==========================================
-        import feedparser # Importation indispensable
-        
+        # SECTION : ACTUALITÉS (Ton ajout Google News)
+        # ==========================================
         st.markdown("---")
         col_n, col_m = st.columns([2, 1])
         
         with col_n:
             st.subheader(f"📰 Actualités : {nom}")
-            # On crée une recherche Google News basée sur le nom de l'entreprise
             search_term = nom.replace(" ", "+")
             url_rss = f"https://news.google.com/rss/search?q={search_term}+stock+bourse&hl=fr&gl=FR&ceid=FR:fr"
             
             try:
-                # Lecture du flux Google
                 flux = feedparser.parse(url_rss)
                 if flux.entries:
                     for entry in flux.entries[:5]:
-                        # On nettoie le titre (Google ajoute souvent la source à la fin)
                         clean_title = entry.title.split(" - ")[0]
                         with st.expander(f"📌 {clean_title}"):
                             st.write(f"**Source :** {entry.source.get('title', 'Presse Finance')}")
@@ -152,7 +144,6 @@ if outil == "📊 Analyseur Pro":
 
         with col_m:
             st.subheader("🌍 Flash Marché")
-            # Flux général pour le marché boursier
             url_mkt = "https://news.google.com/rss/search?q=bourse+mondiale+indices&hl=fr&gl=FR&ceid=FR:fr"
             try:
                 flux_mkt = feedparser.parse(url_mkt)
@@ -193,7 +184,7 @@ elif outil == "⚔️ Mode Duel":
             gagnant = d1['nom'] if m1 > m2 else d2['nom']
             st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
         except:
-            st.error("Impossible de récupérer les données.")
+            st.error("Erreur de données.")
 
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
