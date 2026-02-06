@@ -17,9 +17,9 @@ CONCURRENTS = {
     "Technology": ["STMPA.PA", "DSY.PA", "WLN.PA"]
 }
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW (VERSION GÉANTE) ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW ---
 def afficher_graphique_tradingview(symbol):
-    # Traduction des tickers Yahoo -> TradingView
+    # Traduction propre des tickers Yahoo -> TradingView
     tv_symbol = symbol.upper()
     if ".PA" in tv_symbol:
         tv_symbol = f"EURONEXT:{tv_symbol.replace('.PA', '')}"
@@ -28,7 +28,7 @@ def afficher_graphique_tradingview(symbol):
     elif ".MI" in tv_symbol:
         tv_symbol = f"MILAN:{tv_symbol.replace('.MI', '')}"
     
-    # Hauteur fixée à 2000px pour un rendu professionnel
+    # Code HTML avec hauteur forcée à 800px
     html_code = f"""
     <div class="tradingview-widget-container" style="width:100%; height:800px;">
       <div id="tradingview_chart" style="width:100%; height:100%;"></div>
@@ -52,7 +52,7 @@ def afficher_graphique_tradingview(symbol):
       </script>
     </div>
     """
-    components.html(html_code, height=800)
+    components.html(html_code, height=800, scrolling=False)
 
 def trouver_ticker(nom):
     try:
@@ -100,9 +100,10 @@ if nom_action:
 
         st.markdown("---")
 
-        # --- GRAPHIQUE INTERACTIF (TOUTE LA LARGEUR) ---
+        # --- GRAPHIQUE INTERACTIF (FORCE TOUTE LA LARGEUR VIA CONTAINER) ---
         st.subheader("📈 Graphique Interactif Professionnel")
-        afficher_graphique_tradingview(ticker)
+        with st.container():
+            afficher_graphique_tradingview(ticker)
 
         st.markdown("---")
 
@@ -132,7 +133,7 @@ if nom_action:
             if dette_equity is not None:
                 if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
                 elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
-                elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
+                elif借ette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
 
             if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
             elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
@@ -169,7 +170,6 @@ if nom_action:
                         r_prix = rival_info.get('currentPrice', 1)
                         r_bpa = rival_info.get('trailingEps', 0)
                         
-                        # Fix Rendement
                         r_yield_raw = rival_info.get('dividendYield')
                         if r_yield_raw is not None:
                             r_yield = r_yield_raw if r_yield_raw > 0.2 else r_yield_raw * 100
