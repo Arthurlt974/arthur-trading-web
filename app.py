@@ -9,20 +9,21 @@ from datetime import datetime, timedelta
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
 
-# --- FONCTIONS DE MISE EN CACHE (Anti-Blocage) ---
-@st.cache_data(ttl=3600)  # Garde les infos en mémoire pendant 1 heure
+# --- FONCTIONS DE MISE EN CACHE (Anti-Blocage & Performance) ---
+@st.cache_data(ttl=3600)  # Garde les infos fondamentales en mémoire pendant 1 heure
 def get_ticker_info(ticker):
     try:
         data = yf.Ticker(ticker)
         return data.info
-    except Exception as e:
+    except:
         return None
 
-@st.cache_data(ttl=600)   # Garde l'historique pendant 10 minutes
+@st.cache_data(ttl=600)   # Garde l'historique des prix pendant 10 minutes
 def get_ticker_history(ticker, period="5y", interval="1d"):
     try:
         data = yf.Ticker(ticker)
-        return data.history(period=period, interval=interval)
+        hist = data.history(period=period, interval=interval)
+        return hist
     except:
         return pd.DataFrame()
 
@@ -32,7 +33,8 @@ def trouver_ticker(nom):
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers).json()
         return response['quotes'][0]['symbol'] if response.get('quotes') else nom
-    except: return nom
+    except: 
+        return nom
 
 # --- NAVIGATION ---
 st.sidebar.title("🚀 Arthur Trading Hub")
@@ -46,7 +48,7 @@ if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
     ticker = trouver_ticker(nom_entree)
     
-    # ON UTILISE LA FONCTION CACHÉE ICI
+    # Utilisation du cache
     info = get_ticker_info(ticker)
 
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
@@ -83,8 +85,8 @@ if outil == "📊 Analyseur Pro":
         with col_graph:
             if mode_graph == "Pro (Bougies)":
                 choix_int = st.selectbox("Unité de la bougie :", ["90m", "1d", "1wk", "1mo"], index=1)
-                p = {"90m": "1mo", "1d": "5y", "1wk": "max", "1mo": "max"}[choix_int]
-                hist = get_ticker_history(ticker, period=p, interval=choix_int)
+                p_map = {"90m": "1mo", "1d": "5y", "1wk": "max", "1mo": "max"}
+                hist = get_ticker_history(ticker, period=p_map[choix_int], interval=choix_int)
                 if not hist.empty:
                     fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
             else:
@@ -105,7 +107,73 @@ if outil == "📊 Analyseur Pro":
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # ... (Le reste du code pour le Score et les News reste identique)
+        st.markdown("---")
+        st.subheader("⭐ Scoring Qualité (sur 20)")
+        score = 0
+        positifs, negatifs = [], []
+
+        if bpa > 0:
+            if per < 12: score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
+            elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
+            else: score += 1; positifs.append("🟡 P/E élevé [+1]")
+        else: score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
+
+        if dette_equity is not None:
+            if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
+            elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+            elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
+
+        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
+        elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
+        if marge_pourcent > 30: score += 5; positifs.append("✅ Forte décote Graham [+5]")
+        if cash_action > (prix * 0.15): score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
+
+        score_f = min(20, max(0, score))
+        c_s, c_d = st.columns([1, 2])
+        with c_s:
+            st.write(f"## Note : {score_f}/20")
+            st.progress(score_f / 20)
+            if score_f >= 15: st.success("🚀 ACHAT FORT")
+            elif score_f >= 10: st.info("⚖️ À SURVEILLER")
+            else: st.error("⚠️ ÉVITER")
+        with c_d:
+            for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;font-weight:bold;">{p}</p>', unsafe_allow_html=True)
+            for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
+
+        # SECTION : ACTUALITÉS Google News
+        st.markdown("---")
+        col_n, col_m = st.columns([2, 1])
+        
+        with col_n:
+            st.subheader(f"📰 Actualités : {nom}")
+            search_term = nom.replace(" ", "+")
+            url_rss = f"https://news.google.com/rss/search?q={search_term}+stock+bourse&hl=fr&gl=FR&ceid=FR:fr"
+            try:
+                flux = feedparser.parse(url_rss)
+                if flux.entries:
+                    for entry in flux.entries[:5]:
+                        clean_title = entry.title.split(" - ")[0]
+                        with st.expander(f"📌 {clean_title}"):
+                            st.write(f"**Source :** {entry.source.get('title', 'Presse Finance')}")
+                            st.caption(f"Publié le : {entry.published}")
+                            st.link_button("Lire l'article", entry.link)
+                else:
+                    st.info("Aucune actualité trouvée.")
+            except:
+                st.error("Erreur de flux d'actualités.")
+
+        with col_m:
+            st.subheader("🌍 Flash Marché")
+            url_mkt = "https://news.google.com/rss/search?q=bourse+mondiale+indices&hl=fr&gl=FR&ceid=FR:fr"
+            try:
+                flux_mkt = feedparser.parse(url_mkt)
+                for m_art in flux_mkt.entries[:4]:
+                    m_title = m_art.title.split(" - ")[0]
+                    st.markdown(f"🔹 **{m_art.source.get('title')}**")
+                    st.markdown(f"[{m_title}]({m_art.link})")
+                    st.write("---")
+            except:
+                st.write("Flux indisponible.")
 
 # ==========================================
 # OUTIL 2 : MODE DUEL
@@ -118,9 +186,10 @@ elif outil == "⚔️ Mode Duel":
     
     if st.button("Lancer le Duel"):
         def get_d(t):
-            i = yf.Ticker(trouver_ticker(t)).info
-            p = i.get('currentPrice', 1)
-            b = i.get('trailingEps', 0)
+            ticker_id = trouver_ticker(t)
+            i = get_ticker_info(ticker_id) # Utilisation du cache
+            p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
+            b = i.get('trailingEps') or i.get('forwardEps') or 0
             v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
             return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "dette": i.get('debtToEquity', 0), "yield": (i.get('dividendYield', 0) or 0)*100}
         
@@ -132,11 +201,12 @@ elif outil == "⚔️ Mode Duel":
                 d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['dette']}%", f"{d2['yield']:.2f}%"]
             })
             st.table(df)
-            m1, m2 = ((d1['valeur']-d1['prix'])/d1['prix']), ((d2['valeur']-d2['prix'])/d2['prix'])
+            m1 = (d1['valeur']-d1['prix'])/d1['prix']
+            m2 = (d2['valeur']-d2['prix'])/d2['prix']
             gagnant = d1['nom'] if m1 > m2 else d2['nom']
             st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
         except:
-            st.error("Erreur de données.")
+            st.error("Données indisponibles pour le duel.")
 
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
@@ -144,7 +214,6 @@ elif outil == "⚔️ Mode Duel":
 elif outil == "🌍 Market Monitor":
     maintenant = datetime.utcnow() + timedelta(hours=4)
     h = maintenant.hour
-    
     st.title("🌍 Market Monitor (UTC+4)")
     st.subheader(f"🕒 Heure actuelle : {maintenant.strftime('%H:%M:%S')}")
 
@@ -170,10 +239,10 @@ elif outil == "🌍 Market Monitor":
 
     for i, (tk, nom) in enumerate(indices.items()):
         try:
-            data_idx = yf.Ticker(tk).history(period="2d")
-            if not data_idx.empty:
-                val_actuelle = data_idx['Close'].iloc[-1]
-                val_prec = data_idx['Close'].iloc[-2]
+            hist_idx = get_ticker_history(tk, period="2d") # Utilisation du cache
+            if not hist_idx.empty:
+                val_actuelle = hist_idx['Close'].iloc[-1]
+                val_prec = hist_idx['Close'].iloc[-2]
                 variation = ((val_actuelle - val_prec) / val_prec) * 100
                 cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
                 if cols[i].button(f"Analyser {nom}", key=f"btn_{tk}", use_container_width=True):
@@ -196,13 +265,13 @@ elif outil == "🌍 Market Monitor":
             periode_mkt = "5y"
             intervalle_mkt = "1d"
 
-    hist_idx = yf.Ticker(st.session_state.index_selectionne).history(period=periode_mkt, interval=intervalle_mkt)
+    hist_idx_full = get_ticker_history(st.session_state.index_selectionne, period=periode_mkt, interval=intervalle_mkt)
 
-    if not hist_idx.empty:
+    if not hist_idx_full.empty:
         if mode_graph_mkt == "Pro (Bougies)":
-            fig_idx = go.Figure(data=[go.Candlestick(x=hist_idx.index, open=hist_idx['Open'], high=hist_idx['High'], low=hist_idx['Low'], close=hist_idx['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
+            fig_idx = go.Figure(data=[go.Candlestick(x=hist_idx_full.index, open=hist_idx_full['Open'], high=hist_idx_full['High'], low=hist_idx_full['Low'], close=hist_idx_full['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
         else:
-            fig_idx = go.Figure(data=[go.Scatter(x=hist_idx.index, y=hist_idx['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
+            fig_idx = go.Figure(data=[go.Scatter(x=hist_idx_full.index, y=hist_idx_full['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
         
         fig_idx.update_layout(template="plotly_dark", height=600, margin=dict(l=0, r=10, t=0, b=0), xaxis_rangeslider_visible=False, yaxis_side="right")
         st.plotly_chart(fig_idx, use_container_width=True)
