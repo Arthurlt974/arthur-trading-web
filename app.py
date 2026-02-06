@@ -23,7 +23,7 @@ outil = st.sidebar.radio("Choisir un outil :",
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "🔍 Screener CAC40"])
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO
+# OUTIL 1 : ANALYSEUR PRO (Ta Version Finale)
 # ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
@@ -79,7 +79,8 @@ if outil == "📊 Analyseur Pro":
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
-            st.write(f"**Dette/Equity :** {dette_equity if ajoute dette_equity else 'N/A'} %")
+            # LIGNE CORRIGÉE : suppression du := pour éviter le SyntaxError
+            st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
             st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
@@ -118,7 +119,7 @@ if outil == "📊 Analyseur Pro":
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
 # ==========================================
-# OUTIL 2 : MODE DUEL
+# OUTIL 2 : MODE DUEL (Ta Version Finale)
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
@@ -146,7 +147,7 @@ elif outil == "⚔️ Mode Duel":
         st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR
+# OUTIL 3 : MARKET MONITOR (Ta Version Finale)
 # ==========================================
 elif outil == "🌍 Market Monitor":
     maintenant = datetime.utcnow() + timedelta(hours=4)
@@ -192,28 +193,27 @@ elif outil == "🌍 Market Monitor":
     st.plotly_chart(fig_idx, use_container_width=True)
 
 # ==========================================
-# OUTIL 4 : SCREENER CAC 40 (NOUVEAU)
+# AJOUT 1 : SCREENER CAC 40 (Ton Nouveau Script)
 # ==========================================
 elif outil == "🔍 Screener CAC40":
     st.title("🔍 Scanner Expert du CAC 40")
-    st.write("Analyse automatique des 40 actions pour trouver les meilleures opportunités selon Graham.")
+    st.write("Analyse automatique des 40 actions pour trouver les meilleures opportunités.")
     
-    if st.button("🚀 Lancer le Scan du Marché"):
+    if st.button("🚀 Lancer le Scan Complet"):
         mes_actions = ["AC.PA", "AI.PA", "AIR.PA", "ALO.PA", "MT.AS", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA", "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EL.PA", "STLAP.PA", "RMS.PA", "KER.PA", "OR.PA", "LR.PA", "MC.PA", "ML.PA", "ORA.PA", "RI.PA", "PUB.PA", "RNO.PA", "SAF.PA", "SGO.PA", "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA", "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"]
         
         resultats = []
-        barre_progression = st.progress(0)
+        barre = st.progress(0)
         
         for idx, t in enumerate(mes_actions):
             try:
                 inf = yf.Ticker(t).info
-                # Calcul rapide basé sur ta méthode Graham
                 px = inf.get('currentPrice') or inf.get('regularMarketPrice') or 1
                 bpa = inf.get('trailingEps') or inf.get('forwardEps') or 0
-                val_g = (max(0, bpa) * 22.5 * 4.4) / 3.5
+                val_g = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
                 marge = ((val_g - px) / px) * 100
                 
-                # Scoring simplifié pour le tableau
+                # On utilise la logique de ton script Screener
                 score = 10
                 if marge > 30: score += 5
                 if inf.get('debtToEquity', 150) < 80: score += 5
@@ -226,8 +226,8 @@ elif outil == "🔍 Screener CAC40":
                     "Score": score
                 })
             except: pass
-            barre_progression.progress((idx + 1) / len(mes_actions))
+            barre.progress((idx + 1) / len(mes_actions))
         
         df_res = pd.DataFrame(resultats).sort_values(by="Score", ascending=False)
-        st.dataframe(df_res, use_container_width=True)
-        st.success("Analyse terminée ! Les actions sont triées par Score Qualité.")
+        st.table(df_res)
+        st.success("Analyse terminée !")
