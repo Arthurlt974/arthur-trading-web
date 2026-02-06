@@ -5,7 +5,7 @@ import pandas as pd
 import requests
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Arthur Trading Pro V5", layout="wide")
+st.set_page_config(page_title="Arthur Trading Pro V5.1", layout="wide")
 
 def trouver_ticker(nom):
     try:
@@ -24,28 +24,28 @@ if nom_entree:
     action = yf.Ticker(ticker)
     info = action.info
     
-    if info and 'currentPrice' in info or 'regularMarketPrice' in info:
-        # --- RÉCUPÉRATION ROBUSTE DES DONNÉES ---
+    if info and ('currentPrice' in info or 'regularMarketPrice' in info):
+        # --- RÉCUPÉRATION ROBUSTE ---
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
         devise = info.get('currency', 'EUR')
         secteur = info.get('sector', 'N/A')
         
-        # BPA : on cherche partout pour éviter le "Faux Négatif"
-        bpa = info.get('trailingEps') or info.get('forwardEps') or info.get('defaultKeyStatistics', {}).get('trailingEps', 0)
+        # BPA (EPS)
+        bpa = info.get('trailingEps') or info.get('forwardEps') or 0
         
-        # PER : calcul manuel si Yahoo fait défaut
+        # PER
         per = info.get('trailingPE')
-        if not per and bpa and bpa > 0:
+        if not per and bpa > 0:
             per = prix / bpa
         per = per or 0
 
-        dette_equity = info.get('debtToEquity') # Souvent en % (ex: 50 pour 50%)
+        dette_equity = info.get('debtToEquity')
         div_rate = info.get('dividendRate') or info.get('trailingAnnualDividendRate') or 0
         payout = (info.get('payoutRatio') or 0) * 100
         cash_action = info.get('totalCashPerShare') or 0
 
-        # Calcul Graham (Conservateur)
+        # Calcul Graham
         val_theorique = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
         marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 else 0
 
@@ -84,12 +84,12 @@ if nom_entree:
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
-            st.write(f"**Dette/Equity :** {dette_equity if ajoute := dette_equity else 'N/A'} %")
+            st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
             st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # --- LIGNE 3 : SCORING COHÉRENT SUR 20 ---
+        # --- LIGNE 3 : SCORING ---
         st.markdown("---")
         col_score_final, col_bareme = st.columns([1, 1])
 
@@ -98,43 +98,22 @@ if nom_entree:
             score = 0
             details = []
 
-            # 1. Analyse BPA & PER (Max 5 pts)
             if bpa > 0:
-                if 0 < per < 12: 
-                    score += 5; details.append("✅ P/E Excellent (<12) [+5]")
-                elif 12 <= per < 20: 
-                    score += 4; details.append("✅ P/E Raisonnable (12-20) [+4]")
-                else: 
-                    score += 1; details.append("🟡 P/E Élevé (>20) [+1]")
+                if per < 12: score += 5; details.append("✅ P/E Excellent (<12) [+5]")
+                elif per < 20: score += 4; details.append("✅ P/E Raisonnable (12-20) [+4]")
+                else: score += 1; details.append("🟡 P/E Élevé (>20) [+1]")
             else:
                 score -= 5; details.append("🚨 BPA Négatif (Pertes) [-5]")
 
-            # 2. Analyse Dette (Max 4 pts)
             if dette_equity is not None:
-                if dette_equity < 50: 
-                    score += 4; details.append("✅ Bilan très sain (<50%) [+4]")
-                elif dette_equity < 100: 
-                    score += 3; details.append("✅ Dette sous contrôle (<100%) [+3]")
-                elif dette_equity > 200: 
-                    score -= 4; details.append("❌ Surendettement (>200%) [-4]")
+                if dette_equity < 50: score += 4; details.append("✅ Bilan très sain (<50%) [+4]")
+                elif dette_equity < 100: score += 3; details.append("✅ Dette sous contrôle (<100%) [+3]")
+                elif dette_equity > 200: score -= 4; details.append("❌ Surendettement (>200%) [-4]")
 
-            # 3. Dividende (Max 4 pts)
-            if 10 < payout <= 80: 
-                score += 4; details.append("✅ Dividende soutenable [+4]")
-            elif payout > 95:
-                score -= 4; details.append("🚨 Dividende à risque [-4]")
+            if 10 < payout <= 80: score += 4; details.append("✅ Dividende soutenable [+4]")
+            if marge_pourcent > 30: score += 5; details.append("✅ Forte décote Graham (>30%) [+5]")
+            if cash_action > (prix * 0.15): score += 2; details.append("💰 Trésorerie abondante [+2]")
 
-            # 4. Décote Graham (Max 5 pts)
-            if marge_pourcent > 30: 
-                score += 5; details.append("✅ Forte décote Graham (>30%) [+5]")
-            elif marge_pourcent > 0:
-                score += 2; details.append("🟡 Légère décote [+2]")
-
-            # 5. Cash (Max 2 pts)
-            if cash_action > (prix * 0.15): 
-                score += 2; details.append("💰 Trésorerie abondante [+2]")
-
-            # On bloque le score entre 0 et 20
             score_final = min(20, max(0, score))
             st.write(f"## Note Finale : {score_final}/20")
             st.progress(score_final / 20)
@@ -147,11 +126,11 @@ if nom_entree:
             st.subheader("📋 Barème de Calcul")
             data_bareme = {
                 "Critère": ["P/E < 12", "P/E 12-20", "Dette < 50%", "Dette < 100%", "Payout 10-80%", "Décote Graham > 30%", "Cash abondant", "BPA Négatif", "Surendettement"],
-                "Points Max": ["+5", "+4", "+4", "+3", "+4", "+5", "+2", "-5", "-4"]
+                "Points": ["+5", "+4", "+4", "+3", "+4", "+5", "+2", "-5", "-4"]
             }
             st.table(pd.DataFrame(data_bareme))
 
     else:
-        st.error("Données indisponibles. Vérifiez le ticker (ex: MC.PA, AAPL).")
+        st.error("Données indisponibles pour ce ticker.")
 
-st.info("Note : Ce score est une aide à l'analyse basée sur des critères fondamentaux. Il ne constitue pas un conseil financier.")
+st.info("Note : Ce score est automatisé. Faites toujours vos propres recherches.")
