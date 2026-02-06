@@ -3,6 +3,15 @@ import yfinance as yf
 import plotly.graph_objects as go
 import requests
 
+# Dictionnaire des concurrents par secteur (Tu peux en ajouter d'autres !)
+CONCURRENTS = {
+    "Consumer Cyclical": ["RMS.PA", "KER.PA", "OR.PA", "CAP.PA"], # Luxe et Conso
+    "Financial Services": ["GLE.PA", "ACA.PA", "CS.PA"],          # Banques
+    "Industrials": ["SAF.PA", "HO.PA", "AIR.PA"],                 # Aéro et Industrie
+    "Energy": ["BP.L", "SHEL.L", "ENI.MI"],                       # Énergie
+    "Technology": ["STMPA.PA", "DSY.PA", "WLN.PA"]                # Tech
+}
+
 # Configuration large pour tout faire tenir
 st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
 
@@ -144,3 +153,47 @@ if nom_action:
 
     else:
         st.error("Action non trouvée. Vérifiez le nom ou le ticker.")
+
+# --- SECTION COMPARATIF SECTEUR ---
+st.markdown("---")
+st.subheader(f"🏢 Comparatif du secteur : {secteur}")
+
+# On récupère la liste des concurrents selon le secteur de l'action actuelle
+liste_rivaux = CONCURRENTS.get(secteur, [])
+
+if liste_rivaux:
+    # On crée une liste incluant l'action actuelle et ses rivaux
+    tous_les_tickers = list(set([ticker] + liste_rivaux))
+    donnees_comp = []
+
+    with st.spinner('Chargement du comparatif...'):
+        for t in tous_les_tickers:
+            try:
+                rival = yf.Ticker(t)
+                r_info = rival.info
+                r_prix = r_info.get('currentPrice', 1)
+                r_bpa = r_info.get('trailingEps', 0)
+                
+                donnees_comp.append({
+                    "Action": r_info.get('shortName', t),
+                    "Ticker": t,
+                    "Prix": f"{r_prix:.2f} {devise}",
+                    "P/E Ratio": round(r_prix / r_bpa, 2) if r_bpa > 0 else "N/A",
+                    "Rendement": f"{(r_info.get('dividendYield', 0) or 0)*100:.2f} %",
+                    "Dette/Equity": f"{r_info.get('debtToEquity', 0)} %"
+                })
+            except:
+                continue
+
+    # Affichage sous forme de tableau propre
+    df_comp = pd.DataFrame(donnees_comp)
+    st.dataframe(df_comp, use_container_width=True)
+
+    # Petit graphique visuel pour comparer les P/E Ratios
+    import plotly.express as px
+    fig_comp = px.bar(df_comp, x='Action', y='P/E Ratio', color='Action', 
+                     title="Comparaison des Valorisations (P/E Ratio)",
+                     template="plotly_dark")
+    st.plotly_chart(fig_comp, use_container_width=True)
+else:
+    st.info("ℹ️ Pas de concurrents répertoriés pour ce secteur spécifique.")
