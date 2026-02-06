@@ -22,7 +22,7 @@ outil = st.sidebar.radio("Choisir un outil :",
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO (Version Finale Conclue)
+# OUTIL 1 : ANALYSEUR PRO (Inchangé)
 # ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
@@ -31,19 +31,13 @@ if outil == "📊 Analyseur Pro":
     info = action.info
 
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
-        # Récupération Robuste
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
         devise = info.get('currency', 'EUR')
         secteur = info.get('sector', 'N/A')
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
-        
-        per = info.get('trailingPE')
-        if not per and bpa > 0: per = prix / bpa
-        per = per or 0
-
+        per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
         dette_equity = info.get('debtToEquity')
-        div_rate = info.get('dividendRate') or info.get('trailingAnnualDividendRate') or 0
         payout = (info.get('payoutRatio') or 0) * 100
         cash_action = info.get('totalCashPerShare') or 0
 
@@ -52,7 +46,6 @@ if outil == "📊 Analyseur Pro":
 
         st.title(f"📊 {nom} ({ticker})")
 
-        # Metrics
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Prix Actuel", f"{prix:.2f} {devise}")
         c2.metric("Valeur Graham", f"{val_theorique:.2f} {devise}")
@@ -85,7 +78,6 @@ if outil == "📊 Analyseur Pro":
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # Scoring
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
         score = 0
@@ -120,7 +112,7 @@ if outil == "📊 Analyseur Pro":
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (Fusion de Duel V2.py)
+# OUTIL 2 : MODE DUEL (Inchangé)
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
@@ -148,7 +140,7 @@ elif outil == "⚔️ Mode Duel":
         st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR (Version Session.py Complète)
+# OUTIL 3 : MARKET MONITOR (Version Interactive)
 # ==========================================
 elif outil == "🌍 Market Monitor":
     st.title("🌍 Market Monitor (UTC+4)")
@@ -157,12 +149,11 @@ elif outil == "🌍 Market Monitor":
     
     st.write(f"🕒 **Heure Réunion :** {maintenant.strftime('%H:%M:%S')}")
 
-    # 1. TABLEAU DES HORAIRES (Inspiré de Session.py)
+    # 1. TABLEAU DES HORAIRES
     st.markdown("### 🕒 Statut des Bourses")
     data_horaires = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
         "Ouverture (REU)": ["05:30", "12:00", "18:30"],
-        "Fermeture (REU)": ["12:00", "20:30", "01:00"],
         "Statut": [
             "🟢 OUVERT" if 5 <= h < 12 else "🔴 FERMÉ",
             "🟢 OUVERT" if 12 <= h < 20 else "🔴 FERMÉ",
@@ -171,35 +162,60 @@ elif outil == "🌍 Market Monitor":
     }
     st.table(pd.DataFrame(data_horaires))
 
-    # 2. INDICES MAJEURS AVEC VARIATION
+    # 2. MOTEURS DU MARCHÉ AVEC GRAPHIQUES CLICQUABLES
     st.markdown("---")
-    st.subheader("⚡ Moteurs du Marché")
+    st.subheader("⚡ Moteurs du Marché (Cliquez pour afficher le graphique)")
+    
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
+    
+    # On crée les colonnes pour les métriques
     cols = st.columns(len(indices))
     
+    # On utilise le session_state de Streamlit pour mémoriser quel graphique afficher
+    if 'index_selectionne' not in st.session_state:
+        st.session_state.index_selectionne = "^FCHI" # Par défaut CAC 40
+
     for i, (tk, nom) in enumerate(indices.items()):
         try:
-            # Récupération sur 2 jours pour avoir la variation
             data_idx = yf.Ticker(tk).history(period="2d")
             if not data_idx.empty:
                 val_actuelle = data_idx['Close'].iloc[-1]
                 val_prec = data_idx['Close'].iloc[-2]
                 variation = ((val_actuelle - val_prec) / val_prec) * 100
+                
+                # Affichage de la métrique
                 cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
+                
+                # Bouton pour sélectionner cet indice
+                if cols[i].button(f"Voir {nom}", key=f"btn_{tk}"):
+                    st.session_state.index_selectionne = tk
         except:
             cols[i].write(f"{nom} : N/A")
 
-    # 3. CONSEILS STRATÉGIQUES (Exactement comme ton Session.py)
+    # Affichage du graphique de l'indice sélectionné
+    st.markdown(f"### 📈 Graphique : {indices[st.session_state.index_selectionne]}")
+    idx_ticker = yf.Ticker(st.session_state.index_selectionne)
+    hist_idx = idx_ticker.history(period="1mo", interval="1d")
+    
+    fig_idx = go.Figure(data=[go.Scatter(
+        x=hist_idx.index, 
+        y=hist_idx['Close'], 
+        fill='tozeroy', 
+        line=dict(color='#f1c40f' if "BTC" in st.session_state.index_selectionne else '#00d1ff')
+    )])
+    fig_idx.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, t=0, b=0), yaxis_side="right")
+    st.plotly_chart(fig_idx, use_container_width=True)
+
+    # 3. CONSEILS STRATÉGIQUES
     st.markdown("---")
     st.subheader("💡 Conseils de Session (UTC+4)")
     if 5 <= h < 12:
         st.warning("**Chine (HK)** : Surveille la clôture de Hong Kong, elle impacte souvent l'ouverture de Paris à midi.")
     elif 12 <= h < 19:
-        st.info("**Europe (Paris)** : Observe le DAX. S'il ne suit pas le CAC, la hausse est suspecte. Le 'Gap' de midi est souvent testé avant l'arrivée des Américains.")
+        st.info("**Europe (Paris)** : Observe le DAX. S'il ne suit pas le CAC, la hausse est suspecte.")
     elif h >= 19 or h < 2:
-        st.success("**USA (NY)** : C'est le gros volume. Regarde le NASDAQ pour la Tech. Attention aux retournements de tendance après 22h (Réunion).")
+        st.success("**USA (NY)** : C'est le gros volume. Regarde le NASDAQ pour la Tech.")
     else:
-        st.write("🌑 **Session Nocturne** : Les marchés majeurs sont fermés. Analyse les clôtures US et prépare ta watchlist pour demain.")
+        st.write("🌑 **Session Nocturne** : Les marchés majeurs sont fermés.")
 
-    st.markdown("---")
-    st.caption("Note : Les horaires et conseils sont calibrés pour le fuseau de l'île de la Réunion.")
+    st.caption("Note : Les graphiques affichent les données du dernier mois.")
