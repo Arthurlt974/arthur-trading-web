@@ -2,3 +2,5 @@ streamlit
 yfinance
 plotly
 requests
+requests-cache
+urllib3
