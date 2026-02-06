@@ -101,7 +101,7 @@ if nom_action:
 
         if dette_equity is not None:
             if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
-            elif借ette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+            elif ette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
             elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
 
         if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
