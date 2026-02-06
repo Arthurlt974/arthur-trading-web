@@ -22,7 +22,7 @@ outil = st.sidebar.radio("Choisir un outil :",
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO (Version Finale Conclue)
+# OUTIL 1 : ANALYSEUR PRO
 # ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
@@ -36,15 +36,9 @@ if outil == "📊 Analyseur Pro":
         devise = info.get('currency', 'EUR')
         secteur = info.get('sector', 'N/A')
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
-        
-        per = info.get('trailingPE')
-        if not per and bpa > 0: per = prix / bpa
-        per = per or 0
-
+        per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
         dette_equity = info.get('debtToEquity')
-        div_rate = info.get('dividendRate') or info.get('trailingAnnualDividendRate') or 0
         payout = (info.get('payoutRatio') or 0) * 100
-        cash_action = info.get('totalCashPerShare') or 0
 
         val_theorique = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
         marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 else 0
@@ -63,13 +57,11 @@ if outil == "📊 Analyseur Pro":
         col_graph, col_data = st.columns([2, 1])
         with col_graph:
             if mode_graph == "Pro (Bougies)":
-                choix_int = st.selectbox("Unité :", ["1d", "1wk", "1mo"], index=0)
-                hist = action.history(period="5y", interval=choix_int)
+                hist = action.history(period="5y", interval="1d")
                 fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
             else:
                 hist = action.history(period="5y")
                 fig = go.Figure(data=[go.Scatter(x=hist.index, y=hist['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
-            
             fig.update_layout(template="plotly_dark", height=500, xaxis_rangeslider_visible=False, yaxis_side="right")
             st.plotly_chart(fig, use_container_width=True)
 
@@ -77,7 +69,6 @@ if outil == "📊 Analyseur Pro":
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
-            # LIGNE CORRIGÉE ICI :
             st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
             st.write(f"**Payout Ratio :** {payout:.2f} %")
 
@@ -108,29 +99,33 @@ if outil == "📊 Analyseur Pro":
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (Inspiré de Duel V2.py)
+# OUTIL 2 : MODE DUEL (Corrigé)
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
     c1, c2 = st.columns(2)
-    t1 = c1.text_input("Action 1", value="MC.PA")
-    t2 = c2.text_input("Action 2", value="RMS.PA")
+    t1_input = c1.text_input("Action 1", value="MC.PA")
+    t2_input = c2.text_input("Action 2", value="RMS.PA")
     
     if st.button("Lancer le Duel"):
         def get_d(t):
-            i = yf.Ticker(trouver_ticker(t)).info
+            tk = trouver_ticker(t)
+            i = yf.Ticker(tk).info
             p = i.get('currentPrice', 1)
             b = i.get('trailingEps', 0)
             v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
-            return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "dette": i.get('debtToEquity', 0), "yield": (i.get('dividendYield', 0) or 0)*100}
+            return {"nom": i.get('shortName', tk), "prix": p, "valeur": v, "dette": i.get('debtToEquity', 0), "yield": (i.get('dividendYield', 0) or 0)*100}
         
-        d1, d2 = get_d(t1), get_d(t2)
-        df = pd.DataFrame({
+        d1 = get_d(t1_input)
+        d2 = get_d(t2_input)
+        
+        df_duel = pd.DataFrame({
             "Critère": ["Prix", "Valeur Graham", "Dette/Eq", "Rendement"],
             d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['dette']}%", f"{d1['yield']:.2f}%"],
-            d2['nom']: [f"{d2['nom']}"]: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['dette']}%", f"{d2['yield']:.2f}%"]
+            d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['dette']}%", f"{d2['yield']:.2f}%"]
         })
-        st.table(df)
+        st.table(df_duel)
+        
         m1, m2 = ((d1['valeur']-d1['prix'])/d1['prix']), ((d2['valeur']-d2['prix'])/d2['prix'])
         gagnant = d1['nom'] if m1 > m2 else d2['nom']
         st.success(f"🏆 Meilleure opportunité (Graham) : {gagnant}")
@@ -144,11 +139,10 @@ elif outil == "🌍 Market Monitor":
     h = maintenant.hour
     st.write(f"🕒 **Heure Réunion :** {maintenant.strftime('%H:%M:%S')}")
 
-    # 1. TABLEAU DES HORAIRES (Logique Session.py)
     st.markdown("### 🕒 Statut des Bourses")
     data_h = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
-        "Horaires": ["05:30 - 12:00", "12:00 - 20:30", "18:30 - 01:00"],
+        "Horaires (REU)": ["05:30 - 12:00", "12:00 - 20:30", "18:30 - 01:00"],
         "Statut": [
             "🟢 OUVERT" if 5 <= h < 12 else "🔴 FERMÉ",
             "🟢 OUVERT" if 12 <= h < 20 else "🔴 FERMÉ",
@@ -157,27 +151,23 @@ elif outil == "🌍 Market Monitor":
     }
     st.table(pd.DataFrame(data_h))
 
-    # 2. INDICES ET VARIATIONS (Logique Session.py avec couleurs)
     st.markdown("---")
-    st.subheader("⚡ Moteurs du Marché")
+    st.subheader("⚡ Indices et Bitcoin")
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
-    cols = st.columns(len(indices))
-    
+    cols = st.columns(4)
     for i, (tk, nom) in enumerate(indices.items()):
         d = yf.Ticker(tk).history(period="2d")
         if not d.empty:
-            c = d['Close'].iloc[-1]
-            o = d['Open'].iloc[-1]
+            c, o = d['Close'].iloc[-1], d['Open'].iloc[-1]
             var = ((c - o) / o) * 100
             cols[i].metric(nom, f"{c:,.2f}", f"{var:+.2f}%")
 
-    # 3. CONSEILS STRATÉGIQUES (Exactement comme ton Session.py)
     st.markdown("---")
     st.subheader("💡 Conseils de Session")
     if 5 <= h < 12:
         st.warning("**Chine (HK)** : Surveille la clôture de HK, elle impacte souvent l'ouverture de Paris à midi.")
     elif 12 <= h < 19:
-        st.info("**Europe (Paris)** : Observe le DAX. S'il ne suit pas le CAC, la hausse est suspecte. Le 'Gap' de midi est souvent testé avant les US.")
+        st.info("**Europe (Paris)** : Observe le DAX. S'il ne suit pas le CAC, la hausse est suspecte. Le 'Gap' de midi est testé avant les US.")
     elif h >= 19 or h < 2:
         st.success("**USA (NY)** : Gros volumes. Regarde le NASDAQ pour la Tech. Attention aux retournements après 22h (Réunion).")
     else:
