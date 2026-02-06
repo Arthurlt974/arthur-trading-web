@@ -79,7 +79,7 @@ if outil == "📊 Analyseur Pro":
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
-            st.write(f"**Dette/Equity :** {dette_equity if ajoute := dette_equity else 'N/A'} %")
+            st.write(f"**Dette/Equity :** {dette_equity if ajoute dette_equity else 'N/A'} %")
             st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
