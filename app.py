@@ -2,6 +2,37 @@ import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
 import requests
+import streamlit.components.v1 as components
+
+def afficher_graphique_tradingview(symbol):
+    # On adapte le nom pour TradingView (ex: MC.PA devient EURONEXT:MC)
+    tv_symbol = symbol.replace(".PA", "").replace(".L", "")
+    if ".PA" in symbol:
+        tv_symbol = f"EURONEXT:{tv_symbol}"
+    
+    html_code = f"""
+    <div class="tradingview-widget-container" style="height:500px;">
+      <div id="tradingview_chart"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({{
+        "autosize": true,
+        "symbol": "{tv_symbol}",
+        "interval": "D",
+        "timezone": "Europe/Paris",
+        "theme": "dark",
+        "style": "1",
+        "locale": "fr",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "hide_side_toolbar": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_chart"
+      }});
+      </script>
+    </div>
+    """
+    components.html(html_code, height=500)
 
 # Configuration large pour tout faire tenir
 st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
@@ -56,17 +87,10 @@ if nom_action:
         col_graph, col_data = st.columns([2, 1])
 
         with col_graph:
-            st.subheader("📈 Courbe sur 5 ans")
-            hist = action.history(period="5y")
-            if not hist.empty:
-                fig = go.Figure(data=[go.Scatter(
-                    x=hist.index, y=hist['Close'], 
-                    line=dict(color='#00d1ff', width=2),
-                    fill='tozeroy'
-                )])
-                fig.update_layout(template="plotly_dark", height=400, margin=dict(l=0, r=0, t=0, b=0))
-                st.plotly_chart(fig, width='stretch')
-
+            st.subheader(f"📈 Graphique Pro : {ticker}")
+            # Appel de la fonction TradingView
+            afficher_graphique_tradingview(ticker)
+            
         with col_data:
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
