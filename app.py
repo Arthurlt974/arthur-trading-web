@@ -8,10 +8,10 @@ from datetime import datetime, timedelta
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
 
-# --- CORRECTIF ANTI-BLOCAGE (Session HTTP + Cache) ---
+# --- CORRECTIF ANTI-BLOCAGE (Session HTTP) ---
 @st.cache_resource
 def get_session():
-    """Crée une session qui imite un navigateur pour éviter le Rate Limit de Yahoo"""
+    """Crée une session qui imite un navigateur pour éviter le Rate Limit"""
     session = requests.Session()
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -28,7 +28,7 @@ def trouver_ticker(nom):
     except: return nom
 
 def obtenir_action(ticker_symbol):
-    """Récupère l'objet Ticker en utilisant la session sécurisée"""
+    """Récupère l'objet Ticker avec la session sécurisée"""
     return yf.Ticker(ticker_symbol, session=get_session())
 
 # --- NAVIGATION ---
@@ -42,10 +42,8 @@ outil = st.sidebar.radio("Choisir un outil :",
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
     ticker = trouver_ticker(nom_entree)
-    
-    # Utilisation du moteur sécurisé
     action = obtenir_action(ticker)
-    
+
     try:
         info = action.info
         if info and ('currentPrice' in info or 'regularMarketPrice' in info):
@@ -76,38 +74,95 @@ if outil == "📊 Analyseur Pro":
             c4.metric("Secteur", secteur)
 
             st.markdown("---")
-            mode_graph = st.radio("Style de graphique :", ["Débutant (Ligne)", "Pro (Bougies)"], horizontal=True)
+            mode_graph = st.radio("Style :", ["Ligne", "Bougies"], horizontal=True)
 
             col_graph, col_data = st.columns([2, 1])
             with col_graph:
-                if mode_graph == "Pro (Bougies)":
-                    choix_int = st.selectbox("Unité :", ["90m", "1d", "1wk", "1mo"], index=1)
-                    p = {"90m": "1mo", "1d": "5y", "1wk": "max", "1mo": "max"}[choix_int]
-                    hist = action.history(period=p, interval=choix_int)
-                    fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'], increasing_line_color='#2ecc71', decreasing_line_color='#e74c3c')])
+                if mode_graph == "Bougies":
+                    hist = action.history(period="5y", interval="1d")
+                    fig = go.Figure(data=[go.Candlestick(x=hist.index, open=hist['Open'], high=hist['High'], low=hist['Low'], close=hist['Close'])])
                 else:
                     hist = action.history(period="5y")
                     fig = go.Figure(data=[go.Scatter(x=hist.index, y=hist['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
                 
-                fig.update_layout(template="plotly_dark", height=500, margin=dict(l=0, r=10, t=0, b=0), xaxis_rangeslider_visible=False, yaxis_side="right")
+                fig.update_layout(template="plotly_dark", height=450, xaxis_rangeslider_visible=False, yaxis_side="right")
                 st.plotly_chart(fig, use_container_width=True)
 
             with col_data:
                 st.subheader("📑 Détails Financiers")
-                st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
+                st.write(f"**BPA :** {bpa:.2f}")
                 st.write(f"**Ratio P/E :** {per:.2f}")
-                st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
-                st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
-                st.write(f"**Payout Ratio :** {payout:.2f} %")
-                st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
+                st.write(f"**Dette/Equity :** {dette_equity}%")
+                st.write(f"**Payout :** {payout:.1f}%")
 
-            # --- SYSTEME DE SCORING ---
+            # --- CORRECTION DE LA SYNTAXE DU SCORING ---
             st.markdown("---")
             st.subheader("⭐ Scoring Qualité (sur 20)")
             score = 0
             positifs, negatifs = [], []
 
             if bpa > 0:
-                if per < 12: score += 5; positifs.append("✅ P/E attractif [+5]")
-                elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
-                else: score += 1; positifs.append("🟡 P/
+                if per < 12: 
+                    score += 5
+                    positifs.append("✅ P/E attractif (Value) [+5]")
+                elif per < 20: 
+                    score += 4
+                    positifs.append("✅ Valorisation raisonnable [+4]")
+                else: 
+                    score += 1
+                    positifs.append("🟡 P/E élevé [+1]")
+            else: 
+                score -= 5
+                negatifs.append("🚨 Entreprise en PERTE [-5]")
+
+            if dette_equity is not None:
+                if dette_equity < 50: score += 4; positifs.append("✅ Bilan solide [+4]")
+                elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
+
+            if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende safe [+4]")
+            if marge_pourcent > 30: score += 5; positifs.append("✅ Décote Graham [+5]")
+
+            score_f = min(20, max(0, score))
+            st.write(f"## Note : {score_f}/20")
+            st.progress(score_f / 20)
+            
+            for p in positifs: st.markdown(f"**{p}**")
+            for n in negatifs: st.markdown(f"**{n}**")
+    except:
+        st.error("Erreur de récupération des données Yahoo Finance.")
+
+# ==========================================
+# OUTIL 2 : MODE DUEL
+# ==========================================
+elif outil == "⚔️ Mode Duel":
+    st.title("⚔️ Duel d'Actions")
+    c1, c2 = st.columns(2)
+    t1 = c1.text_input("Action 1", value="MC.PA")
+    t2 = c2.text_input("Action 2", value="RI.PA")
+    
+    if st.button("Lancer le Duel"):
+        def get_d(t):
+            i = obtenir_action(trouver_ticker(t)).info
+            p = i.get('currentPrice', 1)
+            b = i.get('trailingEps', 0)
+            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
+            return {"nom": i.get('shortName', t), "prix": p, "valeur": v}
+        
+        d1, d2 = get_d(t1), get_d(t2)
+        st.write(f"**{d1['nom']}** vs **{d2['nom']}**")
+        st.success(f"🏆 Meilleur potentiel : {d1['nom'] if d1['valeur'] > d2['valeur'] else d2['nom']}")
+
+# ==========================================
+# OUTIL 3 : MARKET MONITOR
+# ==========================================
+elif outil == "🌍 Market Monitor":
+    maintenant = datetime.utcnow() + timedelta(hours=4)
+    h = maintenant.hour
+    st.title("🌍 Market Monitor (UTC+4)")
+    
+    data_horaires = {
+        "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
+        "Ouverture (REU)": ["05:30", "12:00", "18:30"],
+        "Statut": ["🟢 OUVERT" if 5<=h<12 else "🔴 FERMÉ", "🟢 OUVERT" if 12<=h<20 else "🔴 FERMÉ", "🟢 OUVERT" if (h>=18 or h<1) else "🔴 FERMÉ"]
+    }
+    st.table(pd.DataFrame(data_horaires))
