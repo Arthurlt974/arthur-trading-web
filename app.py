@@ -5,18 +5,20 @@ import requests
 import streamlit.components.v1 as components
 
 def afficher_graphique_tradingview(symbol):
-    # On adapte le nom pour TradingView (ex: MC.PA devient EURONEXT:MC)
+    # Adaptation du ticker pour TradingView
     tv_symbol = symbol.replace(".PA", "").replace(".L", "")
     if ".PA" in symbol:
         tv_symbol = f"EURONEXT:{tv_symbol}"
     
+    # On définit la largeur à 100% dans le HTML et dans le composant Streamlit
     html_code = f"""
-    <div class="tradingview-widget-container" style="height:500px;">
-      <div id="tradingview_chart"></div>
+    <div class="tradingview-widget-container" style="width:100%; height:600px;">
+      <div id="tradingview_chart" style="width:100%; height:100%;"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
       <script type="text/javascript">
       new TradingView.widget({{
-        "autosize": true,
+        "width": "100%",
+        "height": "100%",
         "symbol": "{tv_symbol}",
         "interval": "D",
         "timezone": "Europe/Paris",
@@ -32,8 +34,9 @@ def afficher_graphique_tradingview(symbol):
       </script>
     </div>
     """
-    components.html(html_code, height=500)
-
+    
+    # L'argument width=None permet au composant de prendre toute la largeur de la colonne
+    components.html(html_code, height=600, scrolling=False)
 # Configuration large pour tout faire tenir
 st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
 
