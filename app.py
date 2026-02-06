@@ -5,11 +5,9 @@ import pandas as pd
 import requests
 import feedparser
 from datetime import datetime, timedelta
-from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
-st_autorefresh(interval=15000, key="global_refresh")
 
 # --- FONCTIONS DE MISE EN CACHE (Anti-Blocage & Performance) ---
 @st.cache_data(ttl=3600)  # Garde les infos fondamentales en mémoire pendant 1 heure
@@ -20,7 +18,7 @@ def get_ticker_info(ticker):
     except:
         return None
 
-@st.cache_data(ttl=30)   # Garde l'historique des prix pendant 10 minutes
+@st.cache_data(ttl=600)   # Garde l'historique des prix pendant 10 minutes
 def get_ticker_history(ticker, period="5y", interval="1d"):
     try:
         data = yf.Ticker(ticker)
@@ -214,8 +212,6 @@ elif outil == "⚔️ Mode Duel":
 # OUTIL 3 : MARKET MONITOR
 # ==========================================
 elif outil == "🌍 Market Monitor":
-    st_autorefresh(interval=1000, key="datarefresh")
-
     maintenant = datetime.utcnow() + timedelta(hours=4)
     h = maintenant.hour
     st.title("🌍 Market Monitor (UTC+4)")
@@ -279,3 +275,4 @@ elif outil == "🌍 Market Monitor":
         
         fig_idx.update_layout(template="plotly_dark", height=600, margin=dict(l=0, r=10, t=0, b=0), xaxis_rangeslider_visible=False, yaxis_side="right")
         st.plotly_chart(fig_idx, use_container_width=True)
+
