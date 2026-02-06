@@ -148,22 +148,58 @@ elif outil == "⚔️ Mode Duel":
         st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR (Fusion de Session.py)
+# OUTIL 3 : MARKET MONITOR (Version Session.py Complète)
 # ==========================================
 elif outil == "🌍 Market Monitor":
     st.title("🌍 Market Monitor (UTC+4)")
-    h = datetime.now().hour
+    maintenant = datetime.now()
+    h = maintenant.hour
     
-    c1, c2, c3 = st.columns(3)
-    c1.metric("PARIS", "12:00 - 20:30", "OUVERT" if 12 <= h < 20 else "FERMÉ")
-    c2.metric("NEW YORK", "18:30 - 01:00", "OUVERT" if (h >= 18 or h < 1) else "FERMÉ")
-    c3.metric("HONG KONG", "05:30 - 12:00", "OUVERT" if 5 <= h < 12 else "FERMÉ")
+    st.write(f"🕒 **Heure Réunion :** {maintenant.strftime('%H:%M:%S')}")
+
+    # 1. TABLEAU DES HORAIRES (Inspiré de Session.py)
+    st.markdown("### 🕒 Statut des Bourses")
+    data_horaires = {
+        "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
+        "Ouverture (REU)": ["05:30", "12:00", "18:30"],
+        "Fermeture (REU)": ["12:00", "20:30", "01:00"],
+        "Statut": [
+            "🟢 OUVERT" if 5 <= h < 12 else "🔴 FERMÉ",
+            "🟢 OUVERT" if 12 <= h < 20 else "🔴 FERMÉ",
+            "🟢 OUVERT" if (h >= 18 or h < 1) else "🔴 FERMÉ"
+        ]
+    }
+    st.table(pd.DataFrame(data_horaires))
+
+    # 2. INDICES MAJEURS AVEC VARIATION
+    st.markdown("---")
+    st.subheader("⚡ Moteurs du Marché")
+    indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
+    cols = st.columns(len(indices))
+    
+    for i, (tk, nom) in enumerate(indices.items()):
+        try:
+            # Récupération sur 2 jours pour avoir la variation
+            data_idx = yf.Ticker(tk).history(period="2d")
+            if not data_idx.empty:
+                val_actuelle = data_idx['Close'].iloc[-1]
+                val_prec = data_idx['Close'].iloc[-2]
+                variation = ((val_actuelle - val_prec) / val_prec) * 100
+                cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
+        except:
+            cols[i].write(f"{nom} : N/A")
+
+    # 3. CONSEILS STRATÉGIQUES (Exactement comme ton Session.py)
+    st.markdown("---")
+    st.subheader("💡 Conseils de Session (UTC+4)")
+    if 5 <= h < 12:
+        st.warning("**Chine (HK)** : Surveille la clôture de Hong Kong, elle impacte souvent l'ouverture de Paris à midi.")
+    elif 12 <= h < 19:
+        st.info("**Europe (Paris)** : Observe le DAX. S'il ne suit pas le CAC, la hausse est suspecte. Le 'Gap' de midi est souvent testé avant l'arrivée des Américains.")
+    elif h >= 19 or h < 2:
+        st.success("**USA (NY)** : C'est le gros volume. Regarde le NASDAQ pour la Tech. Attention aux retournements de tendance après 22h (Réunion).")
+    else:
+        st.write("🌑 **Session Nocturne** : Les marchés majeurs sont fermés. Analyse les clôtures US et prépare ta watchlist pour demain.")
 
     st.markdown("---")
-    indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
-    cols = st.columns(4)
-    for i, (tk, n) in enumerate(indices.items()):
-        val = yf.Ticker(tk).history(period="1d")['Close'].iloc[-1]
-        cols[i].metric(n, f"{val:,.2f}")
-    
-    st.info("💡 Stratégie : " + ("Session US en cours, surveillez la volatilité." if h >= 18 else "Attente de l'ouverture US, marchés européens calmes."))
+    st.caption("Note : Les horaires et conseils sont calibrés pour le fuseau de l'île de la Réunion.")
