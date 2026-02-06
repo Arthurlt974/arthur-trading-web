@@ -120,6 +120,50 @@ if outil == "📊 Analyseur Pro":
             for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;font-weight:bold;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
+  # ==========================================
+        # SECTION : ACTUALITÉS (Alternative Google News)
+        # ==========================================
+        import feedparser # Importation indispensable
+        
+        st.markdown("---")
+        col_n, col_m = st.columns([2, 1])
+        
+        with col_n:
+            st.subheader(f"📰 Actualités : {nom}")
+            # On crée une recherche Google News basée sur le nom de l'entreprise
+            search_term = nom.replace(" ", "+")
+            url_rss = f"https://news.google.com/rss/search?q={search_term}+stock+bourse&hl=fr&gl=FR&ceid=FR:fr"
+            
+            try:
+                # Lecture du flux Google
+                flux = feedparser.parse(url_rss)
+                if flux.entries:
+                    for entry in flux.entries[:5]:
+                        # On nettoie le titre (Google ajoute souvent la source à la fin)
+                        clean_title = entry.title.split(" - ")[0]
+                        with st.expander(f"📌 {clean_title}"):
+                            st.write(f"**Source :** {entry.source.get('title', 'Presse Finance')}")
+                            st.caption(f"Publié le : {entry.published}")
+                            st.link_button("Lire l'article", entry.link)
+                else:
+                    st.info("Aucune actualité trouvée sur Google News pour le moment.")
+            except:
+                st.error("Impossible de charger les actualités Google News.")
+
+        with col_m:
+            st.subheader("🌍 Flash Marché")
+            # Flux général pour le marché boursier
+            url_mkt = "https://news.google.com/rss/search?q=bourse+mondiale+indices&hl=fr&gl=FR&ceid=FR:fr"
+            try:
+                flux_mkt = feedparser.parse(url_mkt)
+                for m_art in flux_mkt.entries[:4]:
+                    m_title = m_art.title.split(" - ")[0]
+                    st.markdown(f"🔹 **{m_art.source.get('title')}**")
+                    st.markdown(f"[{m_title}]({m_art.link})")
+                    st.write("---")
+            except:
+                st.write("Flux mondial momentanément indisponible.")
+
 # ==========================================
 # OUTIL 2 : MODE DUEL
 # ==========================================
