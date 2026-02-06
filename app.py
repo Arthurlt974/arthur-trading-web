@@ -4,13 +4,19 @@ import plotly.graph_objects as go
 import requests
 import streamlit.components.v1 as components
 
+# --- CONFIGURATION DE LA PAGE ---
+st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
+
+# --- FONCTION GRAPHIQUE TRADINGVIEW ---
 def afficher_graphique_tradingview(symbol):
-    # Adaptation du ticker pour TradingView
+    # Adaptation du ticker pour TradingView (ex: MC.PA -> EURONEXT:MC)
     tv_symbol = symbol.replace(".PA", "").replace(".L", "")
     if ".PA" in symbol:
         tv_symbol = f"EURONEXT:{tv_symbol}"
+    elif ".L" in symbol:
+        tv_symbol = f"LSE:{tv_symbol}"
     
-    # On définit la largeur à 100% dans le HTML et dans le composant Streamlit
+    # Code HTML pour un graphique qui prend 100% de la largeur
     html_code = f"""
     <div class="tradingview-widget-container" style="width:100%; height:600px;">
       <div id="tradingview_chart" style="width:100%; height:100%;"></div>
@@ -34,11 +40,7 @@ def afficher_graphique_tradingview(symbol):
       </script>
     </div>
     """
-    
-    # L'argument width=None permet au composant de prendre toute la largeur de la colonne
     components.html(html_code, height=600, scrolling=False)
-# Configuration large pour tout faire tenir
-st.set_page_config(page_title="Arthur Trading Pro", layout="wide")
 
 def trouver_ticker(nom):
     try:
@@ -48,7 +50,7 @@ def trouver_ticker(nom):
         return response['quotes'][0]['symbol'] if response.get('quotes') else nom
     except: return nom
 
-# Barre latérale
+# --- BARRE LATÉRALE ---
 st.sidebar.title("💎 Arthur Trading")
 nom_action = st.sidebar.text_input("Nom de l'action", value="MC.PA")
 
@@ -58,7 +60,7 @@ if nom_action:
     info = action.info
     
     if info and 'currentPrice' in info:
-        # --- RÉCUPÉRATION DE TOUTES TES INFOS V4 ---
+        # --- RÉCUPÉRATION DES DONNÉES ---
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
@@ -75,9 +77,9 @@ if nom_action:
         marge_pourcent = ((val_theorique - prix) / prix) * 100
         div_yield = (div_rate / prix * 100) if (div_rate > 0) else 0
 
+        # --- TITRE ET METRICS ---
         st.title(f"📊 {nom} ({ticker})")
-
-        # --- LIGNE 1 : METRICS PRINCIPALES ---
+        
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Prix Actuel", f"{prix:.2f} {devise}")
         c2.metric("Valeur Graham", f"{val_theorique:.2f} {devise}")
@@ -86,14 +88,15 @@ if nom_action:
 
         st.markdown("---")
 
-        # --- LIGNE 2 : GRAPHIQUE + INFOS COMPLÈTES ---
-        col_graph, col_data = st.columns([2, 1])
+        # --- GRAPHIQUE INTERACTIF LARGE ---
+        st.subheader(f"📈 Graphique Interactif Professionnel")
+        afficher_graphique_tradingview(ticker)
 
-        with col_graph:
-            st.subheader(f"📈 Graphique Pro : {ticker}")
-            # Appel de la fonction TradingView
-            afficher_graphique_tradingview(ticker)
-            
+        st.markdown("---")
+
+        # --- DÉTAILS ET SCORING CÔTE À CÔTE ---
+        col_data, col_score_ui = st.columns([1, 1])
+
         with col_data:
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
@@ -103,71 +106,42 @@ if nom_action:
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash par Action :** {cash_action:.2f} {devise}")
 
-        # --- LIGNE 3 : TON SCORING V4 AVEC MALUS ---
-        st.markdown("---")
-        st.subheader("⭐ Scoring Qualité (sur 20)")
-        
-        score = 0
-        positifs = []
-        negatifs = []
+        with col_score_ui:
+            st.subheader("⭐ Scoring Qualité (sur 20)")
+            score = 0
+            positifs, negatifs = [], []
 
-        # Analyse BPA / PE
-        if bpa > 0:
-            if per < 12: 
-                score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
-            elif per < 20: 
-                score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
-            else: 
-                score += 1; positifs.append("🟡 P/E élevé [+1]")
-        else: 
-            score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
+            if bpa > 0:
+                if per < 12: score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
+                elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
+                else: score += 1; positifs.append("🟡 P/E élevé [+1]")
+            else: score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
 
-        # Analyse Dette
-        if dette_equity is not None:
-            if dette_equity < 50: 
-                score += 4; positifs.append("✅ Bilan très solide [+4]")
-            elif dette_equity < 100: 
-                score += 3; positifs.append("✅ Dette maîtrisée [+3]")
-            elif dette_equity > 200: 
-                score -= 4; negatifs.append("❌ Surendettement [-4]")
+            if dette_equity is not None:
+                if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
+                elif借ette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+                elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
 
-        # Analyse Dividende
-        if 10 < payout <= 80: 
-            score += 4; positifs.append("✅ Dividende solide/safe [+4]")
-        elif payout > 95: 
-            score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
-        
-        # Analyse Marge Graham
-        if marge_pourcent > 100: 
-            score += 7; positifs.append("🔥 DÉCOTE EXCEPTIONNELLE [+7]")
-        elif marge_pourcent > 30: 
-            score += 5; positifs.append("✅ Forte décote Graham [+5]")
+            if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
+            elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
             
-        # Analyse Cash
-        if cash_action > (prix * 0.2): 
-            score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
+            if marge_pourcent > 100: score += 7; positifs.append("🔥 DÉCOTE EXCEPTIONNELLE [+7]")
+            elif marge_pourcent > 30: score += 5; positifs.append("✅ Forte décote Graham [+5]")
+                
+            if cash_action > (prix * 0.2): score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
 
-        score = min(20, max(0, score))
-        
-        # Affichage du score
-        col_score, col_details = st.columns([1, 2])
-        with col_score:
+            score = min(20, max(0, score))
+            
             st.write(f"## Note : {score}/20")
             st.progress(score / 20)
-            
             if score >= 17: st.success("🔥 ACHAT FORT")
             elif score >= 14: st.info("🚀 ACHAT")
             elif score >= 10: st.warning("⚖️ À SURVEILLER")
             else: st.error("⚠️ ÉVITER")
 
-        with col_details:
             st.write("**Détails de l'analyse :**")
-            # Affichage des points positifs
-            for p in positifs:
-                st.write(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
-            # Affichage des points négatifs (malus)
-            for n in negatifs:
-                st.write(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
+            for p in positifs: st.write(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
+            for n in negatifs: st.write(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
     else:
         st.error("Action non trouvée. Vérifiez le nom ou le ticker.")
