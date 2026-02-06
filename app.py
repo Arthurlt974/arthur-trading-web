@@ -5,34 +5,10 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 
-# Nouveaux imports pour la stabilité
-import requests_cache
-from requests import Session
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
-
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
 
-# --- OPTIMISATION ANTI-BLOCAGE (Session & Cache) ---
-@st.cache_resource
-def get_session():
-    # Crée un cache local pour éviter de redemander la même info pendant 10 minutes
-    session = requests_cache.CachedSession('yfinance.cache', expire_after=600)
-    # Définit une stratégie de réessai en cas d'erreur 429 (Too Many Requests)
-    retry = Retry(
-        total=5, 
-        backoff_factor=1, 
-        status_forcelist=[429, 500, 502, 503, 504]
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount('https://', adapter)
-    session.mount('http://', adapter)
-    # Ajout d'un User-Agent crédible pour éviter d'être banni
-    session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-    return session
-
-session = get_session()
+# On a supprimé toute la partie "session" et "requests-cache" qui causait l'erreur
 
 def trouver_ticker(nom):
     try:
@@ -54,8 +30,8 @@ if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
     ticker = trouver_ticker(nom_entree)
     
-    # Utilisation de la session ici
-    action = yf.Ticker(ticker, session=session)
+    # On appelle Ticker normalement sans session
+    action = yf.Ticker(ticker)
     info = action.info
 
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
@@ -155,8 +131,7 @@ elif outil == "⚔️ Mode Duel":
     
     if st.button("Lancer le Duel"):
         def get_d(t):
-            # Utilisation de la session ici
-            i = yf.Ticker(trouver_ticker(t), session=session).info
+            i = yf.Ticker(trouver_ticker(t)).info
             p = i.get('currentPrice', 1)
             b = i.get('trailingEps', 0)
             v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
@@ -174,7 +149,7 @@ elif outil == "⚔️ Mode Duel":
             gagnant = d1['nom'] if m1 > m2 else d2['nom']
             st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
         except:
-            st.error("Erreur lors de la récupération des données. Réessayez dans un instant.")
+            st.error("Impossible de récupérer les données.")
 
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
@@ -208,8 +183,7 @@ elif outil == "🌍 Market Monitor":
 
     for i, (tk, nom) in enumerate(indices.items()):
         try:
-            # Utilisation de la session ici
-            data_idx = yf.Ticker(tk, session=session).history(period="2d")
+            data_idx = yf.Ticker(tk).history(period="2d")
             if not data_idx.empty:
                 val_actuelle = data_idx['Close'].iloc[-1]
                 val_prec = data_idx['Close'].iloc[-2]
@@ -235,8 +209,7 @@ elif outil == "🌍 Market Monitor":
             periode_mkt = "5y"
             intervalle_mkt = "1d"
 
-    # Utilisation de la session ici
-    hist_idx = yf.Ticker(st.session_state.index_selectionne, session=session).history(period=periode_mkt, interval=intervalle_mkt)
+    hist_idx = yf.Ticker(st.session_state.index_selectionne).history(period=periode_mkt, interval=intervalle_mkt)
 
     if not hist_idx.empty:
         if mode_graph_mkt == "Pro (Bougies)":
@@ -246,8 +219,3 @@ elif outil == "🌍 Market Monitor":
         
         fig_idx.update_layout(template="plotly_dark", height=600, margin=dict(l=0, r=10, t=0, b=0), xaxis_rangeslider_visible=False, yaxis_side="right")
         st.plotly_chart(fig_idx, use_container_width=True)
-
-    st.markdown("---")
-    if 12 <= h < 19: st.info("💡 **Europe** : Session en cours. Surveille la volatilité.")
-    elif h >= 18 or h < 1: st.success("💡 **USA** : Session majeure. Regarde le NASDAQ pour la Tech.")
-    else: st.warning("🌑 Marchés calmes.")
