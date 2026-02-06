@@ -1,6 +1,6 @@
 streamlit
 yfinance
+curl_cffi
 plotly
 pandas
 requests
-requests-cache
