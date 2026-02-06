@@ -6,7 +6,7 @@ import requests
 from datetime import datetime
 
 # --- CONFIGURATION GLOBALE ---
-st.set_page_config(page_title="AM-Trading Hub", layout="wide")
+st.set_page_config(page_title="AM-Analysis", layout="wide")
 
 def trouver_ticker(nom):
     try:
@@ -17,7 +17,7 @@ def trouver_ticker(nom):
     except: return nom
 
 # --- NAVIGATION ---
-st.sidebar.title("🚀 Arthur Trading Hub")
+st.sidebar.title("🚀 AM-Analysis")
 outil = st.sidebar.radio("Choisir un outil :", 
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
 
