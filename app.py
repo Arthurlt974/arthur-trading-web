@@ -23,7 +23,7 @@ outil = st.sidebar.radio("Choisir un outil :",
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "🔍 Screener CAC40"])
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO (Ta Version Finale)
+# OUTIL 1 : ANALYSEUR PRO
 # ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
@@ -79,7 +79,6 @@ if outil == "📊 Analyseur Pro":
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
-            # LIGNE CORRIGÉE : suppression du := pour éviter le SyntaxError
             st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
             st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
             st.write(f"**Payout Ratio :** {payout:.2f} %")
@@ -87,8 +86,7 @@ if outil == "📊 Analyseur Pro":
 
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
-        score = 0
-        positifs, negatifs = [], []
+        score, positifs, negatifs = 0, [], []
 
         if bpa > 0:
             if per < 12: score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
@@ -119,7 +117,7 @@ if outil == "📊 Analyseur Pro":
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (Ta Version Finale)
+# OUTIL 2 : MODE DUEL
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
@@ -147,7 +145,7 @@ elif outil == "⚔️ Mode Duel":
         st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR (Ta Version Finale)
+# OUTIL 3 : MARKET MONITOR (REMIS COMME AVANT)
 # ==========================================
 elif outil == "🌍 Market Monitor":
     maintenant = datetime.utcnow() + timedelta(hours=4)
@@ -155,6 +153,7 @@ elif outil == "🌍 Market Monitor":
     st.title("🌍 Market Monitor (UTC+4)")
     st.subheader(f"🕒 Heure actuelle : {maintenant.strftime('%H:%M:%S')}")
 
+    # REMIS EXACTEMENT COMME AVANT : Session / Ouverture / Statut
     data_horaires = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
         "Ouverture (REU)": ["05:30", "12:00", "18:30"],
@@ -193,41 +192,74 @@ elif outil == "🌍 Market Monitor":
     st.plotly_chart(fig_idx, use_container_width=True)
 
 # ==========================================
-# AJOUT 1 : SCREENER CAC 40 (Ton Nouveau Script)
+# OUTIL 4 : SCREENER CAC 40 (VERSION PRO AVEC TON CLASSEMENT)
 # ==========================================
 elif outil == "🔍 Screener CAC40":
-    st.title("🔍 Scanner Expert du CAC 40")
-    st.write("Analyse automatique des 40 actions pour trouver les meilleures opportunités.")
+    st.title("🔍 Scanner Expert V5.5 - CAC 40")
+    st.markdown("### Analyse de 40 actions en temps réel selon ta stratégie")
     
-    if st.button("🚀 Lancer le Scan Complet"):
-        mes_actions = ["AC.PA", "AI.PA", "AIR.PA", "ALO.PA", "MT.AS", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA", "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EL.PA", "STLAP.PA", "RMS.PA", "KER.PA", "OR.PA", "LR.PA", "MC.PA", "ML.PA", "ORA.PA", "RI.PA", "PUB.PA", "RNO.PA", "SAF.PA", "SGO.PA", "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA", "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"]
+    if st.button("🚀 LANCER LE SCANNER PRO", use_container_width=True):
+        mes_actions = [
+            "AC.PA", "AI.PA", "AIR.PA", "ALO.PA", "MT.AS", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA", 
+            "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EL.PA", "STLAP.PA", "RMS.PA", "KER.PA", "OR.PA", 
+            "LR.PA", "MC.PA", "ML.PA", "ORA.PA", "RI.PA", "PUB.PA", "RNO.PA", "SAF.PA", "SGO.PA", 
+            "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA", "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", 
+            "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"
+        ]
         
         resultats = []
         barre = st.progress(0)
+        status_text = st.empty()
         
         for idx, t in enumerate(mes_actions):
+            status_text.text(f"🔄 Analyse de {t}...")
             try:
-                inf = yf.Ticker(t).info
-                px = inf.get('currentPrice') or inf.get('regularMarketPrice') or 1
-                bpa = inf.get('trailingEps') or inf.get('forwardEps') or 0
-                val_g = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
-                marge = ((val_g - px) / px) * 100
+                action = yf.Ticker(t)
+                inf = action.info
+                nom_reel = inf.get('shortName', t)
                 
-                # On utilise la logique de ton script Screener
-                score = 10
-                if marge > 30: score += 5
-                if inf.get('debtToEquity', 150) < 80: score += 5
+                # --- RÉCUPÉRATION LOGIQUE TON SCRIPT ---
+                prix = inf.get('currentPrice') or inf.get('regularMarketPrice') or 1
+                bpa = inf.get('trailingEps') or inf.get('forwardEps') or 0
+                per = inf.get('trailingPE') or (prix / bpa if bpa > 0 else 50)
+                dette_equity = inf.get('debtToEquity')
+                payout = (inf.get('payoutRatio') or 0) * 100
+                marge_p = (((max(0, bpa) * 22.5 * 4.4) / 3.5) - prix) / prix * 100
+
+                # --- TON CLASSEMENT SCORING EXPERT ---
+                score = 0
+                if bpa > 0:
+                    if per < 12: score += 5
+                    elif per < 20: score += 4
+                    else: score += 1
+                else: score -= 5
+                
+                if dette_equity is not None:
+                    if dette_equity < 50: score += 4
+                    elif dette_equity < 100: score += 3
+                    elif dette_equity > 200: score -= 4
+                
+                if 10 < payout <= 80: score += 4
+                if marge_p > 30: score += 5
+                
+                score_f = min(20, max(0, score))
                 
                 resultats.append({
-                    "Ticker": t,
-                    "Nom": inf.get('shortName', t),
-                    "Prix": f"{px:.2f} €",
-                    "Potentiel": f"{marge:+.1f}%",
-                    "Score": score
+                    "RANG": 0, # Sera mis à jour après le tri
+                    "SCORE": score_f,
+                    "TICKER": t,
+                    "NOM": nom_reel,
+                    "PRIX": f"{prix:.2f} €",
+                    "POTENTIEL": f"{marge_p:+.1f}%"
                 })
             except: pass
             barre.progress((idx + 1) / len(mes_actions))
         
-        df_res = pd.DataFrame(resultats).sort_values(by="Score", ascending=False)
-        st.table(df_res)
-        st.success("Analyse terminée !")
+        status_text.text("✅ Scan terminé avec succès !")
+        
+        # --- CLASSEMENT COMME TON PROGRAMME ---
+        df_res = pd.DataFrame(resultats).sort_values(by="SCORE", ascending=False)
+        df_res["RANG"] = range(1, len(df_res) + 1) # Ajout du rang pro
+        
+        # Style du tableau pro
+        st.table(df_res.set_index("RANG"))
