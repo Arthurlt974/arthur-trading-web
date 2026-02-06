@@ -5,7 +5,7 @@ import pandas as pd
 import requests
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Arthur Trading Pro V5.1", layout="wide")
+st.set_page_config(page_title="Arthur Trading Pro V5.2", layout="wide")
 
 def trouver_ticker(nom):
     try:
@@ -25,13 +25,13 @@ if nom_entree:
     info = action.info
     
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
-        # --- RÉCUPÉRATION ROBUSTE ---
+        # --- RÉCUPÉRATION DES DONNÉES ---
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
         devise = info.get('currency', 'EUR')
         secteur = info.get('sector', 'N/A')
         
-        # BPA (EPS)
+        # Récupération BPA Robuste
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
         
         # PER
@@ -61,7 +61,7 @@ if nom_entree:
         st.markdown("---")
         mode_graph = st.radio("Style de graphique :", ["Débutant (Ligne)", "Pro (Bougies)"], horizontal=True)
 
-        # --- LIGNE 2 : GRAPHIQUE ---
+        # --- LIGNE 2 : GRAPHIQUE + INFOS ---
         col_graph, col_data = st.columns([2, 1])
         with col_graph:
             if mode_graph == "Pro (Bougies)":
@@ -77,7 +77,7 @@ if nom_entree:
                 hist = action.history(period="5y", interval="1d")
                 fig = go.Figure(data=[go.Scatter(x=hist.index, y=hist['Close'], fill='tozeroy', line=dict(color='#00d1ff'))])
             
-            fig.update_layout(template="plotly_dark", height=500, margin=dict(l=0, r=10, t=0, b=0), xaxis=dict(rangeslider=dict(visible=False)), yaxis=dict(side="right"))
+            fig.update_layout(template="plotly_dark", height=550, margin=dict(l=0, r=10, t=0, b=0), xaxis=dict(rangeslider=dict(visible=False)), yaxis=dict(side="right"))
             st.plotly_chart(fig, use_container_width=True)
 
         with col_data:
@@ -89,48 +89,51 @@ if nom_entree:
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # --- LIGNE 3 : SCORING ---
+        # --- LIGNE 3 : SCORING (RETOUR FORMAT AVANT) ---
         st.markdown("---")
-        col_score_final, col_bareme = st.columns([1, 1])
+        st.subheader("⭐ Scoring Qualité (sur 20)")
+        
+        score = 0
+        positifs, negatifs = [], []
 
-        with col_score_final:
-            st.subheader("⭐ Analyse du Score")
-            score = 0
-            details = []
+        # Calcul du score
+        if bpa > 0:
+            if per < 12: score += 5; positifs.append("✅ P/E attractif (Value) [+5]")
+            elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
+            else: score += 1; positifs.append("🟡 P/E élevé [+1]")
+        else:
+            score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
 
-            if bpa > 0:
-                if per < 12: score += 5; details.append("✅ P/E Excellent (<12) [+5]")
-                elif per < 20: score += 4; details.append("✅ P/E Raisonnable (12-20) [+4]")
-                else: score += 1; details.append("🟡 P/E Élevé (>20) [+1]")
-            else:
-                score -= 5; details.append("🚨 BPA Négatif (Pertes) [-5]")
+        if dette_equity is not None:
+            if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
+            elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+            elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
 
-            if dette_equity is not None:
-                if dette_equity < 50: score += 4; details.append("✅ Bilan très sain (<50%) [+4]")
-                elif dette_equity < 100: score += 3; details.append("✅ Dette sous contrôle (<100%) [+3]")
-                elif dette_equity > 200: score -= 4; details.append("❌ Surendettement (>200%) [-4]")
+        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
+        elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
+        
+        if marge_pourcent > 30: score += 5; positifs.append("✅ Forte décote Graham [+5]")
+        if cash_action > (prix * 0.15): score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
 
-            if 10 < payout <= 80: score += 4; details.append("✅ Dividende soutenable [+4]")
-            if marge_pourcent > 30: score += 5; details.append("✅ Forte décote Graham (>30%) [+5]")
-            if cash_action > (prix * 0.15): score += 2; details.append("💰 Trésorerie abondante [+2]")
-
-            score_final = min(20, max(0, score))
-            st.write(f"## Note Finale : {score_final}/20")
+        score_final = min(20, max(0, score))
+        
+        c_score, c_details = st.columns([1, 2])
+        with c_score:
+            st.write(f"## Note : {score_final}/20")
             st.progress(score_final / 20)
-            
-            for d in details:
-                color = "#2ecc71" if "+" in d else ("#f1c40f" if "🟡" in d else "#e74c3c")
-                st.markdown(f'<p style="color:{color}; margin:0; font-weight:bold;">{d}</p>', unsafe_allow_html=True)
+            if score_final >= 15: st.success("🚀 ACHAT FORT")
+            elif score_final >= 10: st.info("⚖️ À SURVEILLER")
+            else: st.error("⚠️ ÉVITER")
 
-        with col_bareme:
-            st.subheader("📋 Barème de Calcul")
-            data_bareme = {
-                "Critère": ["P/E < 12", "P/E 12-20", "Dette < 50%", "Dette < 100%", "Payout 10-80%", "Décote Graham > 30%", "Cash abondant", "BPA Négatif", "Surendettement"],
-                "Points": ["+5", "+4", "+4", "+3", "+4", "+5", "+2", "-5", "-4"]
-            }
-            st.table(pd.DataFrame(data_bareme))
+        with c_details:
+            st.write("**Détails de l'analyse :**")
+            for p in positifs:
+                st.markdown(f'<p style="color:#2ecc71; margin:0; font-weight:bold;">{p}</p>', unsafe_allow_html=True)
+            for n in negatifs:
+                st.markdown(f'<p style="color:#e74c3c; margin:0; font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
     else:
-        st.error("Données indisponibles pour ce ticker.")
+        st.error("Données indisponibles. Vérifiez le ticker.")
 
-st.info("Note : Ce score est automatisé. Faites toujours vos propres recherches.")
+st.markdown("---")
+st.caption("Arthur Trading Pro - Analyse basée sur les données fondamentales Yahoo Finance.")
