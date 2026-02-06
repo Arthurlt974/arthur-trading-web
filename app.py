@@ -192,74 +192,34 @@ elif outil == "🌍 Market Monitor":
     st.plotly_chart(fig_idx, use_container_width=True)
 
 # ==========================================
-# OUTIL 4 : SCREENER CAC 40 (VERSION PRO AVEC TON CLASSEMENT)
+# OUTIL 4 : SCREENER CAC 40 (SYNCHRONISÉ)
 # ==========================================
 elif outil == "🔍 Screener CAC40":
-    st.title("🔍 Scanner Expert V5.5 - CAC 40")
-    st.markdown("### Analyse de 40 actions en temps réel selon ta stratégie")
+    st.title("🔍 Scanner Expert Pro - CAC 40")
     
-    if st.button("🚀 LANCER LE SCANNER PRO", use_container_width=True):
-        mes_actions = [
-            "AC.PA", "AI.PA", "AIR.PA", "ALO.PA", "MT.AS", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA", 
-            "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EL.PA", "STLAP.PA", "RMS.PA", "KER.PA", "OR.PA", 
-            "LR.PA", "MC.PA", "ML.PA", "ORA.PA", "RI.PA", "PUB.PA", "RNO.PA", "SAF.PA", "SGO.PA", 
-            "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA", "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", 
-            "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"
-        ]
+    if st.button("🚀 LANCER LE SCAN SYNCHRONISÉ"):
+        actions = ["AC.PA", "AI.PA", "AIR.PA", "ALO.PA", "MT.AS", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA", "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EL.PA", "STLAP.PA", "RMS.PA", "KER.PA", "OR.PA", "LR.PA", "MC.PA", "ML.PA", "ORA.PA", "RI.PA", "PUB.PA", "RNO.PA", "SAF.PA", "SGO.PA", "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA", "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"]
         
         resultats = []
         barre = st.progress(0)
-        status_text = st.empty()
-        
-        for idx, t in enumerate(mes_actions):
-            status_text.text(f"🔄 Analyse de {t}...")
+        for idx, t in enumerate(actions):
             try:
-                action = yf.Ticker(t)
-                inf = action.info
-                nom_reel = inf.get('shortName', t)
+                inf = yf.Ticker(t).info
+                px = inf.get('currentPrice') or inf.get('regularMarketPrice') or 1
                 
-                # --- RÉCUPÉRATION LOGIQUE TON SCRIPT ---
-                prix = inf.get('currentPrice') or inf.get('regularMarketPrice') or 1
-                bpa = inf.get('trailingEps') or inf.get('forwardEps') or 0
-                per = inf.get('trailingPE') or (prix / bpa if bpa > 0 else 50)
-                dette_equity = inf.get('debtToEquity')
-                payout = (inf.get('payoutRatio') or 0) * 100
-                marge_p = (((max(0, bpa) * 22.5 * 4.4) / 3.5) - prix) / prix * 100
-
-                # --- TON CLASSEMENT SCORING EXPERT ---
-                score = 0
-                if bpa > 0:
-                    if per < 12: score += 5
-                    elif per < 20: score += 4
-                    else: score += 1
-                else: score -= 5
-                
-                if dette_equity is not None:
-                    if dette_equity < 50: score += 4
-                    elif dette_equity < 100: score += 3
-                    elif dette_equity > 200: score -= 4
-                
-                if 10 < payout <= 80: score += 4
-                if marge_p > 30: score += 5
-                
-                score_f = min(20, max(0, score))
+                # Utilisation de la MEME fonction que l'Analyseur
+                note, pot = calculer_score_complet(inf, px)
                 
                 resultats.append({
-                    "RANG": 0, # Sera mis à jour après le tri
-                    "SCORE": score_f,
+                    "SCORE": note,
                     "TICKER": t,
-                    "NOM": nom_reel,
-                    "PRIX": f"{prix:.2f} €",
-                    "POTENTIEL": f"{marge_p:+.1f}%"
+                    "NOM": inf.get('shortName', t),
+                    "PRIX": f"{px:.2f} €",
+                    "POTENTIEL": f"{pot:+.1f}%"
                 })
             except: pass
-            barre.progress((idx + 1) / len(mes_actions))
+            barre.progress((idx + 1) / len(actions))
         
-        status_text.text("✅ Scan terminé avec succès !")
-        
-        # --- CLASSEMENT COMME TON PROGRAMME ---
         df_res = pd.DataFrame(resultats).sort_values(by="SCORE", ascending=False)
-        df_res["RANG"] = range(1, len(df_res) + 1) # Ajout du rang pro
-        
-        # Style du tableau pro
+        df_res.insert(0, "RANG", range(1, len(df_res) + 1))
         st.table(df_res.set_index("RANG"))
