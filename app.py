@@ -275,4 +275,3 @@ elif outil == "🌍 Market Monitor":
         
         fig_idx.update_layout(template="plotly_dark", height=600, margin=dict(l=0, r=10, t=0, b=0), xaxis_rangeslider_visible=False, yaxis_side="right")
         st.plotly_chart(fig_idx, use_container_width=True)
-
