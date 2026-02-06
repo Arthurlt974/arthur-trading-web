@@ -17,9 +17,9 @@ CONCURRENTS = {
     "Technology": ["STMPA.PA", "DSY.PA", "WLN.PA"]
 }
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW (VERSION GÉANTE) ---
 def afficher_graphique_tradingview(symbol):
-    # Traduction propre des tickers Yahoo -> TradingView
+    # Traduction des tickers Yahoo -> TradingView
     tv_symbol = symbol.upper()
     if ".PA" in tv_symbol:
         tv_symbol = f"EURONEXT:{tv_symbol.replace('.PA', '')}"
@@ -27,10 +27,10 @@ def afficher_graphique_tradingview(symbol):
         tv_symbol = f"LSE:{tv_symbol.replace('.L', '')}"
     elif ".MI" in tv_symbol:
         tv_symbol = f"MILAN:{tv_symbol.replace('.MI', '')}"
-    # Si c'est une action US, TradingView n'a pas besoin de préfixe particulier
     
+    # Hauteur fixée à 800px pour un rendu professionnel
     html_code = f"""
-    <div class="tradingview-widget-container" style="width:100%; height:500px;">
+    <div class="tradingview-widget-container" style="width:100%; height:800px;">
       <div id="tradingview_chart" style="width:100%; height:100%;"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
       <script type="text/javascript">
@@ -52,7 +52,7 @@ def afficher_graphique_tradingview(symbol):
       </script>
     </div>
     """
-    components.html(html_code, height=500)
+    components.html(html_code, height=800)
 
 def trouver_ticker(nom):
     try:
@@ -100,7 +100,7 @@ if nom_action:
 
         st.markdown("---")
 
-        # --- GRAPHIQUE INTERACTIF LARGE ---
+        # --- GRAPHIQUE INTERACTIF (TOUTE LA LARGEUR) ---
         st.subheader("📈 Graphique Interactif Professionnel")
         afficher_graphique_tradingview(ticker)
 
@@ -131,7 +131,7 @@ if nom_action:
 
             if dette_equity is not None:
                 if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
-                elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
+                elif借ette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
                 elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
 
             if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
@@ -161,21 +161,35 @@ if nom_action:
         if liste_rivaux:
             tous_les_tickers = list(set([ticker] + liste_rivaux))
             donnees_comp = []
-            for t in tous_les_tickers:
-                try:
-                    rival_info = yf.Ticker(t).info
-                    r_prix = rival_info.get('currentPrice', 1)
-                    r_bpa = rival_info.get('trailingEps', 0)
-                    r_yield_raw = rival_info.get('dividendYield')
-                    r_yield = (r_yield_raw if r_yield_raw and r_yield_raw > 0.2 else (r_yield_raw * 100 if r_yield_raw else 0))
-                    donnees_comp.append({
-                        "Action": rival_info.get('shortName', t),
-                        "P/E Ratio": round(r_prix / r_bpa, 2) if r_bpa > 0 else 0,
-                        "Rendement": f"{r_yield:.2f} %",
-                        "Dette/Equity": f"{rival_info.get('debtToEquity', 0)} %"
-                    })
-                except: continue
+            
+            with st.spinner('Chargement du comparatif...'):
+                for t in tous_les_tickers:
+                    try:
+                        rival_info = yf.Ticker(t).info
+                        r_prix = rival_info.get('currentPrice', 1)
+                        r_bpa = rival_info.get('trailingEps', 0)
+                        
+                        # Fix Rendement
+                        r_yield_raw = rival_info.get('dividendYield')
+                        if r_yield_raw is not None:
+                            r_yield = r_yield_raw if r_yield_raw > 0.2 else r_yield_raw * 100
+                        else: r_yield = 0
+                        
+                        donnees_comp.append({
+                            "Action": rival_info.get('shortName', t),
+                            "Ticker": t,
+                            "P/E Ratio": round(r_prix / r_bpa, 2) if r_bpa > 0 else 0,
+                            "Rendement": f"{r_yield:.2f} %",
+                            "Dette/Equity": f"{rival_info.get('debtToEquity', 0)} %"
+                        })
+                    except: continue
+                    
             df_comp = pd.DataFrame(donnees_comp)
-            st.table(df_comp)
+            st.dataframe(df_comp, use_container_width=True)
+
+            fig_comp = px.bar(df_comp, x='Action', y='P/E Ratio', color='Action', 
+                             title="Comparaison des Valorisations (P/E Ratio)",
+                             template="plotly_dark")
+            st.plotly_chart(fig_comp, use_container_width=True)
     else:
         st.error("Action non trouvée. Vérifiez le nom ou le ticker.")
