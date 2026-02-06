@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
+import time
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
@@ -22,7 +23,7 @@ outil = st.sidebar.radio("Choisir un outil :",
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "🔍 Screener CAC40", "😨 Fear & Greed", "💰 Simulateur Intérêts"])
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO (VERSION INCHANGÉE)
+# OUTIL 1 : ANALYSEUR PRO (TA VERSION ORIGINALE)
 # ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
@@ -72,7 +73,8 @@ if outil == "📊 Analyseur Pro":
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
-            st.write(f"**Dette/Equity :** {dette_equity if ajoute := dette_equity else 'N/A'} %")
+            # LIGNE CORRIGÉE : Suppression du walrus operator :=
+            st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
             st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
@@ -107,7 +109,7 @@ if outil == "📊 Analyseur Pro":
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (VERSION INCHANGÉE)
+# OUTIL 2 : MODE DUEL (TA VERSION ORIGINALE)
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
@@ -117,7 +119,8 @@ elif outil == "⚔️ Mode Duel":
     
     if st.button("Lancer le Duel"):
         def get_d(t):
-            i = yf.Ticker(trouver_ticker(t)).info
+            ticker_resolu = trouver_ticker(t)
+            i = yf.Ticker(ticker_resolu).info
             p = i.get('currentPrice', 1)
             b = i.get('trailingEps', 0)
             v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
@@ -135,7 +138,7 @@ elif outil == "⚔️ Mode Duel":
         st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR (VERSION INCHANGÉE + HEURE REU)
+# OUTIL 3 : MARKET MONITOR (TA VERSION ORIGINALE)
 # ==========================================
 elif outil == "🌍 Market Monitor":
     maintenant = datetime.utcnow() + timedelta(hours=4)
@@ -184,11 +187,11 @@ elif outil == "🔍 Screener CAC40":
         for i, t in enumerate(actions):
             try:
                 inf = yf.Ticker(t).info
-                bpa = inf.get('trailingEps', 0)
-                px = inf.get('currentPrice', 1)
+                bpa = inf.get('trailingEps') or inf.get('forwardEps') or 0
+                px = inf.get('currentPrice') or inf.get('regularMarketPrice') or 1
                 val = (max(0, bpa) * 22.5 * 4.4) / 3.5
                 pot = ((val - px) / px) * 100
-                res.append({"Ticker": t, "Nom": inf.get('shortName'), "Potentiel": f"{pot:.1f}%", "Score": 10 + (5 if pot > 30 else 0)})
+                res.append({"Ticker": t, "Nom": inf.get('shortName', t), "Potentiel": f"{pot:.1f}%", "Score": 10 + (5 if pot > 30 else 0)})
             except: pass
             p.progress((i + 1) / len(actions))
         st.table(pd.DataFrame(res).sort_values(by="Score", ascending=False))
@@ -198,13 +201,17 @@ elif outil == "🔍 Screener CAC40":
 # ==========================================
 elif outil == "😨 Fear & Greed":
     st.title("🔍 Sentiment Fear & Greed")
-    m = {"^GSPC": "S&P 500", "^FCHI": "CAC 40", "BTC-USD": "Bitcoin"}
-    for tk, nom in m.items():
+    marches = {"^GSPC": "USA (S&P 500)", "^FCHI": "EUROPE (CAC 40)", "BTC-USD": "CRYPTO (Bitcoin)"}
+    for tk, nom in marches.items():
         d = yf.Ticker(tk).history(period="1y")
-        ma = d['Close'].rolling(window=200).mean().iloc[-1]
-        r = (d['Close'].iloc[-1] / ma) - 1
-        txt, col = ("GREED 🚀", "#2ecc71") if r > 0.05 else (("FEAR 💀", "#e74c3c") if r < -0.05 else ("NEUTRAL ⚖️", "#f1c40f"))
-        st.markdown(f"### {nom} : <span style='color:{col}'>{txt}</span>", unsafe_allow_html=True)
+        if len(d) > 200:
+            ma200 = d['Close'].rolling(window=200).mean().iloc[-1]
+            prix = d['Close'].iloc[-1]
+            ratio = (prix/ma200) - 1
+            if ratio > 0.10: txt, col = "EXTREME GREED 🚀", "#2ecc71"
+            elif ratio < -0.10: txt, col = "EXTREME FEAR 💀", "#e74c3c"
+            else: txt, col = "NEUTRAL ⚖️", "#f1c40f"
+            st.markdown(f"### {nom} : <span style='color:{col}'>{txt}</span>", unsafe_allow_html=True)
 
 # ==========================================
 # NOUVEL OUTIL : SIMULATEUR INTÉRÊTS
@@ -212,10 +219,16 @@ elif outil == "😨 Fear & Greed":
 elif outil == "💰 Simulateur Intérêts":
     st.title("💰 Simulateur d'Intérêts Composés")
     c1, c2 = st.columns(2)
-    cap = c1.number_input("Départ (€)", value=1000)
-    mens = c1.number_input("Mensuel (€)", value=100)
-    tx = c2.number_input("Taux (%)", value=8.0)
-    ans = c2.number_input("Ans", value=10)
-    tot = cap
-    for i in range(ans * 12): tot = (tot + mens) * (1 + (tx/100/12))
-    st.success(f"Somme finale : {tot:,.2f} €")
+    cap = c1.number_input("Capital de départ (€)", value=1000)
+    mens = c1.number_input("Versement mensuel (€)", value=100)
+    tx = c2.number_input("Taux annuel (%)", value=8.0)
+    ans = c2.number_input("Durée (ans)", value=10)
+    
+    total = cap
+    total_investi = cap
+    for i in range(ans * 12):
+        total = (total + mens) * (1 + (tx/100/12))
+        total_investi += mens
+    
+    st.success(f"Somme finale : {total:,.2f} €")
+    st.info(f"Total investi : {total_investi:,.2f} € | Gain pur : {total - total_investi:,.2f} €")
