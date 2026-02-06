@@ -5,8 +5,34 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 
+# Nouveaux imports pour la stabilité
+import requests_cache
+from requests import Session
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
+
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="Arthur Trading Hub", layout="wide")
+
+# --- OPTIMISATION ANTI-BLOCAGE (Session & Cache) ---
+@st.cache_resource
+def get_session():
+    # Crée un cache local pour éviter de redemander la même info pendant 10 minutes
+    session = requests_cache.CachedSession('yfinance.cache', expire_after=600)
+    # Définit une stratégie de réessai en cas d'erreur 429 (Too Many Requests)
+    retry = Retry(
+        total=5, 
+        backoff_factor=1, 
+        status_forcelist=[429, 500, 502, 503, 504]
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    # Ajout d'un User-Agent crédible pour éviter d'être banni
+    session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
+    return session
+
+session = get_session()
 
 def trouver_ticker(nom):
     try:
@@ -22,12 +48,14 @@ outil = st.sidebar.radio("Choisir un outil :",
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO (Ta Version Finale)
+# OUTIL 1 : ANALYSEUR PRO
 # ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="MC.PA")
     ticker = trouver_ticker(nom_entree)
-    action = yf.Ticker(ticker)
+    
+    # Utilisation de la session ici
+    action = yf.Ticker(ticker, session=session)
     info = action.info
 
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
@@ -117,7 +145,7 @@ if outil == "📊 Analyseur Pro":
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (Ta Version Finale)
+# OUTIL 2 : MODE DUEL
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
@@ -127,35 +155,37 @@ elif outil == "⚔️ Mode Duel":
     
     if st.button("Lancer le Duel"):
         def get_d(t):
-            i = yf.Ticker(trouver_ticker(t)).info
+            # Utilisation de la session ici
+            i = yf.Ticker(trouver_ticker(t), session=session).info
             p = i.get('currentPrice', 1)
             b = i.get('trailingEps', 0)
             v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
             return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "dette": i.get('debtToEquity', 0), "yield": (i.get('dividendYield', 0) or 0)*100}
         
-        d1, d2 = get_d(t1), get_d(t2)
-        df = pd.DataFrame({
-            "Critère": ["Prix", "Valeur Graham", "Dette/Eq", "Rendement"],
-            d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['dette']}%", f"{d1['yield']:.2f}%"],
-            d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['dette']}%", f"{d2['yield']:.2f}%"]
-        })
-        st.table(df)
-        m1, m2 = ((d1['valeur']-d1['prix'])/d1['prix']), ((d2['valeur']-d2['prix'])/d2['prix'])
-        gagnant = d1['nom'] if m1 > m2 else d2['nom']
-        st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
+        try:
+            d1, d2 = get_d(t1), get_d(t2)
+            df = pd.DataFrame({
+                "Critère": ["Prix", "Valeur Graham", "Dette/Eq", "Rendement"],
+                d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['dette']}%", f"{d1['yield']:.2f}%"],
+                d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['dette']}%", f"{d2['yield']:.2f}%"]
+            })
+            st.table(df)
+            m1, m2 = ((d1['valeur']-d1['prix'])/d1['prix']), ((d2['valeur']-d2['prix'])/d2['prix'])
+            gagnant = d1['nom'] if m1 > m2 else d2['nom']
+            st.success(f"🏆 Gagnant sur la marge de sécurité : {gagnant}")
+        except:
+            st.error("Erreur lors de la récupération des données. Réessayez dans un instant.")
 
 # ==========================================
-# OUTIL 3 : MARKET MONITOR (Correction Heure UTC+4)
+# OUTIL 3 : MARKET MONITOR
 # ==========================================
 elif outil == "🌍 Market Monitor":
-    # Correction Heure : Streamlit Cloud est en UTC, on ajoute +4 pour La Réunion
     maintenant = datetime.utcnow() + timedelta(hours=4)
     h = maintenant.hour
     
     st.title("🌍 Market Monitor (UTC+4)")
     st.subheader(f"🕒 Heure actuelle : {maintenant.strftime('%H:%M:%S')}")
 
-    # 1. TABLEAU DES HORAIRES
     st.markdown("### 🕒 Statut des Bourses")
     data_horaires = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
@@ -168,7 +198,6 @@ elif outil == "🌍 Market Monitor":
     }
     st.table(pd.DataFrame(data_horaires))
 
-    # 2. MOTEURS DU MARCHÉ
     st.markdown("---")
     st.subheader("⚡ Moteurs du Marché")
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
@@ -179,7 +208,8 @@ elif outil == "🌍 Market Monitor":
 
     for i, (tk, nom) in enumerate(indices.items()):
         try:
-            data_idx = yf.Ticker(tk).history(period="2d")
+            # Utilisation de la session ici
+            data_idx = yf.Ticker(tk, session=session).history(period="2d")
             if not data_idx.empty:
                 val_actuelle = data_idx['Close'].iloc[-1]
                 val_prec = data_idx['Close'].iloc[-2]
@@ -189,7 +219,6 @@ elif outil == "🌍 Market Monitor":
                     st.session_state.index_selectionne = tk
         except: pass
 
-    # 3. GRAPHIQUE INTERACTIF (Style identique à l'Analyseur)
     st.markdown("---")
     nom_sel = indices[st.session_state.index_selectionne]
     st.subheader(f"📈 Graphique : {nom_sel}")
@@ -206,7 +235,8 @@ elif outil == "🌍 Market Monitor":
             periode_mkt = "5y"
             intervalle_mkt = "1d"
 
-    hist_idx = yf.Ticker(st.session_state.index_selectionne).history(period=periode_mkt, interval=intervalle_mkt)
+    # Utilisation de la session ici
+    hist_idx = yf.Ticker(st.session_state.index_selectionne, session=session).history(period=periode_mkt, interval=intervalle_mkt)
 
     if not hist_idx.empty:
         if mode_graph_mkt == "Pro (Bougies)":
@@ -217,7 +247,6 @@ elif outil == "🌍 Market Monitor":
         fig_idx.update_layout(template="plotly_dark", height=600, margin=dict(l=0, r=10, t=0, b=0), xaxis_rangeslider_visible=False, yaxis_side="right")
         st.plotly_chart(fig_idx, use_container_width=True)
 
-    # 4. CONSEILS
     st.markdown("---")
     if 12 <= h < 19: st.info("💡 **Europe** : Session en cours. Surveille la volatilité.")
     elif h >= 18 or h < 1: st.success("💡 **USA** : Session majeure. Regarde le NASDAQ pour la Tech.")
