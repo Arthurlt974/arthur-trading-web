@@ -503,29 +503,30 @@ elif outil == "📅 Calendrier Éco":
 # OUTIL 6 : FEAR & GREED INDEX PRO
 # ==========================================
 elif outil == "🌡️ Sentiment Index":
-    st.title("🌡️ Market Fear & Greed Index")
-    st.markdown("Ce score mesure l'écart entre le prix actuel et la **Moyenne Mobile 200 jours**. Plus l'écart est grand, plus l'euphorie est forte.")
+    st.title("🌡️ Market Sentiment Index")
+    st.write("Analyse de l'écart à la Moyenne Mobile 200 jours (MA200).")
     
     marches = {
-        "^GSPC": "🇺🇸 USA (S&P 500)",
-        "^FCHI": "🇫🇷 France (CAC 40)",
-        "^HSI":  "🇭🇰 Asie (Hang Kong)",
-        "BTC-USD": "₿ Crypto (Bitcoin)",
-        "GC=F": "🟡 Or (Gold)",
-        "NVDA": "🤖 Tech (NVIDIA)"
+        "^GSPC": "🇺🇸 USA - S&P 500",
+        "^FCHI": "🇫🇷 France - CAC 40",
+        "^HSI":  "🇭🇰 Asie - Hang Seng",
+        "BTC-USD": "₿ Crypto - Bitcoin",
+        "GC=F": "🟡 Or - Métal Précieux",
+        "NVDA": "🤖 Tech - NVIDIA"
     }
     
-    # Affichage en grille (2 colonnes)
-    cols = st.columns(2)
+    # Correction ici : on appelle bien 'afficher_jauge_pro'
+    c1, c2 = st.columns(2)
     for i, (ticker, nom) in enumerate(marches.items()):
         score, label, couleur = calculer_score_sentiment(ticker)
-        fig = afficher_jauge(score, nom, couleur, label)
-        cols[i % 2].plotly_chart(fig, use_container_width=True)
+        fig = afficher_jauge_pro(score, nom, couleur, label) # Le nom doit être identique ici
+        if i % 2 == 0:
+            c1.plotly_chart(fig, use_container_width=True)
+        else:
+            c2.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("💡 Guide d'interprétation")
-    c1, c2 = st.columns(2)
-    with c1:
+    st.info("💡 **Stratégie** : Un score très bas (Panique) est souvent une opportunité d'achat, tandis qu'un score très haut (Euphorie) invite à la prudence.")
         st.error("**Zone 0-25 (Extreme Fear)** : Les investisseurs paniquent. Historiquement, c'est souvent une zone d'accumulation (achat).")
     with c2:
         st.success("**Zone 75-100 (Extreme Greed)** : Le marché est en surchauffe. Risque élevé de correction brutale.")
