@@ -9,7 +9,6 @@ from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading", layout="wide")
-# L'autorefresh est à 30s pour les données, l'horloge JS gère les secondes
 st_autorefresh(interval=30000, key="global_refresh")
 
 # --- FONCTION HORLOGE TEMPS RÉEL (JS) ---
@@ -46,10 +45,10 @@ def afficher_horloge_temps_reel():
 # --- FONCTION GRAPHIQUE TRADINGVIEW PRO ---
 def afficher_graphique_pro(symbol, height=600):
     traduction_symbols = {
-        "^FCHI": "CAC40",            # Indice CAC40 par TVC
-        "^GSPC": "VANTAGE:SP500",      # S&P index cash CFD par VANTAGE
-        "^IXIC": "NASDAQ",         # Indice Nasdaq 100 par NASDAQ
-        "BTC-USD": "BINANCE:BTCUSDT"   # Bitcoin
+        "^FCHI": "CAC40",
+        "^GSPC": "VANTAGE:SP500",
+        "^IXIC": "NASDAQ",
+        "BTC-USD": "BINANCE:BTCUSDT"
     }
     tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
     if ".PA" in symbol and symbol not in traduction_symbols:
@@ -72,17 +71,13 @@ def afficher_graphique_pro(symbol, height=600):
           "hide_side_toolbar": false,
           "allow_symbol_change": true,
           "details": true,
-          "hotlist": true,
-          "calendar": true,
-          "show_popup_button": true,
           "container_id": "tradingview_chart"
         }});
         </script>
     """
     components.html(tradingview_html, height=height + 10)
 
-# --- FONCTIONS DE MISE EN CACHE ---
-# MODIFICATION ICI : ttl=5 pour rafraîchir le prix quasiment en direct
+# --- FONCTIONS DE MISE EN CACHE (Anti-Blocage & Performance) ---
 @st.cache_data(ttl=5) 
 def get_ticker_info(ticker):
     try:
@@ -133,6 +128,7 @@ if outil == "📊 Analyseur Pro":
 
         st.title(f"📊 {nom} ({ticker})")
 
+        # Métriques principales
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Prix Actuel", f"{prix:.2f} {devise}")
         c2.metric("Valeur Graham", f"{val_theorique:.2f} {devise}")
@@ -140,16 +136,23 @@ if outil == "📊 Analyseur Pro":
         c4.metric("Secteur", secteur)
 
         st.markdown("---")
+        
+        # LE GRAPHIQUE (PREND TOUTE LA LARGEUR)
         st.subheader("📈 Analyse Technique Pro")
-        col_graph, col_data = st.columns([2, 1])
-        with col_graph:
-            afficher_graphique_pro(ticker)
-        with col_data:
-            st.subheader("📑 Détails Financiers")
+        afficher_graphique_pro(ticker, height=650) # Hauteur augmentée pour plus de confort
+
+        st.markdown("---")
+
+        # LES DÉTAILS FINANCIERS (DÉCALÉS EN BAS)
+        st.subheader("📑 Détails Financiers")
+        f1, f2, f3 = st.columns(3)
+        with f1:
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
             st.write(f"**Ratio P/E :** {per:.2f}")
+        with f2:
             st.write(f"**Dette/Equity :** {dette_equity if dette_equity is not None else 'N/A'} %")
             st.write(f"**Rendement Div. :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
+        with f3:
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
