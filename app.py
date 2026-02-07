@@ -928,21 +928,32 @@ elif outil == "CORRÉLATION DASH 📊":
 # ==========================================
 # OUTIL : GESTION WATCHLIST
 # ==========================================
+# ==========================================
+# OUTIL : GESTION WATCHLIST
+# ==========================================
 elif outil == "WATCHLIST MGMT 📋":
-    st.title("📋 MANAGE YOUR WATCHLIST")
+    st.title("📋 GESTION DU BANDEAU DÉROULANT")
     
-    c1, c2 = st.columns([3, 1])
-    new_fav = c1.text_input("ADD TICKER (ex: NVDA, GOOGL, MSFT)")
-    if c2.button("➕ ADD") and new_fav:
-        tkr_clean = trouver_ticker(new_fav)
-        if tkr_clean not in st.session_state.watchlist:
-            st.session_state.watchlist.append(tkr_clean)
-            st.rerun()
+    # Formulaire d'ajout
+    with st.container():
+        c1, c2 = st.columns([3, 1])
+        new_fav = c1.text_input("RECHERCHER UN SYMBOLE (ex: NVDA, SOL-USD, MSFT)")
+        if c2.button("➕ AJOUTER") and new_fav:
+            # On utilise la fonction de recherche que tu as déjà dans ton code
+            tkr_clean = trouver_ticker(new_fav).upper()
+            if tkr_clean not in st.session_state.watchlist:
+                st.session_state.watchlist.append(tkr_clean)
+                st.success(f"{tkr_clean} ajouté !")
+                st.rerun() # Relance pour mettre à jour le bandeau en haut
 
-    st.markdown("### CURRENT FAVORITES")
-    for i, f in enumerate(st.session_state.watchlist):
+    st.markdown("---")
+    st.subheader("🗑️ SUPPRIMER DES FAVORIS")
+    
+    # Liste de suppression
+    for f in st.session_state.watchlist:
         col_name, col_del = st.columns([4, 1])
-        col_name.write(f"**{i+1}. {f}**")
-        if col_del.button("🗑️", key=f"del_{f}"):
+        col_name.write(f"**{f}**")
+        if col_del.button("SUPPRIMER", key=f"del_{f}"):
             st.session_state.watchlist.remove(f)
             st.rerun()
+        
