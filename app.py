@@ -911,21 +911,34 @@ elif outil == "CORRÉLATION DASH 📊":
 # ==========================================
 # OUTIL : GESTION WATCHLIST
 # ==========================================
-elif outil == "WATCHLIST MGMT 📋":
-    st.title("📋 MANAGE YOUR WATCHLIST")
+# --- GLOBAL TICKER TAPE ---
+with st.container():
+    # On encapsule dans un div stylé
+    st.markdown("""
+        <div style="background-color: #1a1a1a; padding: 10px; border-radius: 5px; border-left: 5px solid #00ffad;">
+            <span style="color: #00ffad; font-weight: bold;">📌 MARKET MOMENTUM (WATCHLIST)</span>
+        </div>
+        """, unsafe_allow_html=True)
     
-    c1, c2 = st.columns([3, 1])
-    new_fav = c1.text_input("ADD TICKER (ex: NVDA, GOOGL, MSFT)")
-    if c2.button("➕ ADD") and new_fav:
-        tkr_clean = trouver_ticker(new_fav)
-        if tkr_clean not in st.session_state.watchlist:
-            st.session_state.watchlist.append(tkr_clean)
-            st.rerun()
+    if "watchlist" not in st.session_state:
+        st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA"]
 
-    st.markdown("### CURRENT FAVORITES")
-    for i, f in enumerate(st.session_state.watchlist):
-        col_name, col_del = st.columns([4, 1])
-        col_name.write(f"**{i+1}. {f}**")
-        if col_del.button("🗑️", key=f"del_{f}"):
-            st.session_state.watchlist.remove(f)
-            st.rerun()
+    if len(st.session_state.watchlist) > 0:
+        cols_watch = st.columns(len(st.session_state.watchlist))
+
+        for i, tkr in enumerate(st.session_state.watchlist):
+            try:
+                t_data = yf.Ticker(tkr)
+                price_now = t_data.fast_info['last_price']
+                prev_close = t_data.fast_info['previous_close']
+                change = ((price_now - prev_close) / prev_close) * 100
+                
+                # Affichage
+                cols_watch[i].metric(
+                    tkr.replace("-USD", ""), 
+                    f"{price_now:.2f}", 
+                    f"{change:+.2f}%"
+                )
+            except:
+                cols_watch[i].error(f"ERR: {tkr}")
+    st.markdown("---")
