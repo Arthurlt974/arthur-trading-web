@@ -15,9 +15,6 @@ st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 # --- INITIALISATION DU WORKSPACE (FÊNETRES MULTIPLES) ---
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
-# AJOUTEZ CETTE LIGNE ICI :
-if "multi_charts" not in st.session_state:
-    st.session_state.multi_charts = []
 
 # --- STYLE BLOOMBERG TERMINAL (DARK HEADER) ---
 st.markdown("""
@@ -123,6 +120,21 @@ def afficher_horloge_temps_reel():
     """
     components.html(horloge_html, height=120)
 
+# Fonction améliorée pour récupérer le prix live (API Binance)
+    def get_crypto_price(symbol):
+        try:
+            # On ajoute un 'headers' pour éviter d'être bloqué par le pare-feu de Binance
+            url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(url, headers=headers, timeout=5)
+            
+            if response.status_code == 200:
+                return float(response.json()['price'])
+            else:
+                return None
+        except Exception as e:
+            return None
+
 
 # --- FONCTION GRAPHIQUE TRADINGVIEW PRO ---
 def afficher_graphique_pro(symbol, height=600):
@@ -227,8 +239,7 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
 # --- NAVIGATION ---
 st.sidebar.title("📟 AM-TERMINAL")
 outil = st.sidebar.radio("SELECT MODULE :", [
-    "ANALYSEUR PRO",
-    "MULTI-CHARTS",
+    "ANALYSEUR PRO", 
     "MODE DUEL", 
     "MARKET MONITOR", 
     "DAILY BRIEF", 
@@ -237,34 +248,29 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "INTERETS COMPOSES",
     "CRYPTO WALLET",
     "WHALE WATCHER 🐋",
-     "CORRÉLATION DASH 📊"
+    "CORRÉLATION DASH 📊"
 ])
 
-# --- NOUVELLE FONCTION POUR GRAPHIQUES MULTIPLES ---
-def afficher_mini_graphique(symbol, chart_id):
-    traduction_symbols = {"^FCHI": "CAC40", "^GSPC": "VANTAGE:SP500", "^IXIC": "NASDAQ", "BTC-USD": "BINANCE:BTCUSDT"}
-    tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
-    if ".PA" in symbol and symbol not in traduction_symbols:
-        tv_symbol = f"EURONEXT:{tv_symbol}"
+st.markdown("### 📌 WATCHLIST QUICK-VIEW")
+if "watchlist" not in st.session_state:
+    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA"]
 
-    # On utilise chart_id pour éviter les conflits de DOM entre les fenêtres
-    tradingview_html = f"""
-        <div id="tv_chart_{chart_id}" style="height:400px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-        new TradingView.widget({{
-          "autosize": true,
-          "symbol": "{tv_symbol}",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "container_id": "tv_chart_{chart_id}"
-        }});
-        </script>
-    """
-    components.html(tradingview_html, height=410)
+cols_watch = st.columns(len(st.session_state.watchlist))
+
+for i, tkr in enumerate(st.session_state.watchlist):
+    try:
+        t_data = yf.Ticker(tkr)
+        # On récupère le prix actuel et la clôture précédente
+        price_now = t_data.fast_info['last_price']
+        prev_close = t_data.fast_info['previous_close']
+        change = ((price_now - prev_close) / prev_close) * 100
+        
+        # Affichage du petit widget pour chaque ticker
+        cols_watch[i].metric(tkr.replace("-USD", ""), f"{price_now:.2f}", f"{change:+.2f}%")
+    except:
+        cols_watch[i].error(f"ERR: {tkr}")
+
+st.markdown("---") # Ligne de séparation avec le reste de l'outil
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
@@ -455,7 +461,7 @@ elif outil == "MODE DUEL":
         
         fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#ff9800"), height=400)
         st.plotly_chart(fig, use_container_width=True)
-
+           
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
 # ==========================================
@@ -658,6 +664,7 @@ elif outil == "INTERETS COMPOSES":
     with st.expander("VOIR LE DÉTAIL ANNÉE PAR ANNÉE"):
         st.table(df_plot)
 
+
 # ==========================================
 # OUTIL 8 : CRYPTO WALLET TRACKER
 # ==========================================
@@ -740,53 +747,6 @@ elif outil == "CRYPTO WALLET":
         st.warning("⚠️ ATTENTE DES DONNÉES MARCHÉ...")
 
 # ==========================================
-# NOUVEAU MODULE : MULTI-CHARTS
-# ==========================================
-if outil == "MULTI-CHARTS":
-    st.title("🖥️ MULTI-WINDOW WORKSPACE")
-    
-    # Barre de recherche pour ajouter des fenêtres
-    with st.container():
-        c_search, c_btn, c_clear = st.columns([3, 1, 1])
-        new_ticker = c_search.text_input("ADD TICKER TO WORKSPACE (ex: AAPL, TSLA, MC.PA)", key="add_chart_input")
-        if c_btn.button("➕ ADD WINDOW"):
-            if new_ticker:
-                ticker_to_add = trouver_ticker(new_ticker)
-                if ticker_to_add not in st.session_state.multi_charts:
-                    st.session_state.multi_charts.append(ticker_to_add)
-                    st.rerun()
-        
-        if c_clear.button("🗑️ CLEAR ALL"):
-            st.session_state.multi_charts = []
-            st.rerun()
-
-    st.markdown("---")
-
-    # Affichage en grille (2 colonnes)
-    if not st.session_state.multi_charts:
-        st.info("Votre espace est vide. Ajoutez un ticker ci-dessus pour ouvrir une fenêtre.")
-    else:
-        # On crée une grille de 2 colonnes (tu peux passer à 3 pour plus de fenêtres)
-        cols = st.columns(2)
-        for idx, ticker in enumerate(st.session_state.multi_charts):
-            col_index = idx % 2
-            with cols[col_index]:
-                # En-tête de la mini fenêtre
-                st.markdown(f"""
-                    <div style="background:#1a1a1a; padding:5px 10px; border:1px solid #ff9800; border-bottom:none; display:flex; justify-content:space-between;">
-                        <span style="color:#ff9800; font-weight:bold;">📟 {ticker}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # Affichage du graphique
-                afficher_mini_graphique(ticker, idx)
-                
-                # Bouton pour fermer cette fenêtre précise
-                if st.button(f"CLOSE {ticker}", key=f"close_{idx}"):
-                    st.session_state.multi_charts.pop(idx)
-                    st.rerun()
-
-# ==========================================
 # OUTIL : WHALE WATCHER (FLUX LIVE)
 # ==========================================
 elif outil == "WHALE WATCHER 🐋":
@@ -813,30 +773,21 @@ elif outil == "WHALE WATCHER 🐋":
 
     trades = get_live_trades()
     
-   # Traitement des données
+    # Traitement des données
     new_logs = []
-    if isinstance(trades, list): # Sécurité si l'API renvoie une erreur
-        for t in trades:
-            # Correction ici : les clés de l'API Binance sont en minuscules
-            try:
-                qty = float(t['qty'])
-                if qty >= seuil_baleine:
-                    is_buyer = t['isBuyerMaker'] # True = Vente, False = Achat
-                    color = "🔴" if is_buyer else "🟢"
-                    label = "SELL" if is_buyer else "BUY"
-                    prix = float(t['price'])
-                    # On formate l'heure proprement
-                    time_str = datetime.fromtimestamp(t['time']/1000).strftime('%H:%M:%S')
-                    
-                    log = f"{color} | {time_str} | {label} {qty:.2f} BTC @ {prix:,.0f} $"
-                    
-                    # On vérifie si ce log n'est pas déjà présent pour éviter les doublons
-                    if log not in st.session_state.whale_logs:
-                        st.session_state.whale_logs.insert(0, log)
-                        st.session_state.pressure_data.append(0 if is_buyer else 1)
-            except KeyError as e:
-                # Si une clé manque, on passe au trade suivant sans faire planter l'app
-                continue
+    for t in trades:
+        qty = float(t['qty'])
+        if qty >= seuil_baleine:
+            is_buyer = t['isBuyerMaker'] # True = Vente, False = Achat
+            color = "🔴" if is_buyer else "🟢"
+            label = "SELL" if is_buyer else "BUY"
+            prix = float(t['price'])
+            time_str = datetime.fromtimestamp(t['time']/1000).strftime('%H:%M:%S')
+            
+            log = f"{color} | {time_str} | {label} {qty:.2f} BTC @ {prix:,.0f} $"
+            if log not in st.session_state.whale_logs:
+                st.session_state.whale_logs.insert(0, log)
+                st.session_state.pressure_data.append(0 if is_buyer else 1)
 
     # Nettoyage historique (max 15 logs)
     st.session_state.whale_logs = st.session_state.whale_logs[:15]
@@ -957,4 +908,24 @@ elif outil == "CORRÉLATION DASH 📊":
         except Exception as e:
             st.error(f"Erreur de calcul : {e}")
 
+# ==========================================
+# OUTIL : GESTION WATCHLIST
+# ==========================================
+elif outil == "WATCHLIST MGMT 📋":
+    st.title("📋 MANAGE YOUR WATCHLIST")
+    
+    c1, c2 = st.columns([3, 1])
+    new_fav = c1.text_input("ADD TICKER (ex: NVDA, GOOGL, MSFT)")
+    if c2.button("➕ ADD") and new_fav:
+        tkr_clean = trouver_ticker(new_fav)
+        if tkr_clean not in st.session_state.watchlist:
+            st.session_state.watchlist.append(tkr_clean)
+            st.rerun()
 
+    st.markdown("### CURRENT FAVORITES")
+    for i, f in enumerate(st.session_state.watchlist):
+        col_name, col_del = st.columns([4, 1])
+        col_name.write(f"**{i+1}. {f}**")
+        if col_del.button("🗑️", key=f"del_{f}"):
+            st.session_state.watchlist.remove(f)
+            st.rerun()
