@@ -6,13 +6,40 @@ import feedparser
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
+import plotly.graph_objects as go
+import numpy as np
+
+# --- FONCTIONS DE CALCUL ET SENTIMENT ---
+
+def calculer_score_sentiment(ticker):
+    try:
+        data = yf.Ticker(ticker).history(period="1y")
+        if len(data) < 200: return 50, "NEUTRE", "gray"
+        
+        prix_actuel = data['Close'].iloc[-1]
+        ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
+        
+        # Calcul de l'écart relatif (Ratio)
+        ratio = (prix_actuel / ma200) - 1
+        
+        # Formule lissée pour le score
+        score = 50 + (ratio * 300) 
+        score = max(10, min(90, score)) # Bridage visuel pour éviter les bords
+        
+        if score > 70: return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
+        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
+        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
+        elif score > 30: return score, "PEUR 📉", "#e67e22"
+        else: return score, "PANIQUE TOTALE 💀", "#e74c3c"
+    except:
+        return 50, "ERREUR", "gray"
+
 def afficher_jauge_pro(score, titre, couleur, sentiment):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = score,
         domain = {'x': [0, 1], 'y': [0, 1]},
         number = {'font': {'size': 45, 'color': "white"}, 'suffix': "%"},
-        # On sépare le texte du titre pour éviter l'erreur Plotly
         title = {
             'text': f"{titre}<br><span style='color:{couleur}; font-size:18px;'>{sentiment}</span>", 
             'font': {'size': 22, 'color': "white"}
@@ -59,7 +86,6 @@ def check_password():
         return True
 
     st.markdown("### 🔒 Accès Restreint")
-    # On utilise le paramètre 'key' pour lier directement l'input au session_state
     pwd = st.text_input("Mot de passe :", type="password")
     
     if st.button("Se connecter"):
@@ -70,27 +96,13 @@ def check_password():
             st.error("❌ Mot de passe incorrect")
     return False
 
-    if "password_correct" not in st.session_state:
-        st.markdown("### 🔒 Accès Restreint")
-        st.text_input("Veuillez saisir le mot de passe pour accéder à AM-Trading :", 
-                     type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.markdown("### 🔒 Accès Restreint")
-        st.text_input("Veuillez saisir le mot de passe pour accéder à AM-Trading :", 
-                     type="password", on_change=password_entered, key="password")
-        st.error("❌ Mot de passe incorrect")
-        return False
-    else:
-        return True
-
 if not check_password():
-    st.stop() # Arrête le code ici si le mot de passe n'est pas bon
+    st.stop()
 
-# --- LA SUITE DU CODE (S'exécute seulement si le MDP est correct) ---
+# --- REFRESH ---
 st_autorefresh(interval=30000, key="global_refresh")
 
-# --- FONCTION HORLOGE TEMPS RÉEL (JS) ---
+# --- HORLOGE ---
 def afficher_horloge_temps_reel():
     horloge_html = """
         <div id="clock" style="
@@ -121,7 +133,7 @@ def afficher_horloge_temps_reel():
     """
     components.html(horloge_html, height=100)
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW PRO ---
+# --- GRAPHIQUES ---
 def afficher_graphique_pro(symbol, height=600):
     traduction_symbols = {
         "^FCHI": "CAC40",
@@ -156,7 +168,6 @@ def afficher_graphique_pro(symbol, height=600):
     """
     components.html(tradingview_html, height=height + 10)
 
-# --- FONCTIONS DE MISE EN CACHE ---
 @st.cache_data(ttl=5) 
 def get_ticker_info(ticker):
     try:
@@ -183,14 +194,10 @@ def trouver_ticker(nom):
 st.sidebar.title("🚀 AM-Trading")
 outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "🌡️ Sentiment Index", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief", "📅 Calendrier Éco"])
 
-# ==========================================
-# OUTIL 1 : ANALYSEUR PRO
-# ==========================================
 if outil == "📊 Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="NVIDIA")
     ticker = trouver_ticker(nom_entree)
     info = get_ticker_info(ticker)
-
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
@@ -206,17 +213,14 @@ if outil == "📊 Analyseur Pro":
         marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 else 0
 
         st.title(f"📊 {nom} ({ticker})")
-
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Prix Actuel", f"{prix:.2f} {devise}")
         c2.metric("Valeur Graham", f"{val_theorique:.2f} {devise}")
         c3.metric("Potentiel", f"{marge_pourcent:+.2f}%")
         c4.metric("Secteur", secteur)
-
         st.markdown("---")
         st.subheader("📈 Analyse Technique Pro")
         afficher_graphique_pro(ticker, height=650)
-
         st.markdown("---")
         st.subheader("📑 Détails Financiers")
         f1, f2, f3 = st.columns(3)
@@ -230,93 +234,6 @@ if outil == "📊 Analyseur Pro":
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        st.markdown("---")
-        st.subheader("⭐ Scoring Qualité (sur 20)")
-        score = 0
-        positifs, negatifs = [], []
-        if bpa > 0:
-            if per < 12: score += 5; positifs.append("✅ P/E attractif [+5]")
-            elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
-            else: score += 1; positifs.append("🟡 P/E élevé [+1]")
-        else: score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
-        
-        if dette_equity is not None:
-            if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
-            elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
-            elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
-            
-        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide [+4]")
-        elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
-        if marge_pourcent > 30: score += 5; positifs.append("✅ Forte décote Graham [+5]")
-
-        score_f = min(20, max(0, score))
-        cs, cd = st.columns([1, 2])
-        with cs:
-            st.write(f"## Note : {score_f}/20")
-            st.progress(score_f / 20)
-        with cd:
-            for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
-            for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.subheader(f"📰 Actualités : {nom}")
-        
-        # Sous-onglets pour l'action spécifique
-        tab_action_24h, tab_action_archive = st.tabs(["🔥 Direct (24h)", "📚 Archive (7 jours)"])
-        
-        search_term = nom.replace(" ", "+")
-        # On ajoute Investing.com à la recherche Google News pour mixer les sources
-        url_rss = f"https://news.google.com/rss/search?q={search_term}+(site:investing.com+OR+bourse+OR+stock)&hl=fr&gl=FR&ceid=FR:fr"
-        
-        try:
-            import time
-            flux = feedparser.parse(url_rss)
-            maintenant = time.time()
-            secondes_par_jour = 24 * 3600
-            
-            # Tri par date (le plus récent en haut)
-            articles = sorted(flux.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
-
-            # --- ONGLET 1 : DIRECT 24H (MIX INVESTING + AUTRES) ---
-            with tab_action_24h:
-                trouve_24h = False
-                for entry in articles:
-                    pub_time = time.mktime(entry.published_parsed) if 'published_parsed' in entry else maintenant
-                    if (maintenant - pub_time) < secondes_par_jour:
-                        trouve_24h = True
-                        clean_title = entry.title.split(' - ')[0]
-                        source = entry.source.get('title', 'Finance')
-                        
-                        # Petite icône spéciale si ça vient d'Investing
-                        prefix = "📊 Investing |" if "investing" in source.lower() else "🆕"
-                        
-                        with st.expander(f"{prefix} {clean_title}"):
-                            st.write(f"**Source :** {source}")
-                            st.caption(f"🕒 Publié le : {entry.published}")
-                            st.link_button("Lire l'article", entry.link)
-                if not trouve_24h:
-                    st.info("Aucune actualité sur les dernières 24h.")
-
-            # --- ONGLET 2 : ARCHIVE (STYLE PRÉCÉDENT MIXÉ) ---
-            with tab_action_archive:
-                if not articles:
-                    st.write("Aucune archive disponible.")
-                for entry in articles[:12]: # On affiche un peu plus d'articles en archive
-                    clean_title = entry.title.split(' - ')[0]
-                    source = entry.source.get('title', 'Finance')
-                    prefix = "📊 Investing |" if "investing" in source.lower() else "📌"
-                    
-                    with st.expander(f"{prefix} {clean_title}"):
-                        st.write(f"**Source :** {source}")
-                        st.caption(f"📅 Date : {entry.published}")
-                        st.link_button("Voir l'archive", entry.link)
-                        
-        except Exception:
-            st.error("Erreur lors de la récupération des flux (Google News & Investing).")
-
-# ==========================================
-# OUTIL 2 : MODE DUEL
-# ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
     c1, c2 = st.columns(2)
@@ -342,16 +259,11 @@ elif outil == "⚔️ Mode Duel":
             st.success(f"🏆 Meilleur potentiel : {d1['nom'] if m1 > m2 else d2['nom']}")
         except: st.error("Erreur de données.")
 
-# ==========================================
-# OUTIL 3 : MARKET MONITOR
-# ==========================================
 elif outil == "🌍 Market Monitor":
     st.title("🌍 Market Monitor")
     afficher_horloge_temps_reel()
-
     st.markdown("### 🕒 Statut des Bourses")
     h = (datetime.utcnow() + timedelta(hours=4)).hour
-    
     data_horaires = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
         "Ouverture (REU)": ["05:30", "12:00", "18:30"],
@@ -363,13 +275,10 @@ elif outil == "🌍 Market Monitor":
         ]
     }
     st.table(pd.DataFrame(data_horaires))
-
     st.markdown("---")
-    st.subheader("⚡ Moteurs du Marché")
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
     cols = st.columns(len(indices))
     if 'index_selectionne' not in st.session_state: st.session_state.index_selectionne = "^FCHI"
-
     for i, (tk, nom) in enumerate(indices.items()):
         try:
             hist_idx = get_ticker_history(tk)
@@ -380,22 +289,13 @@ elif outil == "🌍 Market Monitor":
                 if cols[i].button(f"Analyser {nom}", key=f"btn_{tk}"):
                     st.session_state.index_selectionne = tk
         except: pass
-
     st.markdown("---")
-    nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
-    st.subheader(f"📈 Graphique Avancé : {nom_sel}")
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
 
-# ==========================================
-# OUTIL 4 : DAILY BRIEF (AVEC FOCUS BOURSORAMA)
-# ==========================================
 elif outil == "📰 Daily Brief":
     st.title("📰 Daily Market Brief")
     st.markdown("---")
-
-    # Création des 3 sous-onglets
     tab_eco, tab_tech, tab_quotidien = st.tabs(["🌍 Économie Mondiale", "⚡ Tech & Crypto", "📅 Le Quotidien (Boursorama)"])
-
     def afficher_flux_daily(url, filtre_boursorama_24h=False):
         try:
             import time
@@ -403,79 +303,45 @@ elif outil == "📰 Daily Brief":
             if not flux.entries:
                 st.info("Aucune actualité trouvée.")
                 return
-
             maintenant = time.time()
             secondes_par_jour = 24 * 3600
-            
-            # Tri par date (le plus récent en haut)
             articles = sorted(flux.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
-            
             trouve = False
-            # On affiche les 15 derniers articles pour le quotidien
             for entry in articles[:15]:
                 pub_time = time.mktime(entry.published_parsed) if 'published_parsed' in entry else maintenant
-                
-                # Condition : Si c'est l'onglet Daily, on applique le RESET 24H
                 if not filtre_boursorama_24h or (maintenant - pub_time) < secondes_par_jour:
                     trouve = True
-                    # Nettoyage du titre (on enlève le suffixe Boursorama répétitif)
                     clean_title = entry.title.replace(" - Boursorama", "").split(" - ")[0]
-                    
                     with st.expander(f"⚡ {clean_title}"):
                         st.write(f"**Source :** Boursorama Actualités")
                         if 'published' in entry:
                             st.caption(f"🕒 Publié le : {entry.published}")
                         st.link_button("Lire l'article complet", entry.link)
-            
             if not trouve and filtre_boursorama_24h:
                 st.warning("En attente de nouveaux articles Boursorama pour aujourd'hui...")
-
-        except Exception:
-            st.error("Erreur lors de la récupération des données.")
-
-    # --- DISTRIBUTION DES ONGLETS ---
+        except: st.error("Erreur flux.")
     with tab_eco:
-        # Flux général sans limite de temps stricte
         url_eco = "https://news.google.com/rss/search?q=bourse+economie+mondiale&hl=fr&gl=FR&ceid=FR:fr"
-        afficher_flux_daily(url_eco, filtre_boursorama_24h=False)
-
+        afficher_flux_daily(url_eco)
     with tab_tech:
-        # Flux tech sans limite de temps stricte
         url_tech = "https://news.google.com/rss/search?q=crypto+nasdaq+nvidia&hl=fr&gl=FR&ceid=FR:fr"
-        afficher_flux_daily(url_tech, filtre_boursorama_24h=False)
-
+        afficher_flux_daily(url_tech)
     with tab_quotidien:
-        st.subheader("🗞️ Le Direct Boursorama (Dernières 24h)")
-        # Recherche ciblée exclusivement sur Boursorama
         url_boursorama = "https://news.google.com/rss/search?q=site:boursorama.com&hl=fr&gl=FR&ceid=FR:fr"
         afficher_flux_daily(url_boursorama, filtre_boursorama_24h=True)
 
-# ==========================================
-# OUTIL 5 : CALENDRIER ÉCONOMIQUE
-# ==========================================
 elif outil == "📅 Calendrier Éco":
     st.title("📅 Calendrier Économique")
     st.info("Annonces macroéconomiques mondiales en direct.")
-    
-    # Widget TradingView avec forçage de la langue Française
     calendrier_tv = """
     <meta charset="UTF-8">
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
-      {
-      "colorTheme": "dark",
-      "isMaximized": true,
-      "width": "100%",
-      "height": "800",
-      "locale": "fr",
-      "importanceFilter": "-1,0,1",
-      "countryFilter": "fr,us,eu,gb,jp"
-      }
+      { "colorTheme": "dark", "isMaximized": true, "width": "100%", "height": "800", "locale": "fr", "importanceFilter": "-1,0,1", "countryFilter": "fr,us,eu,gb,jp" }
       </script>
     </div>
     """
-    
     components.html(calendrier_tv, height=800, scrolling=True)
 
 # ==========================================
@@ -504,5 +370,4 @@ elif outil == "🌡️ Sentiment Index":
             c2.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
-    # J'ai simplifié cette partie pour éviter les erreurs d'indentation complexes
     st.info("💡 **Stratégie** : Un score proche de 0 (Panique) est souvent une zone d'achat. Un score proche de 100 (Euphorie) invite à la prudence.")
