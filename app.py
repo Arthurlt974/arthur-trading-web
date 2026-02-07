@@ -260,8 +260,16 @@ elif outil == "📅 Calendrier Éco":
     st.title("📅 Calendrier Économique Temps Réel")
     st.info("Suivez les annonces macroéconomiques mondiales en direct.")
     
+    # Configuration du widget Investing
     calendrier_html = """
-    <iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_main&features=datepicker,timezone&countries=25,32,6,37,7,5&calType=day&timeZone=58&lang=5" 
-    width="100%" height="800" frameborder="0" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
+    <div style="width: 100%; height: 800px;">
+        <iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_main&features=datepicker,timezone&countries=25,32,6,37,7,5&calType=day&timeZone=58&lang=5" 
+        width="100%" height="800" frameborder="0" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
+        <div style="font-size:11px; font-family:Arial, Helvetica, sans-serif; text-align:right;">
+            <a href="https://fr.investing.com/" rel="nofollow" target="_blank">Calendrier économique fourni par Investing.com France</a>
+        </div>
+    </div>
     """
-    components.html(calendrier_html, height=850)
+    
+    # Affichage du composant
+    components.html(calendrier_html, height=850, scrolling=True)
