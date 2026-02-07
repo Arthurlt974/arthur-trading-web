@@ -662,7 +662,7 @@ elif outil == "INTERETS COMPOSES":
 elif outil == "CRYPTO WALLET":
     st.title("₿ CRYPTO PROFIT TRACKER")
     
-    # Configuration du Portefeuille dans la barre latérale ou en haut
+    # Configuration des positions
     st.subheader("» CONFIGURATION DES POSITIONS")
     c1, c2 = st.columns(2)
     with c1:
@@ -672,55 +672,58 @@ elif outil == "CRYPTO WALLET":
         achat_eth = st.number_input("PRIX D'ACHAT MOYEN ETH ($)", value=2500.0)
         qte_eth = st.number_input("QUANTITÉ ETH DÉTENUE", value=0.1, format="%.4f")
 
-    # Fonction pour récupérer le prix live (API Binance)
+    # Fonction de récupération des prix (Bien alignée !)
     def get_crypto_price(symbol):
         try:
             url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
-            return float(requests.get(url).json()['price'])
-        except: return None
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(url, headers=headers, timeout=5)
+            if response.status_code == 200:
+                return float(response.json()['price'])
+            return yf.Ticker(f"{symbol}-USD").fast_info['last_price']
+        except:
+            return None
 
-    # Récupération des données
+    # Fonction d'affichage des cartes (Bien alignée !)
+    def display_crypto_card(nom, actuel, achat, qte):
+        profit_unit = actuel - achat
+        profit_total = profit_unit * qte
+        perf_pct = (actuel - achat) / achat * 100
+        couleur = "#00ff00" if perf_pct >= 0 else "#ff0000"
+        signe = "+" if perf_pct >= 0 else ""
+        
+        st.markdown(f"""
+            <div style="border: 1px solid #333; padding: 20px; border-radius: 5px; background: #111;">
+                <h3 style="margin:0; color:#ff9800;">{nom}</h3>
+                <p style="margin:0; font-size:12px; color:#666;">PRIX ACTUEL</p>
+                <h2 style="margin:0; color:#00ff00;">{actuel:,.2f} $</h2>
+                <hr style="border:0.5px solid #222;">
+                <div style="display: flex; justify-content: space-between;">
+                    <div>
+                        <p style="margin:0; font-size:12px; color:#666;">PERFORMANCE</p>
+                        <p style="margin:0; color:{couleur}; font-weight:bold;">{signe}{perf_pct:.2f} %</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p style="margin:0; font-size:12px; color:#666;">PROFIT TOTAL</p>
+                        <p style="margin:0; color:{couleur}; font-weight:bold;">{signe}{profit_total:,.2f} $</p>
+                    </div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Récupération et Affichage
     p_btc = get_crypto_price("BTC")
     p_eth = get_crypto_price("ETH")
 
     if p_btc and p_eth:
         st.markdown("---")
-        st.subheader("» LIVE PERFORMANCE")
-        
-        # Calculs
-        def display_crypto_card(nom, actuel, achat, qte):
-            profit_unit = actuel - achat
-            profit_total = profit_unit * qte
-            perf_pct = (actuel - achat) / achat * 100
-            couleur = "#00ff00" if perf_pct >= 0 else "#ff0000"
-            signe = "+" if perf_pct >= 0 else ""
-            
-            st.markdown(f"""
-                <div style="border: 1px solid #333; padding: 20px; border-radius: 5px; background: #111;">
-                    <h3 style="margin:0; color:#ff9800;">{nom}</h3>
-                    <p style="margin:0; font-size:12px; color:#666;">PRIX ACTUEL</p>
-                    <h2 style="margin:0; color:#00ff00;">{actuel:,.2f} $</h2>
-                    <hr style="border:0.5px solid #222;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <div>
-                            <p style="margin:0; font-size:12px; color:#666;">PERFORMANCE</p>
-                            <p style="margin:0; color:{couleur}; font-weight:bold;">{signe}{perf_pct:.2f} %</p>
-                        </div>
-                        <div style="text-align: right;">
-                            <p style="margin:0; font-size:12px; color:#666;">PROFIT TOTAL</p>
-                            <p style="margin:0; color:{couleur}; font-weight:bold;">{signe}{profit_total:,.2f} $</p>
-                        </div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-
         col_btc, col_eth = st.columns(2)
         with col_btc:
             display_crypto_card("BITCOIN", p_btc, achat_btc, qte_btc)
         with col_eth:
             display_crypto_card("ETHEREUM", p_eth, achat_eth, qte_eth)
-
-        # Résumé du Wallet
+            
+        # Résumé Global
         total_val = (p_btc * qte_btc) + (p_eth * qte_eth)
         total_investi = (achat_btc * qte_btc) + (achat_eth * qte_eth)
         profit_global = total_val - total_investi
@@ -728,11 +731,12 @@ elif outil == "CRYPTO WALLET":
 
         st.markdown("---")
         m1, m2, m3 = st.columns(3)
-        m1.metric("VALEUR TOTALE PORTFOLIO", f"{total_val:,.2f} $")
-        m2.metric("PROFIT GLOBAL ($)", f"{profit_global:,.2f} $", f"{perf_globale:+.2f}%")
-        m3.metric("MARCHÉ", "BTC/USDT", "LIVE")
+        m1.metric("VALEUR TOTALE", f"{total_val:,.2f} $")
+        m2.metric("PROFIT GLOBAL", f"{profit_global:,.2f} $", f"{perf_globale:+.2f}%")
+        m3.metric("STATUS", "LIVE FEED", "OK")
     else:
-        st.error("ERREUR DE CONNEXION À L'API BINANCE")
+        st.warning("⚠️ ATTENTE DES DONNÉES MARCHÉ...")
+
 # ==========================================
 # NOUVEAU MODULE : MULTI-CHARTS
 # ==========================================
