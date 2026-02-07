@@ -7,7 +7,6 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
-import numpy as np
 
 def calculer_score_sentiment(ticker):
     try:
@@ -17,56 +16,55 @@ def calculer_score_sentiment(ticker):
         prix_actuel = data['Close'].iloc[-1]
         ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
         
-        # Calcul de l'écart relatif
+        # Calcul de l'écart relatif (Ratio)
         ratio = (prix_actuel / ma200) - 1
         
-        # Nouvelle formule mathématique pour éviter le 0 et le 100 trop faciles
-        # On utilise une normalisation plus douce (ratio de 0.25 = Extreme Greed)
-        score = 50 + (ratio * 200) 
-        score = max(5, min(95, score)) # On bride entre 5 et 95 pour garder de la marge visuelle
+        # Formule lissée pour éviter le 0/100 immédiat
+        score = 50 + (ratio * 150) 
+        score = max(10, min(90, score)) # Bloqué entre 10 et 90 pour la lisibilité visuelle
         
-        if score > 75: return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
-        elif score > 60: return score, "OPTIMISME 📈", "#2ecc71"
-        elif score > 40: return score, "NEUTRE ⚖️", "#f1c40f"
-        elif score > 20: return score, "PEUR 📉", "#e67e22"
+        if score > 70: return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
+        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
+        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
+        elif score > 30: return score, "PEUR 📉", "#e67e22"
         else: return score, "PANIQUE TOTALE 💀", "#e74c3c"
     except:
         return 50, "ERREUR", "gray"
 
-def afficher_jauge(score, titre, couleur, sentiment):
+def afficher_jauge_pro(score, titre, couleur, sentiment):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = score,
         domain = {'x': [0, 1], 'y': [0, 1]},
-        number = {'font': {'size': 40, 'color': "white"}},
-        title = {'text': f"<span style='font-size:18px;color:white'>{titre}</span><br><span style='font-size:14px;color:{couleur}'>{sentiment}</span>", 'align': 'center'},
+        number = {'font': {'size': 50, 'color': "white"}, 'suffix': "%"},
+        title = {'text': f"<b style='font-size:24px; color:white;'>{titre}</b><br><span style='font-size:18px; color:{couleur};'>{sentiment}</span>", 'padding': {'b': 20}},
         gauge = {
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-            'bar': {'color': couleur, 'thickness': 0.25},
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white", 'tickfont': {'size': 12}},
+            'bar': {'color': couleur, 'thickness': 0.3},
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 2,
             'bordercolor': "#242733",
             'steps': [
-                {'range': [0, 20], 'color': "#4d0000"},
-                {'range': [20, 40], 'color': "#4d2600"},
-                {'range': [40, 60], 'color': "#333300"},
-                {'range': [60, 80], 'color': "#003300"},
-                {'range': [80, 100], 'color': "#004d33"}
+                {'range': [0, 30], 'color': "rgba(231, 76, 60, 0.3)"}, # Panique
+                {'range': [30, 45], 'color': "rgba(230, 126, 34, 0.3)"}, # Peur
+                {'range': [45, 55], 'color': "rgba(241, 196, 15, 0.3)"}, # Neutre
+                {'range': [55, 70], 'color': "rgba(46, 204, 113, 0.3)"}, # Optimisme
+                {'range': [70, 100], 'color': "rgba(0, 255, 173, 0.3)"}  # Euphorie
             ],
             'threshold': {
-                'line': {'color': "white", 'width': 4},
-                'thickness': 0.75,
+                'line': {'color': "white", 'width': 5},
+                'thickness': 0.8,
                 'value': score
             }
         }
     ))
     
     fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", 
+        paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font={'color': "white", 'family': "Arial"},
-        height=280, # Hauteur réduite pour éviter de couper
-        margin=dict(l=40, r=40, t=80, b=20) # Marges augmentées pour le texte
+        height=400, # Augmenté pour éviter les coupures
+        margin=dict(l=50, r=50, t=100, b=50)
     )
     return fig
 
