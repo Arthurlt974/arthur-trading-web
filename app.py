@@ -415,9 +415,9 @@ elif outil == "📰 Daily Brief":
 # ==========================================
 elif outil == "📅 Calendrier Éco":
     st.title("📅 Calendrier Économique")
-    st.info("Annonces macroéconomiques mondiales (Source: TradingView)")
+    st.info("Annonces macroéconomiques mondiales en direct.")
     
-    # Widget TradingView (très stable)
+    # Widget TradingView en Français
     calendrier_tv = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
