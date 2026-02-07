@@ -236,7 +236,8 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "Fear and Gread Index",
     "INTERETS COMPOSES",
     "CRYPTO WALLET",
-    "WHALE WATCHER 🐋"
+    "WHALE WATCHER 🐋",
+     "CORRÉLATION DASH 📊"
 ])
 
 # --- NOUVELLE FONCTION POUR GRAPHIQUES MULTIPLES ---
@@ -882,5 +883,78 @@ elif outil == "WHALE WATCHER 🐋":
             st.warning("BEARISH : Les baleines déchargent leurs sacs.")
         else:
             st.write("NEUTRE : Le marché cherche une direction.")
+
+# ==========================================
+# OUTIL : DASHBOARD DE CORRÉLATION
+# ==========================================
+elif outil == "CORRÉLATION DASH 📊":
+    st.title("📊 ASSET CORRELATION MATRIX")
+    st.write("Analyse de la corrélation sur les 30 derniers jours (Données Daily)")
+
+    # Liste des actifs à comparer
+    assets = {
+        "BTC-USD": "Bitcoin",
+        "^GSPC": "S&P 500",
+        "GC=F": "Or (Gold)",
+        "DX-Y.NYB": "Dollar Index",
+        "^IXIC": "Nasdaq",
+        "ETH-USD": "Ethereum"
+    }
+
+    with st.spinner('Calculating correlations...'):
+        try:
+            # Téléchargement des données pour tous les actifs
+            data = yf.download(list(assets.keys()), period="60d", interval="1d")['Close']
+            
+            # Calcul des rendements journaliers pour corréler les mouvements et non les prix
+            returns = data.pct_change().dropna()
+            
+            # Calcul de la matrice de corrélation
+            corr_matrix = returns.corr()
+            
+            # Renommer avec les noms propres
+            corr_matrix.columns = [assets[c] for c in corr_matrix.columns]
+            corr_matrix.index = [assets[i] for i in corr_matrix.index]
+
+            # Affichage de la Heatmap avec Plotly
+            fig = go.Figure(data=go.Heatmap(
+                z=corr_matrix.values,
+                x=corr_matrix.columns,
+                y=corr_matrix.index,
+                colorscale='RdYlGn', # Rouge (négatif) à Vert (positif)
+                zmin=-1, zmax=1
+            ))
+            
+            fig.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#ff9800"),
+                height=500
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # --- ANALYSE DÉTAILLÉE ---
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("🔍 KEY INSIGHTS")
+                # Focus sur BTC vs S&P500
+                btc_sp = corr_matrix.loc["Bitcoin", "S&P 500"]
+                if btc_sp > 0.7:
+                    st.warning(f"⚠️ BTC / S&P 500 : Forte Corrélation ({btc_sp:.2f}). Le marché crypto suit les actions US.")
+                elif btc_sp < 0.3:
+                    st.success(f"✅ BTC / S&P 500 : Découplage ({btc_sp:.2f}). Le BTC suit sa propre route.")
+                else:
+                    st.info(f"⚖️ BTC / S&P 500 : Corrélation Modérée ({btc_sp:.2f}).")
+
+            with col2:
+                st.subheader("📖 INTERPRÉTATION")
+                st.write("**+1.0** : Les actifs bougent identiquement.")
+                st.write("**0.0** : Aucun lien entre les deux.")
+                st.write("**-1.0** : Les actifs bougent en sens opposé.")
+
+        except Exception as e:
+            st.error(f"Erreur de calcul : {e}")
 
 
