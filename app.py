@@ -9,26 +9,51 @@ from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading", layout="wide")
-st_autorefresh(interval=15000, key="global_refresh")
+# L'autorefresh est à 30s pour les données, l'horloge JS gère les secondes
+st_autorefresh(interval=30000, key="global_refresh")
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (TRADUCTION EXACTE) ---
+# --- FONCTION HORLOGE TEMPS RÉEL (JS) ---
+def afficher_horloge_temps_reel():
+    horloge_html = """
+        <div id="clock" style="
+            font-size: 28px; 
+            font-family: 'Source Code Pro', monospace; 
+            color: #26a69a; 
+            font-weight: bold;
+            padding: 15px;
+            border-radius: 8px;
+            background: #131722;
+            border: 1px solid #242733;
+            text-align: center;
+            margin-bottom: 20px;
+        ">--:--:--</div>
+        <script>
+            function updateClock() {
+                const now = new Date();
+                const offset = 4; // UTC+4 Réunion
+                const localTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (offset * 3600000));
+                const h = String(localTime.getHours()).padStart(2, '0');
+                const m = String(localTime.getMinutes()).padStart(2, '0');
+                const s = String(localTime.getSeconds()).padStart(2, '0');
+                document.getElementById('clock').innerText = h + ":" + m + ":" + s;
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+        </script>
+    """
+    components.html(horloge_html, height=100)
+
+# --- FONCTION GRAPHIQUE TRADINGVIEW PRO ---
 def afficher_graphique_pro(symbol, height=600):
-    # Dictionnaire de traduction selon tes sources demandées
     traduction_symbols = {
-        "^FCHI": "CAC40",            # Indice CAC40 par TVC
+        "^FCHI": "TVC:PX1",            # Indice CAC40 par TVC
         "^GSPC": "VANTAGE:SP500",      # S&P index cash CFD par VANTAGE
-        "^IXIC": "NASDAQ",         # Indice Nasdaq 100 par NASDAQ
+        "^IXIC": "NASDAQ:NDX",         # Indice Nasdaq 100 par NASDAQ
         "BTC-USD": "BINANCE:BTCUSDT"   # Bitcoin
     }
-    
-    # Choix du symbole
-    if symbol in traduction_symbols:
-        tv_symbol = traduction_symbols[symbol]
-    else:
-        # Pour les actions françaises (ex: MC.PA)
-        tv_symbol = symbol.replace(".PA", "")
-        if ".PA" in symbol:
-            tv_symbol = f"EURONEXT:{tv_symbol}"
+    tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
+    if ".PA" in symbol and symbol not in traduction_symbols:
+        tv_symbol = f"EURONEXT:{tv_symbol}"
 
     tradingview_html = f"""
         <div id="tradingview_chart" style="height:{height}px;"></div>
@@ -62,16 +87,14 @@ def get_ticker_info(ticker):
     try:
         data = yf.Ticker(ticker)
         return data.info
-    except:
-        return None
+    except: return None
 
 @st.cache_data(ttl=60)
 def get_ticker_history(ticker, period="2d"):
     try:
         data = yf.Ticker(ticker)
         return data.history(period=period)
-    except:
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
 def trouver_ticker(nom):
     try:
@@ -79,13 +102,11 @@ def trouver_ticker(nom):
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers).json()
         return response['quotes'][0]['symbol'] if response.get('quotes') else nom
-    except: 
-        return nom
+    except: return nom
 
 # --- NAVIGATION ---
 st.sidebar.title("🚀 AM-Trading")
-outil = st.sidebar.radio("Choisir un outil :", 
-    ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
+outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
@@ -118,12 +139,10 @@ if outil == "📊 Analyseur Pro":
         c4.metric("Secteur", secteur)
 
         st.markdown("---")
-        st.subheader("📈 Analyse Technique (TradingView)")
-        
+        st.subheader("📈 Analyse Technique Pro")
         col_graph, col_data = st.columns([2, 1])
         with col_graph:
             afficher_graphique_pro(ticker)
-
         with col_data:
             st.subheader("📑 Détails Financiers")
             st.write(f"**BPA (EPS) :** {bpa:.2f} {devise}")
@@ -133,7 +152,7 @@ if outil == "📊 Analyseur Pro":
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # --- SECTION SCORING ---
+        # --- SCORING ---
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
         score = 0
@@ -143,53 +162,37 @@ if outil == "📊 Analyseur Pro":
             elif per < 20: score += 4; positifs.append("✅ Valorisation raisonnable [+4]")
             else: score += 1; positifs.append("🟡 P/E élevé [+1]")
         else: score -= 5; negatifs.append("🚨 Entreprise en PERTE [-5]")
+        
         if dette_equity is not None:
             if dette_equity < 50: score += 4; positifs.append("✅ Bilan très solide [+4]")
             elif dette_equity < 100: score += 3; positifs.append("✅ Dette maîtrisée [+3]")
             elif dette_equity > 200: score -= 4; negatifs.append("❌ Surendettement [-4]")
-        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide/safe [+4]")
+            
+        if 10 < payout <= 80: score += 4; positifs.append("✅ Dividende solide [+4]")
         elif payout > 95: score -= 4; negatifs.append("🚨 Payout Ratio risqué [-4]")
         if marge_pourcent > 30: score += 5; positifs.append("✅ Forte décote Graham [+5]")
-        if cash_action > (prix * 0.15): score += 2; positifs.append("💰 Bonus : Trésorerie abondante [+2]")
 
         score_f = min(20, max(0, score))
-        c_s, c_d = st.columns([1, 2])
-        with c_s:
+        cs, cd = st.columns([1, 2])
+        with cs:
             st.write(f"## Note : {score_f}/20")
             st.progress(score_f / 20)
-            if score_f >= 15: st.success("🚀 ACHAT FORT")
-            elif score_f >= 10: st.info("⚖️ À SURVEILLER")
-            else: st.error("⚠️ ÉVITER")
-        with c_d:
-            for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;font-weight:bold;">{p}</p>', unsafe_allow_html=True)
-            for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;font-weight:bold;">{n}</p>', unsafe_allow_html=True)
+        with cd:
+            for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
+            for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
-        # --- SECTION ACTUALITÉS ---
+        # --- ACTUALITÉS ---
         st.markdown("---")
-        col_n, col_m = st.columns([2, 1])
-        with col_n:
-            st.subheader(f"📰 Actualités : {nom}")
-            search_term = nom.replace(" ", "+")
-            url_rss = f"https://news.google.com/rss/search?q={search_term}+stock+bourse&hl=fr&gl=FR&ceid=FR:fr"
-            try:
-                flux = feedparser.parse(url_rss)
-                if flux.entries:
-                    for entry in flux.entries[:5]:
-                        clean_title = entry.title.split(" - ")[0]
-                        with st.expander(f"📌 {clean_title}"):
-                            st.write(f"**Source :** {entry.source.get('title', 'Presse Finance')}")
-                            st.caption(f"Publié le : {entry.published}")
-                            st.link_button("Lire l'article", entry.link)
-            except: st.error("Erreur de flux d'actualités.")
-        with col_m:
-            st.subheader("🌍 Flash Marché")
-            url_mkt = "https://news.google.com/rss/search?q=bourse+mondiale+indices&hl=fr&gl=FR&ceid=FR:fr"
-            try:
-                flux_mkt = feedparser.parse(url_mkt)
-                for m_art in flux_mkt.entries[:4]:
-                    m_title = m_art.title.split(" - ")[0]
-                    st.markdown(f"🔹 **{m_art.source.get('title')}**\n[{m_title}]({m_art.link})")
-            except: st.write("Flux indisponible.")
+        st.subheader(f"📰 Actualités : {nom}")
+        search_term = nom.replace(" ", "+")
+        url_rss = f"https://news.google.com/rss/search?q={search_term}+stock+bourse&hl=fr&gl=FR&ceid=FR:fr"
+        try:
+            flux = feedparser.parse(url_rss)
+            for entry in flux.entries[:5]:
+                with st.expander(f"📌 {entry.title.split(' - ')[0]}"):
+                    st.write(f"**Source :** {entry.source.get('title')}")
+                    st.link_button("Lire l'article", entry.link)
+        except: st.error("Erreur de flux d'actualités.")
 
 # ==========================================
 # OUTIL 2 : MODE DUEL
@@ -204,31 +207,30 @@ elif outil == "⚔️ Mode Duel":
             ticker_id = trouver_ticker(t)
             i = get_ticker_info(ticker_id)
             p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
-            b = i.get('trailingEps') or i.get('forwardEps') or 0
+            b = i.get('trailingEps') or 0
             v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
-            return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "dette": i.get('debtToEquity', 0), "yield": (i.get('dividendYield', 0) or 0)*100}
+            return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "yield": (i.get('dividendYield', 0) or 0)*100}
         try:
             d1, d2 = get_d(t1), get_d(t2)
             df = pd.DataFrame({
-                "Critère": ["Prix", "Valeur Graham", "Dette/Eq", "Rendement"],
-                d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['dette']}%", f"{d1['yield']:.2f}%"],
-                d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['dette']}%", f"{d2['yield']:.2f}%"]
+                "Critère": ["Prix", "Valeur Graham", "Rendement Div."],
+                d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['yield']:.2f}%"],
+                d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['yield']:.2f}%"]
             })
             st.table(df)
-            m1 = (d1['valeur']-d1['prix'])/d1['prix']
-            m2 = (d2['valeur']-d2['prix'])/d2['prix']
-            st.success(f"🏆 Gagnant : {d1['nom'] if m1 > m2 else d2['nom']}")
+            m1, m2 = (d1['valeur']-d1['prix'])/d1['prix'], (d2['valeur']-d2['prix'])/d2['prix']
+            st.success(f"🏆 Meilleur potentiel : {d1['nom'] if m1 > m2 else d2['nom']}")
         except: st.error("Erreur de données.")
 
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
 # ==========================================
 elif outil == "🌍 Market Monitor":
-    maintenant = datetime.utcnow() + timedelta(hours=4)
-    h = maintenant.hour
-    st.title("🌍 Market Monitor (UTC+4)")
-    st.subheader(f"🕒 Heure actuelle : {maintenant.strftime('%H:%M:%S')}")
+    st.title("🌍 Market Monitor")
+    afficher_horloge_temps_reel()
 
+    st.markdown("### 🕒 Statut des Bourses")
+    h = (datetime.utcnow() + timedelta(hours=4)).hour
     data_horaires = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
         "Ouverture (REU)": ["05:30", "12:00", "18:30"],
@@ -240,26 +242,20 @@ elif outil == "🌍 Market Monitor":
     st.subheader("⚡ Moteurs du Marché")
     indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
     cols = st.columns(len(indices))
-    
-    if 'index_selectionne' not in st.session_state:
-        st.session_state.index_selectionne = "^FCHI"
+    if 'index_selectionne' not in st.session_state: st.session_state.index_selectionne = "^FCHI"
 
     for i, (tk, nom) in enumerate(indices.items()):
         try:
             hist_idx = get_ticker_history(tk)
             if not hist_idx.empty:
-                val_actuelle = hist_idx['Close'].iloc[-1]
-                val_prec = hist_idx['Close'].iloc[-2]
+                val_actuelle, val_prec = hist_idx['Close'].iloc[-1], hist_idx['Close'].iloc[-2]
                 variation = ((val_actuelle - val_prec) / val_prec) * 100
                 cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
-                if cols[i].button(f"Analyser {nom}", key=f"btn_{tk}", use_container_width=True):
+                if cols[i].button(f"Analyser {nom}", key=f"btn_{tk}"):
                     st.session_state.index_selectionne = tk
         except: pass
 
     st.markdown("---")
-    indices_noms = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
-    nom_sel = indices_noms.get(st.session_state.index_selectionne, "Indice")
+    nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
     st.subheader(f"📈 Graphique Avancé : {nom_sel}")
-    
-    # Affichage du graphique avec les flux spécifiques (TVC, VANTAGE, NASDAQ)
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
