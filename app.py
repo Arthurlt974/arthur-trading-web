@@ -7,25 +7,28 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
+import numpy as np
 
 def calculer_score_sentiment(ticker):
     try:
         data = yf.Ticker(ticker).history(period="1y")
-        if len(data) < 200: return 50, "NEUTRAL", "gray"
+        if len(data) < 200: return 50, "NEUTRE", "gray"
         
         prix_actuel = data['Close'].iloc[-1]
         ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
+        
+        # Calcul de l'écart relatif
         ratio = (prix_actuel / ma200) - 1
         
-        # Transformation du ratio en score 0-100
-        # -15% ou moins = 0 (Extreme Fear) | +15% ou plus = 100 (Extreme Greed)
-        score = 50 + (ratio * 333) 
-        score = max(0, min(100, score))
+        # Nouvelle formule mathématique pour éviter le 0 et le 100 trop faciles
+        # On utilise une normalisation plus douce (ratio de 0.25 = Extreme Greed)
+        score = 50 + (ratio * 200) 
+        score = max(5, min(95, score)) # On bride entre 5 et 95 pour garder de la marge visuelle
         
         if score > 75: return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
-        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
-        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
-        elif score > 25: return score, "PEUR 📉", "#e67e22"
+        elif score > 60: return score, "OPTIMISME 📈", "#2ecc71"
+        elif score > 40: return score, "NEUTRE ⚖️", "#f1c40f"
+        elif score > 20: return score, "PEUR 📉", "#e67e22"
         else: return score, "PANIQUE TOTALE 💀", "#e74c3c"
     except:
         return 50, "ERREUR", "gray"
@@ -34,21 +37,37 @@ def afficher_jauge(score, titre, couleur, sentiment):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = score,
-        title = {'text': f"<b>{titre}</b><br><span style='font-size:0.8em;color:{couleur}'>{sentiment}</span>"},
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        number = {'font': {'size': 40, 'color': "white"}},
+        title = {'text': f"<span style='font-size:18px;color:white'>{titre}</span><br><span style='font-size:14px;color:{couleur}'>{sentiment}</span>", 'align': 'center'},
         gauge = {
-            'axis': {'range': [0, 100], 'tickwidth': 1},
-            'bar': {'color': couleur},
-            'bgcolor': "#131722",
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+            'bar': {'color': couleur, 'thickness': 0.25},
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 2,
+            'bordercolor': "#242733",
             'steps': [
-                {'range': [0, 25], 'color': "#4d0000"},
-                {'range': [25, 45], 'color': "#4d2600"},
-                {'range': [45, 55], 'color': "#333300"},
-                {'range': [55, 75], 'color': "#003300"},
-                {'range': [75, 100], 'color': "#004d33"}
+                {'range': [0, 20], 'color': "#4d0000"},
+                {'range': [20, 40], 'color': "#4d2600"},
+                {'range': [40, 60], 'color': "#333300"},
+                {'range': [60, 80], 'color': "#003300"},
+                {'range': [80, 100], 'color': "#004d33"}
             ],
+            'threshold': {
+                'line': {'color': "white", 'width': 4},
+                'thickness': 0.75,
+                'value': score
+            }
         }
     ))
-    fig.update_layout(paper_bgcolor="#131722", font={'color': "white", 'family': "Arial"}, height=300, margin=dict(l=20, r=20, t=50, b=20))
+    
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", 
+        plot_bgcolor="rgba(0,0,0,0)",
+        font={'color': "white", 'family': "Arial"},
+        height=280, # Hauteur réduite pour éviter de couper
+        margin=dict(l=40, r=40, t=80, b=20) # Marges augmentées pour le texte
+    )
     return fig
 
 # --- CONFIGURATION GLOBALE ---
