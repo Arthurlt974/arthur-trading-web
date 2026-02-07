@@ -17,7 +17,7 @@ def afficher_graphique_pro(symbol, height=600):
     traduction_symbols = {
         "^FCHI": "CAC40",            # Indice CAC40 par TVC
         "^GSPC": "VANTAGE:SP500",      # S&P index cash CFD par VANTAGE
-        "^IXIC": "NASDAQ:NDX",         # Indice Nasdaq 100 par NASDAQ
+        "^IXIC": "NASDAQ100",         # Indice Nasdaq 100 par NASDAQ
         "BTC-USD": "BINANCE:BTCUSDT"   # Bitcoin
     }
     
