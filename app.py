@@ -414,15 +414,28 @@ elif outil == "📰 Daily Brief":
 # OUTIL 5 : CALENDRIER ÉCONOMIQUE
 # ==========================================
 elif outil == "📅 Calendrier Éco":
-    st.title("📅 Calendrier Économique Temps Réel")
-    st.info("Suivez les annonces macroéconomiques mondiales en direct.")
+    st.title("📅 Calendrier Économique")
+    st.info("Annonces macroéconomiques mondiales (Source: TradingView)")
     
-    # Widget Investing avec sécurité renforcée pour Streamlit Cloud
-    calendrier_html = """
-    <div style="width: 100%; height: 800px; overflow: hidden; border-radius: 10px;">
-        <iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_main&features=datepicker,timezone&countries=25,32,6,37,7,5&calType=day&timeZone=58&lang=5" 
-        width="100%" height="800" frameborder="0" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
+    # Widget TradingView (beaucoup plus stable sur Streamlit)
+    calendrier_tv = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+      {
+      "colorTheme": "dark",
+      "isMaximized": true,
+      "width": "100%",
+      "height": "800",
+      "locale": "fr",
+      "importanceFilter": "-1,0,1",
+      "countryFilter": "fr,us,eu,gb,jp"
+      }
+      </script>
     </div>
+    """
+    
+    components.html(calendrier_tv, height=800)
     """
     
     components.html(calendrier_html, height=850, scrolling=True)
