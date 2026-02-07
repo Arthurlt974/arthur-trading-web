@@ -250,27 +250,44 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "WHALE WATCHER 🐋",
     "CORRÉLATION DASH 📊"
 ])
-
-st.markdown("### 📌 WATCHLIST QUICK-VIEW")
+# --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
 if "watchlist" not in st.session_state:
-    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA"]
+    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA", "NVDA", "GOOGL"]
 
-cols_watch = st.columns(len(st.session_state.watchlist))
+ticker_data_string = ""
 
-for i, tkr in enumerate(st.session_state.watchlist):
+for tkr in st.session_state.watchlist:
     try:
-        t_data = yf.Ticker(tkr)
-        # On récupère le prix actuel et la clôture précédente
-        price_now = t_data.fast_info['last_price']
-        prev_close = t_data.fast_info['previous_close']
-        change = ((price_now - prev_close) / prev_close) * 100
+        t_info = yf.Ticker(tkr).fast_info
+        price = t_info['last_price']
+        change = ((price - t_info['previous_close']) / t_info['previous_close']) * 100
+        color = "#00ffad" if change >= 0 else "#ff4b4b"
+        sign = "+" if change >= 0 else ""
         
-        # Affichage du petit widget pour chaque ticker
-        cols_watch[i].metric(tkr.replace("-USD", ""), f"{price_now:.2f}", f"{change:+.2f}%")
+        # Formatage du texte pour le bandeau
+        ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 40px; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
+        ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px; font-family: monospace;">{price:,.2f} ({sign}{change:.2f}%)</span>'
     except:
-        cols_watch[i].error(f"ERR: {tkr}")
+        continue
 
-st.markdown("---") # Ligne de séparation avec le reste de l'outil
+# --- AFFICHAGE DU COMPOSANT HTML DÉFILANT ---
+marquee_html = f"""
+<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
+    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
+        {ticker_data_string} {ticker_data_string} {ticker_data_string}
+    </div>
+</div>
+
+<style>
+@keyframes marquee {{
+    0% {{ transform: translateX(0); }}
+    100% {{ transform: translateX(-33.33%); }}
+}}
+</style>
+"""
+
+components.html(marquee_html, height=60)
+# st.markdown("---") # Tu peux garder ou enlever cette ligne selon tes préférences visuelles
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
