@@ -515,18 +515,15 @@ elif outil == "🌡️ Sentiment Index":
         "NVDA": "🤖 Tech - NVIDIA"
     }
     
-    # Correction ici : on appelle bien 'afficher_jauge_pro'
     c1, c2 = st.columns(2)
     for i, (ticker, nom) in enumerate(marches.items()):
         score, label, couleur = calculer_score_sentiment(ticker)
-        fig = afficher_jauge_pro(score, nom, couleur, label) # Le nom doit être identique ici
+        fig = afficher_jauge_pro(score, nom, couleur, label)
         if i % 2 == 0:
             c1.plotly_chart(fig, use_container_width=True)
         else:
             c2.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
-    st.info("💡 **Stratégie** : Un score très bas (Panique) est souvent une opportunité d'achat, tandis qu'un score très haut (Euphorie) invite à la prudence.")
-        st.error("**Zone 0-25 (Extreme Fear)** : Les investisseurs paniquent. Historiquement, c'est souvent une zone d'accumulation (achat).")
-    with c2:
-        st.success("**Zone 75-100 (Extreme Greed)** : Le marché est en surchauffe. Risque élevé de correction brutale.")
+    # J'ai simplifié cette partie pour éviter les erreurs d'indentation complexes
+    st.info("💡 **Stratégie** : Un score proche de 0 (Panique) est souvent une zone d'achat. Un score proche de 100 (Euphorie) invite à la prudence.")
