@@ -1,6 +1,6 @@
 import streamlit as st
 import yfinance as yf
-import pd
+import pandas as pd
 import requests
 import feedparser
 import streamlit.components.v1 as components
@@ -42,21 +42,15 @@ def afficher_horloge_temps_reel():
     """
     components.html(horloge_html, height=100)
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (FIX EURONEXT) ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (FIX FINAL) ---
 def afficher_graphique_pro(symbol, height=600):
-    # Traduction automatique pour TradingView
-    if symbol == "^FCHI":
-        tv_symbol = "EURONEXT:PX1"
-    elif symbol == "^GSPC":
-        tv_symbol = "SPX"
-    elif symbol == "^IXIC":
-        tv_symbol = "NASDAQ:IXIC"
-    elif symbol == "BTC-USD":
-        tv_symbol = "BINANCE:BTCUSDT"
+    # Traduction pour TradingView
+    if symbol == "^FCHI": tv_symbol = "EURONEXT:PX1"
+    elif symbol == "^GSPC": tv_symbol = "SPX"
+    elif symbol == "^IXIC": tv_symbol = "NASDAQ:IXIC"
+    elif symbol == "BTC-USD": tv_symbol = "BINANCE:BTCUSDT"
     elif ".PA" in symbol:
-        # On enlève le .PA et on force EURONEXT
-        nom_net = symbol.replace(".PA", "")
-        tv_symbol = f"EURONEXT:{nom_net}"
+        tv_symbol = f"EURONEXT:{symbol.replace('.PA', '')}"
     else:
         tv_symbol = symbol
 
@@ -137,7 +131,6 @@ if outil == "📊 Analyseur Pro":
 
         st.title(f"📊 {nom} ({ticker})")
 
-        # --- MÉTRIQUES ---
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Prix Actuel", f"{prix:.2f} {devise}")
         c2.metric("Valeur Graham", f"{val_theorique:.2f} {devise}")
@@ -145,14 +138,10 @@ if outil == "📊 Analyseur Pro":
         c4.metric("Secteur", secteur)
 
         st.markdown("---")
-        
-        # --- GRAPHIQUE ---
         st.subheader("📈 Analyse Technique Pro")
         afficher_graphique_pro(ticker, height=650)
 
         st.markdown("---")
-
-        # --- DÉTAILS FINANCIERS ---
         st.subheader("📑 Détails Financiers")
         f1, f2, f3 = st.columns(3)
         with f1:
@@ -165,7 +154,6 @@ if outil == "📊 Analyseur Pro":
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # --- SCORING ---
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
         score = 0
@@ -194,7 +182,6 @@ if outil == "📊 Analyseur Pro":
             for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
-        # --- ACTUALITÉS ---
         st.markdown("---")
         st.subheader(f"📰 Actualités : {nom}")
         search_term = nom.replace(" ", "+")
@@ -206,6 +193,34 @@ if outil == "📊 Analyseur Pro":
                     st.write(f"**Source :** {entry.source.get('title')}")
                     st.link_button("Lire l'article", entry.link)
         except: st.error("Erreur de flux d'actualités.")
+
+# ==========================================
+# OUTIL 2 : MODE DUEL
+# ==========================================
+elif outil == "⚔️ Mode Duel":
+    st.title("⚔️ Duel d'Actions")
+    c1, c2 = st.columns(2)
+    t1 = c1.text_input("Action 1", value="BNP.PA")
+    t2 = c2.text_input("Action 2", value="MC.PA")
+    if st.button("Lancer le Duel"):
+        def get_d(t):
+            ticker_id = trouver_ticker(t)
+            i = get_ticker_info(ticker_id)
+            p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
+            b = i.get('trailingEps') or 0
+            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
+            return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "yield": (i.get('dividendYield', 0) or 0)*100}
+        try:
+            d1, d2 = get_d(t1), get_d(t2)
+            df = pd.DataFrame({
+                "Critère": ["Prix", "Valeur Graham", "Rendement Div."],
+                d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['yield']:.2f}%"],
+                d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['yield']:.2f}%"]
+            })
+            st.table(df)
+            m1, m2 = (d1['valeur']-d1['prix'])/d1['prix'], (d2['valeur']-d2['prix'])/d2['prix']
+            st.success(f"🏆 Meilleur potentiel : {d1['nom'] if m1 > m2 else d2['nom']}")
+        except: st.error("Erreur de données.")
 
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
@@ -244,31 +259,3 @@ elif outil == "🌍 Market Monitor":
     nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
     st.subheader(f"📈 Graphique Avancé : {nom_sel}")
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
-
-# ==========================================
-# OUTIL 2 : MODE DUEL
-# ==========================================
-elif outil == "⚔️ Mode Duel":
-    st.title("⚔️ Duel d'Actions")
-    c1, c2 = st.columns(2)
-    t1 = c1.text_input("Action 1", value="BNP.PA")
-    t2 = c2.text_input("Action 2", value="MC.PA")
-    if st.button("Lancer le Duel"):
-        def get_d(t):
-            ticker_id = trouver_ticker(t)
-            i = get_ticker_info(ticker_id)
-            p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
-            b = i.get('trailingEps') or 0
-            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
-            return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "yield": (i.get('dividendYield', 0) or 0)*100}
-        try:
-            d1, d2 = get_d(t1), get_d(t2)
-            df = pd.DataFrame({
-                "Critère": ["Prix", "Valeur Graham", "Rendement Div."],
-                d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['yield']:.2f}%"],
-                d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['yield']:.2f}%"]
-            })
-            st.table(df)
-            m1, m2 = (d1['valeur']-d1['prix'])/d1['prix'], (d2['valeur']-d2['prix'])/d2['prix']
-            st.success(f"🏆 Meilleur potentiel : {d1['nom'] if m1 > m2 else d2['nom']}")
-        except: st.error("Erreur de données.")
