@@ -39,7 +39,7 @@ def trouver_ticker(nom):
         return nom
 
 # --- NAVIGATION ---
-st.sidebar.title("🚀 Arthur Trading Hub")
+st.sidebar.title("🚀 AM-Trading")
 outil = st.sidebar.radio("Choisir un outil :", 
     ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
 
