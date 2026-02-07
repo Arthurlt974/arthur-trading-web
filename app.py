@@ -16,7 +16,7 @@ def afficher_graphique_pro(symbol, height=600):
     # Dictionnaire de traduction Yahoo Finance -> TradingView pour les indices
     traduction_symbols = {
         "^FCHI": "EURONEXT:PX1",     # CAC 40
-        "SP500": "INDEX:SPX",        # S&P 500
+        "SP500": "INDEX cfd VANTAGE",        # S&P 500
         "^IXIC": "NASDAQ:IXIC",      # NASDAQ
         "BTC-USD": "BINANCE:BTCUSDT" # Bitcoin
     }
