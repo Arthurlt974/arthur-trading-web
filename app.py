@@ -10,6 +10,39 @@ from streamlit_autorefresh import st_autorefresh
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading", layout="wide")
 
+# --- STYLE BLOOMBERG TERMINAL ---
+st.markdown("""
+    <style>
+        .stApp { background-color: #0d0d0d; color: #d1d1d1; }
+        [data-testid="stSidebar"] { background-color: #161616; border-right: 1px solid #333; }
+        h1, h2, h3 { color: #ff9800 !important; text-transform: uppercase; }
+        [data-testid="stMetricValue"] { font-size: 28px !important; color: #00ff00 !important; }
+        
+        /* Boutons */
+        .stButton>button {
+            background-color: #1a1a1a; color: #ff9800; border: 1px solid #ff9800;
+            border-radius: 4px; font-weight: bold; width: 100%;
+        }
+        .stButton>button:hover { background-color: #ff9800; color: #000; }
+
+        /* Style des fenêtres flottantes (Workspace) */
+        .chart-container {
+            border: 1px solid #333;
+            background-color: #000;
+            padding: 5px;
+            margin-bottom: 20px;
+        }
+        .chart-header {
+            background-color: #1a1a1a;
+            padding: 5px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- SYSTÈME DE MOT DE PASSE ---
 def check_password():
     if "password_correct" not in st.session_state:
