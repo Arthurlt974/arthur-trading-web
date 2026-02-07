@@ -11,21 +11,20 @@ from streamlit_autorefresh import st_autorefresh
 st.set_page_config(page_title="AM-Trading", layout="wide")
 st_autorefresh(interval=15000, key="global_refresh")
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (TRADUCTION DES SYMBOLES) ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (TRADUCTION PRÉCISE) ---
 def afficher_graphique_pro(symbol, height=600):
-    # Dictionnaire de traduction précis pour TradingView
+    # Dictionnaire de traduction selon tes sources spécifiques
     traduction_symbols = {
-        "^FCHI": "EURONEXT:PX1",      # CAC 40
-        "^GSPC": "CME_MINI:ES1!",     # S&P 500 (Futures) ou "INDEX:SPX"
-        "^IXIC": "NASDAQ:IXIC",       # NASDAQ
-        "BTC-USD": "BINANCE:BTCUSDT"  # Bitcoin
+        "^FCHI": "TVC:PX1",            # Indice CAC40 par TVC
+        "^GSPC": "VANTAGE:SP500",      # S&P index cash CFD par VANTAGE
+        "^IXIC": "NASDAQ:NDX",         # Indice Nasdaq 100 par NASDAQ
+        "BTC-USD": "BINANCE:BTCUSDT"   # Bitcoin
     }
     
-    # Choix du symbole : priorité à la traduction, sinon traitement automatique
+    # Choix du symbole
     if symbol in traduction_symbols:
         tv_symbol = traduction_symbols[symbol]
     else:
-        # Pour les actions (ex: MC.PA -> EURONEXT:MC)
         tv_symbol = symbol.replace(".PA", "")
         if ".PA" in symbol:
             tv_symbol = f"EURONEXT:{tv_symbol}"
@@ -256,5 +255,4 @@ elif outil == "🌍 Market Monitor":
     nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
     st.subheader(f"📈 Graphique Avancé : {nom_sel}")
     
-    # Appel du graphique avec la traduction automatique des indices
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
