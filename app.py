@@ -289,38 +289,6 @@ marquee_html = f"""
 components.html(marquee_html, height=60)
 # st.markdown("---") # Tu peux garder ou enlever cette ligne selon tes préférences visuelles
 
-# --- AFFICHAGE (Inchangé) ---
-marquee_html = f"""
-<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
-    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
-        {ticker_data_string} {ticker_data_string} {ticker_data_string}
-    </div>
-</div>
-<style>
-@keyframes marquee {{ 0% {{ transform: translateX(0); }} 100% {{ transform: translateX(-33.33%); }} }}
-</style>
-"""
-components.html(marquee_html, height=60)
-
-# --- AFFICHAGE DU COMPOSANT HTML DÉFILANT ---
-marquee_html = f"""
-<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
-    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
-        {ticker_data_string} {ticker_data_string} {ticker_data_string}
-    </div>
-</div>
-
-<style>
-@keyframes marquee {{
-    0% {{ transform: translateX(0); }}
-    100% {{ transform: translateX(-33.33%); }}
-}}
-</style>
-"""
-
-components.html(marquee_html, height=60)
-# st.markdown("---") # Tu peux garder ou enlever cette ligne selon tes préférences visuelles
-
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
 # ==========================================
