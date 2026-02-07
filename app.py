@@ -141,7 +141,7 @@ def trouver_ticker(nom):
 
 # --- NAVIGATION ---
 st.sidebar.title("🚀 AM-Trading")
-outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief"])
+outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief", "📅 Calendrier Éco"])
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
@@ -409,3 +409,20 @@ elif outil == "📰 Daily Brief":
         # Recherche ciblée exclusivement sur Boursorama
         url_boursorama = "https://news.google.com/rss/search?q=site:boursorama.com&hl=fr&gl=FR&ceid=FR:fr"
         afficher_flux_daily(url_boursorama, filtre_boursorama_24h=True)
+
+# ==========================================
+# OUTIL 5 : CALENDRIER ÉCONOMIQUE
+# ==========================================
+elif outil == "📅 Calendrier Éco":
+    st.title("📅 Calendrier Économique Temps Réel")
+    st.info("Suivez les annonces macroéconomiques mondiales en direct.")
+    
+    # Widget Investing avec sécurité renforcée pour Streamlit Cloud
+    calendrier_html = """
+    <div style="width: 100%; height: 800px; overflow: hidden; border-radius: 10px;">
+        <iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_main&features=datepicker,timezone&countries=25,32,6,37,7,5&calType=day&timeZone=58&lang=5" 
+        width="100%" height="800" frameborder="0" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
+    </div>
+    """
+    
+    components.html(calendrier_html, height=850, scrolling=True)
