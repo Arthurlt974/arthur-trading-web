@@ -120,28 +120,6 @@ def afficher_horloge_temps_reel():
     """
     components.html(horloge_html, height=120)
 
-def get_crypto_price(symbol):
-    try:
-        # On utilise le symbole correct pour Binance
-        pair = f"{symbol}USDT"
-        url = f"https://api.binance.com/api/v3/ticker/price?symbol={pair}"
-        
-        # CETTE LIGNE EST CRUCIALE : Elle fait croire à Binance que tu es un humain
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            return float(response.json()['price'])
-        else:
-            # Si Binance bloque, on tente Yahoo Finance en secours
-            ticker_yf = yf.Ticker(f"{symbol}-USD")
-            return ticker_yf.fast_info['last_price']
-    except:
-        return None
-
 
 # --- FONCTION GRAPHIQUE TRADINGVIEW PRO ---
 def afficher_graphique_pro(symbol, height=600):
