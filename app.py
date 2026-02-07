@@ -77,7 +77,7 @@ def afficher_graphique_pro(symbol, height=600):
     """
     components.html(tradingview_html, height=height + 10)
 
-# --- FONCTIONS DE MISE EN CACHE (Anti-Blocage & Performance) ---
+# --- FONCTIONS DE MISE EN CACHE ---
 @st.cache_data(ttl=5) 
 def get_ticker_info(ticker):
     try:
@@ -128,7 +128,6 @@ if outil == "📊 Analyseur Pro":
 
         st.title(f"📊 {nom} ({ticker})")
 
-        # Métriques principales
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Prix Actuel", f"{prix:.2f} {devise}")
         c2.metric("Valeur Graham", f"{val_theorique:.2f} {devise}")
@@ -136,14 +135,10 @@ if outil == "📊 Analyseur Pro":
         c4.metric("Secteur", secteur)
 
         st.markdown("---")
-        
-        # LE GRAPHIQUE (PREND TOUTE LA LARGEUR)
         st.subheader("📈 Analyse Technique Pro")
-        afficher_graphique_pro(ticker, height=650) # Hauteur augmentée pour plus de confort
+        afficher_graphique_pro(ticker, height=650)
 
         st.markdown("---")
-
-        # LES DÉTAILS FINANCIERS (DÉCALÉS EN BAS)
         st.subheader("📑 Détails Financiers")
         f1, f2, f3 = st.columns(3)
         with f1:
@@ -156,7 +151,6 @@ if outil == "📊 Analyseur Pro":
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # --- SCORING ---
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
         score = 0
@@ -185,7 +179,6 @@ if outil == "📊 Analyseur Pro":
             for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
-        # --- ACTUALITÉS ---
         st.markdown("---")
         st.subheader(f"📰 Actualités : {nom}")
         search_term = nom.replace(" ", "+")
@@ -236,7 +229,7 @@ elif outil == "🌍 Market Monitor":
     st.markdown("### 🕒 Statut des Bourses")
     h = (datetime.utcnow() + timedelta(hours=4)).hour
     
-    # Tableau mis à jour avec Heure de Fermeture
+    # Tableau avec Ouverture et Fermeture
     data_horaires = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
         "Ouverture (REU)": ["05:30", "12:00", "18:30"],
@@ -250,4 +243,23 @@ elif outil == "🌍 Market Monitor":
     st.table(pd.DataFrame(data_horaires))
 
     st.markdown("---")
-    # ... (la suite du code pour les indices reste la même)
+    st.subheader("⚡ Moteurs du Marché")
+    indices = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
+    cols = st.columns(len(indices))
+    if 'index_selectionne' not in st.session_state: st.session_state.index_selectionne = "^FCHI"
+
+    for i, (tk, nom) in enumerate(indices.items()):
+        try:
+            hist_idx = get_ticker_history(tk)
+            if not hist_idx.empty:
+                val_actuelle, val_prec = hist_idx['Close'].iloc[-1], hist_idx['Close'].iloc[-2]
+                variation = ((val_actuelle - val_prec) / val_prec) * 100
+                cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
+                if cols[i].button(f"Analyser {nom}", key=f"btn_{tk}"):
+                    st.session_state.index_selectionne = tk
+        except: pass
+
+    st.markdown("---")
+    nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
+    st.subheader(f"📈 Graphique Avancé : {nom_sel}")
+    afficher_graphique_pro(st.session_state.index_selectionne, height=700)
