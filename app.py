@@ -225,7 +225,8 @@ if outil == "📊 Analyseur Pro":
         tab_action_24h, tab_action_archive = st.tabs(["🔥 Direct (24h)", "📚 Archive (7 jours)"])
         
         search_term = nom.replace(" ", "+")
-        url_rss = f"https://news.google.com/rss/search?q={search_term}+stock+bourse&hl=fr&gl=FR&ceid=FR:fr"
+        # On ajoute Investing.com à la recherche Google News pour mixer les sources
+        url_rss = f"https://news.google.com/rss/search?q={search_term}+(site:investing.com+OR+bourse+OR+stock)&hl=fr&gl=FR&ceid=FR:fr"
         
         try:
             import time
@@ -233,10 +234,10 @@ if outil == "📊 Analyseur Pro":
             maintenant = time.time()
             secondes_par_jour = 24 * 3600
             
-            # Tri par date (récent en premier)
+            # Tri par date (le plus récent en haut)
             articles = sorted(flux.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
 
-            # --- ONGLET 1 : DIRECT 24H ---
+            # --- ONGLET 1 : DIRECT 24H (MIX INVESTING + AUTRES) ---
             with tab_action_24h:
                 trouve_24h = False
                 for entry in articles:
@@ -244,27 +245,34 @@ if outil == "📊 Analyseur Pro":
                     if (maintenant - pub_time) < secondes_par_jour:
                         trouve_24h = True
                         clean_title = entry.title.split(' - ')[0]
-                        with st.expander(f"🆕 {clean_title}"):
-                            st.write(f"**Source :** {entry.source.get('title')}")
+                        source = entry.source.get('title', 'Finance')
+                        
+                        # Petite icône spéciale si ça vient d'Investing
+                        prefix = "📊 Investing |" if "investing" in source.lower() else "🆕"
+                        
+                        with st.expander(f"{prefix} {clean_title}"):
+                            st.write(f"**Source :** {source}")
                             st.caption(f"🕒 Publié le : {entry.published}")
                             st.link_button("Lire l'article", entry.link)
                 if not trouve_24h:
                     st.info("Aucune actualité sur les dernières 24h.")
 
-            # --- ONGLET 2 : ARCHIVE (Style précédent, sans limite stricte) ---
+            # --- ONGLET 2 : ARCHIVE (STYLE PRÉCÉDENT MIXÉ) ---
             with tab_action_archive:
-                # On affiche les 10 derniers articles, peu importe la date
                 if not articles:
                     st.write("Aucune archive disponible.")
-                for entry in articles[:10]:
+                for entry in articles[:12]: # On affiche un peu plus d'articles en archive
                     clean_title = entry.title.split(' - ')[0]
-                    with st.expander(f"📌 {clean_title}"):
-                        st.write(f"**Source :** {entry.source.get('title')}")
+                    source = entry.source.get('title', 'Finance')
+                    prefix = "📊 Investing |" if "investing" in source.lower() else "📌"
+                    
+                    with st.expander(f"{prefix} {clean_title}"):
+                        st.write(f"**Source :** {source}")
                         st.caption(f"📅 Date : {entry.published}")
                         st.link_button("Voir l'archive", entry.link)
                         
         except Exception:
-            st.error("Erreur de flux d'actualités.")
+            st.error("Erreur lors de la récupération des flux (Google News & Investing).")
 
 # ==========================================
 # OUTIL 2 : MODE DUEL
