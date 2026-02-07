@@ -172,7 +172,7 @@ outil = st.sidebar.radio("SELECT MODULE :", ["[DATA] Analyseur Pro", "[ VS ] Mod
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
 # ==========================================
-if outil == "📊 Analyseur Pro":
+if outil == "[DATA] Analyseur Pro":
     nom_entree = st.sidebar.text_input("Nom de l'action", value="NVIDIA")
     ticker = trouver_ticker(nom_entree)
     info = get_ticker_info(ticker)
