@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION GLOBALE ---
-st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
+st.set_page_config(page_title="AM-Trading", layout="wide")
 
 # --- STYLE BLOOMBERG TERMINAL ---
 st.markdown("""
@@ -47,38 +47,22 @@ st.markdown("""
 def check_password():
     if "password_correct" not in st.session_state:
         st.session_state["password_correct"] = False
-
     if st.session_state["password_correct"]:
         return True
-
-    st.markdown("### 🔒 Accès Restreint")
-    # On utilise le paramètre 'key' pour lier directement l'input au session_state
-    pwd = st.text_input("Mot de passe :", type="password")
-    
-    if st.button("Se connecter"):
+    st.markdown("### [ SECURITY ] TERMINAL ACCESS REQUIRED")
+    pwd = st.text_input("ENTER ACCESS CODE :", type="password")
+    if st.button("EXECUTE LOGIN"):
         if pwd == "1234":
             st.session_state["password_correct"] = True
             st.rerun()
         else:
-            st.error("❌ Mot de passe incorrect")
+            st.error("!! ACCESS DENIED - INVALID CODE")
     return False
 
-    if "password_correct" not in st.session_state:
-        st.markdown("### 🔒 Accès Restreint")
-        st.text_input("Veuillez saisir le mot de passe pour accéder à AM-Trading :", 
-                     type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.markdown("### 🔒 Accès Restreint")
-        st.text_input("Veuillez saisir le mot de passe pour accéder à AM-Trading :", 
-                     type="password", on_change=password_entered, key="password")
-        st.error("❌ Mot de passe incorrect")
-        return False
-    else:
-        return True
-
 if not check_password():
-    st.stop() # Arrête le code ici si le mot de passe n'est pas bon
+    st.stop()
+
+st_autorefresh(interval=30000, key="global_refresh")
 
 # --- LA SUITE DU CODE (S'exécute seulement si le MDP est correct) ---
 st_autorefresh(interval=30000, key="global_refresh")
