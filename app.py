@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import requests
 import feedparser
+import time
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
@@ -29,20 +30,6 @@ def check_password():
         else:
             st.error("❌ Mot de passe incorrect")
     return False
-
-    if "password_correct" not in st.session_state:
-        st.markdown("### 🔒 Accès Restreint")
-        st.text_input("Veuillez saisir le mot de passe pour accéder à AM-Trading :", 
-                     type="password", on_change=password_entered, key="password")
-        return False
-    elif not st.session_state["password_correct"]:
-        st.markdown("### 🔒 Accès Restreint")
-        st.text_input("Veuillez saisir le mot de passe pour accéder à AM-Trading :", 
-                     type="password", on_change=password_entered, key="password")
-        st.error("❌ Mot de passe incorrect")
-        return False
-    else:
-        return True
 
 if not check_password():
     st.stop() # Arrête le code ici si le mot de passe n'est pas bon
@@ -143,6 +130,19 @@ def trouver_ticker(nom):
 st.sidebar.title("🚀 AM-Trading")
 outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief"])
 
+# --- AJOUT DU CALENDRIER ÉCONOMIQUE DANS LA SIDEBAR ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("📅 Calendrier Économique")
+calendrier_html = """
+<div style="height: 500px; overflow: hidden;">
+    <iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_main&features=datepicker,timezone&countries=25,32,6,37,7,5&calType=day&timeZone=58&lang=5" 
+    width="100%" height="500" frameborder="0" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
+</div>
+"""
+with st.sidebar:
+    components.html(calendrier_html, height=510)
+
+
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
 # ==========================================
@@ -229,7 +229,6 @@ if outil == "📊 Analyseur Pro":
         url_rss = f"https://news.google.com/rss/search?q={search_term}+(site:investing.com+OR+bourse+OR+stock)&hl=fr&gl=FR&ceid=FR:fr"
         
         try:
-            import time
             flux = feedparser.parse(url_rss)
             maintenant = time.time()
             secondes_par_jour = 24 * 3600
@@ -358,7 +357,6 @@ elif outil == "📰 Daily Brief":
 
     def afficher_flux_daily(url, filtre_boursorama_24h=False):
         try:
-            import time
             flux = feedparser.parse(url)
             if not flux.entries:
                 st.info("Aucune actualité trouvée.")
@@ -409,21 +407,3 @@ elif outil == "📰 Daily Brief":
         # Recherche ciblée exclusivement sur Boursorama
         url_boursorama = "https://news.google.com/rss/search?q=site:boursorama.com&hl=fr&gl=FR&ceid=FR:fr"
         afficher_flux_daily(url_boursorama, filtre_boursorama_24h=True)
-
-        # --- CALENDRIER ÉCONOMIQUE (SIDEBAR) ---
-st.sidebar.markdown("---")
-st.sidebar.subheader("📅 Calendrier Économique")
-
-# Code du Widget Investing.com
-calendrier_html = """
-<div style="height: 500px; overflow: hidden;">
-    <iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_main&features=datepicker,timezone&countries=25,32,6,37,7,5&calType=day&timeZone=58&lang=5" 
-    width="100%" height="500" frameborder="0" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
-    <div style="font-size:11px; font-family:Arial, Helvetica, sans-serif; text-align:right;">
-        <a href="https://fr.investing.com/" rel="nofollow" target="_blank">Calendrier économique fourni par Investing.com France</a>
-    </div>
-</div>
-"""
-
-with st.sidebar:
-    components.html(calendrier_html, height=520)
