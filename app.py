@@ -911,34 +911,40 @@ elif outil == "CORRÉLATION DASH 📊":
 # ==========================================
 # OUTIL : GESTION WATCHLIST
 # ==========================================
-# --- GLOBAL TICKER TAPE ---
-with st.container():
-    # On encapsule dans un div stylé
-    st.markdown("""
-        <div style="background-color: #1a1a1a; padding: 10px; border-radius: 5px; border-left: 5px solid #00ffad;">
-            <span style="color: #00ffad; font-weight: bold;">📌 MARKET MOMENTUM (WATCHLIST)</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    if "watchlist" not in st.session_state:
-        st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA"]
+# --- CONSTRUCTION DU TEXTE DÉFILANT ---
+if "watchlist" not in st.session_state:
+    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA", "NVDA", "GOOGL"]
 
-    if len(st.session_state.watchlist) > 0:
-        cols_watch = st.columns(len(st.session_state.watchlist))
+ticker_data_string = ""
 
-        for i, tkr in enumerate(st.session_state.watchlist):
-            try:
-                t_data = yf.Ticker(tkr)
-                price_now = t_data.fast_info['last_price']
-                prev_close = t_data.fast_info['previous_close']
-                change = ((price_now - prev_close) / prev_close) * 100
-                
-                # Affichage
-                cols_watch[i].metric(
-                    tkr.replace("-USD", ""), 
-                    f"{price_now:.2f}", 
-                    f"{change:+.2f}%"
-                )
-            except:
-                cols_watch[i].error(f"ERR: {tkr}")
-    st.markdown("---")
+for tkr in st.session_state.watchlist:
+    try:
+        t_info = yf.Ticker(tkr).fast_info
+        price = t_info['last_price']
+        change = ((price - t_info['previous_close']) / t_info['previous_close']) * 100
+        color = "#00ffad" if change >= 0 else "#ff4b4b"
+        sign = "+" if change >= 0 else ""
+        
+        # On crée un segment de texte stylé pour chaque actif
+        ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 30px;">{tkr.replace("-USD", "")}:</span>'
+        ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px;">{price:.2f} ({sign}{change:.2f}%)</span>'
+    except:
+        continue
+
+# --- AFFICHAGE DU MARQUEE (HTML/CSS) ---
+marquee_html = f"""
+<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 10px 0; border-top: 1px solid #333; border-bottom: 1px solid #333;">
+    <div style="display: inline-block; padding-left: 100%; animation: marquee 30s linear infinite;">
+        {ticker_data_string} {ticker_data_string}  </div>
+</div>
+
+<style>
+@keyframes marquee {{
+    0% {{ transform: translate(0, 0); }}
+    100% {{ transform: translate(-100%, 0); }}
+}}
+</style>
+"""
+
+st.components.v1.html(marquee_html, height=50)
+st.markdown("<br>", unsafe_allow_html=True)
