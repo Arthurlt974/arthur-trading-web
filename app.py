@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION GLOBALE ---
-st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
+st.set_page_config(page_title="AM-Trading", layout="wide")
 
 # --- STYLE BLOOMBERG TERMINAL ---
 st.markdown("""
@@ -166,8 +166,14 @@ def trouver_ticker(nom):
     except: return nom
 
 # --- NAVIGATION ---
-st.sidebar.title("🚀 AM-Trading")
-outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief", "📅 Calendrier Éco"])
+st.sidebar.title("📟 AM-TERMINAL")
+outil = st.sidebar.radio("SELECT MODULE :", [
+    "[ DATA ] ANALYSEUR PRO", 
+    "[ VS ] MODE DUEL", 
+    "[ MKT ] MARKET MONITOR", 
+    "[ NEWS ] DAILY BRIEF", 
+    "[ CAL ] CALENDRIER ÉCO"
+])
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
