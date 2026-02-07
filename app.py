@@ -12,6 +12,13 @@ import numpy as np
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 
+# --- CONFIGURATION GLOBALE ---
+st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
+
+# --- AJOUTER ICI : DÉTECTION DU CLIC SUR LA WATCHLIST ---
+if "ticker" in st.query_params:
+    st.session_state.clicked_ticker = st.query_params["ticker"]
+
 # --- INITIALISATION DU WORKSPACE (FÊNETRES MULTIPLES) ---
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
@@ -250,9 +257,9 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "WHALE WATCHER 🐋",
     "CORRÉLATION DASH 📊"
 ])
-# --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
+# --- CONSTRUCTION DU TEXTE DÉFILANT (VERSION INTERACTIVE) ---
 if "watchlist" not in st.session_state:
-    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA", "NVDA", "GOOGL", "MSFT", "PRNDY", "INTC"]
+    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA", "NVDA", "GOOGL"]
 
 ticker_data_string = ""
 
@@ -264,11 +271,29 @@ for tkr in st.session_state.watchlist:
         color = "#00ffad" if change >= 0 else "#ff4b4b"
         sign = "+" if change >= 0 else ""
         
-        # Formatage du texte pour le bandeau
-        ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 40px; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
+        # Le lien qui recharge l'app avec le bon ticker
+        link = f"/?ticker={tkr}"
+        
+        # On entoure le texte par une balise <a> pour le rendre cliquable
+        ticker_data_string += f'<a href="{link}" target="_self" style="text-decoration: none; margin-left: 40px;">'
+        ticker_data_string += f'<span style="color: white; font-weight: bold; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
         ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px; font-family: monospace;">{price:,.2f} ({sign}{change:.2f}%)</span>'
+        ticker_data_string += '</a>'
     except:
         continue
+
+# --- AFFICHAGE (Inchangé) ---
+marquee_html = f"""
+<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
+    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
+        {ticker_data_string} {ticker_data_string} {ticker_data_string}
+    </div>
+</div>
+<style>
+@keyframes marquee {{ 0% {{ transform: translateX(0); }} 100% {{ transform: translateX(-33.33%); }} }}
+</style>
+"""
+components.html(marquee_html, height=60)
 
 # --- AFFICHAGE DU COMPOSANT HTML DÉFILANT ---
 marquee_html = f"""
@@ -293,9 +318,19 @@ components.html(marquee_html, height=60)
 # OUTIL 1 : ANALYSEUR PRO
 # ==========================================
 if outil == "ANALYSEUR PRO":
-    nom_entree = st.sidebar.text_input("TICKER SEARCH", value="NVIDIA")
+    # 1. On définit le ticker par défaut (NVIDIA ou celui cliqué)
+    ticker_par_defaut = st.session_state.get('clicked_ticker', 'NVIDIA')
+    
+    # 2. Le champ de saisie utilise cette valeur
+    nom_entree = st.sidebar.text_input("TICKER SEARCH", value=ticker_par_defaut)
     ticker = trouver_ticker(nom_entree)
+    
+    # 3. Une fois chargé, on nettoie la mémoire du clic pour permettre de nouvelles recherches
+    if 'clicked_ticker' in st.session_state:
+        del st.session_state.clicked_ticker
+        
     info = get_ticker_info(ticker)
+    # ... la suite de ton code habituel
 
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
         nom = info.get('longName') or info.get('shortName') or ticker
