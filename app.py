@@ -417,8 +417,9 @@ elif outil == "📅 Calendrier Éco":
     st.title("📅 Calendrier Économique")
     st.info("Annonces macroéconomiques mondiales en direct.")
     
-    # Widget TradingView en Français
+    # Widget TradingView avec forçage de la langue Française
     calendrier_tv = """
+    <meta charset="UTF-8">
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
@@ -435,4 +436,4 @@ elif outil == "📅 Calendrier Éco":
     </div>
     """
     
-    components.html(calendrier_tv, height=800)
+    components.html(calendrier_tv, height=800, scrolling=True)
