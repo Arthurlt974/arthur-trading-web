@@ -42,15 +42,23 @@ def afficher_horloge_temps_reel():
     """
     components.html(horloge_html, height=100)
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (FIX FINAL) ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (V3 SPECIAL LVMH/BNP) ---
 def afficher_graphique_pro(symbol, height=600):
-    # Traduction pour TradingView
-    if symbol == "^FCHI": tv_symbol = "EURONEXT:PX1"
-    elif symbol == "^GSPC": tv_symbol = "SPX"
-    elif symbol == "^IXIC": tv_symbol = "NASDAQ:IXIC"
-    elif symbol == "BTC-USD": tv_symbol = "BINANCE:BTCUSDT"
+    # Mapping spécifique pour contourner les blocages Euronext
+    if "MC" in symbol.upper(): 
+        tv_symbol = "LVMH" # Symbole global TradingView
+    elif "BNP" in symbol.upper():
+        tv_symbol = "BNP"
+    elif symbol == "^FCHI": 
+        tv_symbol = "CAC40"
+    elif symbol == "^GSPC": 
+        tv_symbol = "S&P500"
+    elif symbol == "^IXIC": 
+        tv_symbol = "NASDAQ:IXIC"
+    elif symbol == "BTC-USD": 
+        tv_symbol = "BINANCE:BTCUSDT"
     elif ".PA" in symbol:
-        tv_symbol = f"EURONEXT:{symbol.replace('.PA', '')}"
+        tv_symbol = symbol.replace(".PA", "")
     else:
         tv_symbol = symbol
 
@@ -68,12 +76,7 @@ def afficher_graphique_pro(symbol, height=600):
           "locale": "fr",
           "toolbar_bg": "#f1f3f6",
           "enable_publishing": false,
-          "withdateranges": true,
-          "hide_side_toolbar": false,
           "allow_symbol_change": true,
-          "details": true,
-          "hotlist": true,
-          "calendar": true,
           "container_id": "tradingview_chart"
         }});
         </script>
@@ -154,6 +157,7 @@ if outil == "📊 Analyseur Pro":
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
+        # --- SCORING ---
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
         score = 0
@@ -195,34 +199,6 @@ if outil == "📊 Analyseur Pro":
         except: st.error("Erreur de flux d'actualités.")
 
 # ==========================================
-# OUTIL 2 : MODE DUEL
-# ==========================================
-elif outil == "⚔️ Mode Duel":
-    st.title("⚔️ Duel d'Actions")
-    c1, c2 = st.columns(2)
-    t1 = c1.text_input("Action 1", value="BNP.PA")
-    t2 = c2.text_input("Action 2", value="MC.PA")
-    if st.button("Lancer le Duel"):
-        def get_d(t):
-            ticker_id = trouver_ticker(t)
-            i = get_ticker_info(ticker_id)
-            p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
-            b = i.get('trailingEps') or 0
-            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
-            return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "yield": (i.get('dividendYield', 0) or 0)*100}
-        try:
-            d1, d2 = get_d(t1), get_d(t2)
-            df = pd.DataFrame({
-                "Critère": ["Prix", "Valeur Graham", "Rendement Div."],
-                d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['yield']:.2f}%"],
-                d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['yield']:.2f}%"]
-            })
-            st.table(df)
-            m1, m2 = (d1['valeur']-d1['prix'])/d1['prix'], (d2['valeur']-d2['prix'])/d2['prix']
-            st.success(f"🏆 Meilleur potentiel : {d1['nom'] if m1 > m2 else d2['nom']}")
-        except: st.error("Erreur de données.")
-
-# ==========================================
 # OUTIL 3 : MARKET MONITOR
 # ==========================================
 elif outil == "🌍 Market Monitor":
@@ -259,3 +235,31 @@ elif outil == "🌍 Market Monitor":
     nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
     st.subheader(f"📈 Graphique Avancé : {nom_sel}")
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
+
+# ==========================================
+# OUTIL 2 : MODE DUEL
+# ==========================================
+elif outil == "⚔️ Mode Duel":
+    st.title("⚔️ Duel d'Actions")
+    c1, c2 = st.columns(2)
+    t1 = c1.text_input("Action 1", value="BNP.PA")
+    t2 = c2.text_input("Action 2", value="MC.PA")
+    if st.button("Lancer le Duel"):
+        def get_d(t):
+            ticker_id = trouver_ticker(t)
+            i = get_ticker_info(ticker_id)
+            p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
+            b = i.get('trailingEps') or 0
+            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
+            return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "yield": (i.get('dividendYield', 0) or 0)*100}
+        try:
+            d1, d2 = get_d(t1), get_d(t2)
+            df = pd.DataFrame({
+                "Critère": ["Prix", "Valeur Graham", "Rendement Div."],
+                d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['yield']:.2f}%"],
+                d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['yield']:.2f}%"]
+            })
+            st.table(df)
+            m1, m2 = (d1['valeur']-d1['prix'])/d1['prix'], (d2['valeur']-d2['prix'])/d2['prix']
+            st.success(f"🏆 Meilleur potentiel : {d1['nom'] if m1 > m2 else d2['nom']}")
+        except: st.error("Erreur de données.")
