@@ -211,7 +211,7 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
 
 # --- NAVIGATION ---
 st.sidebar.title("🚀 AM-TERMINAL")
-outil = st.sidebar.radio("SELECT MODULE :", ["[DATA] Analyseur Pro", "[ VS ] Mode Duel", "[ MKT ] Market Monitor", "[ NEWS ] Daily Brief", "[ CAL ] Calendrier Éco"])
+outil = st.sidebar.radio("SELECT MODULE :", ["[DATA] Analyseur Pro", "[ VS ] Mode Duel", "[ MKT ] Market Monitor", "[ NEWS ] Daily Brief", "[ CAL ] Calendrier Éco", "🌡️ Sentiment Index"])
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
