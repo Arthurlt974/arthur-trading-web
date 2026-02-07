@@ -46,9 +46,9 @@ def afficher_horloge_temps_reel():
 # --- FONCTION GRAPHIQUE TRADINGVIEW PRO ---
 def afficher_graphique_pro(symbol, height=600):
     traduction_symbols = {
-        "^FCHI": "TVC:PX1",            # Indice CAC40 par TVC
+        "^FCHI": "CAC40",            # Indice CAC40 par TVC
         "^GSPC": "VANTAGE:SP500",      # S&P index cash CFD par VANTAGE
-        "^IXIC": "NASDAQ:NDX",         # Indice Nasdaq 100 par NASDAQ
+        "^IXIC": "NASDAQ",         # Indice Nasdaq 100 par NASDAQ
         "BTC-USD": "BINANCE:BTCUSDT"   # Bitcoin
     }
     tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
