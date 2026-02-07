@@ -12,14 +12,23 @@ st.set_page_config(page_title="AM-Trading", layout="wide")
 
 # --- SYSTÈME DE MOT DE PASSE ---
 def check_password():
-    """Retourne True si l'utilisateur a saisi le bon mot de passe."""
-    def password_entered():
-        # MODIFIE LE MOT DE PASSE CI-DESSOUS
-        if st.session_state["password"] == "1234": 
+    if "password_correct" not in st.session_state:
+        st.session_state["password_correct"] = False
+
+    if st.session_state["password_correct"]:
+        return True
+
+    st.markdown("### 🔒 Accès Restreint")
+    # On utilise le paramètre 'key' pour lier directement l'input au session_state
+    pwd = st.text_input("Mot de passe :", type="password")
+    
+    if st.button("Se connecter"):
+        if pwd == "1234":
             st.session_state["password_correct"] = True
-            del st.session_state["password"]
+            st.rerun()
         else:
-            st.session_state["password_correct"] = False
+            st.error("❌ Mot de passe incorrect")
+    return False
 
     if "password_correct" not in st.session_state:
         st.markdown("### 🔒 Accès Restreint")
@@ -132,7 +141,7 @@ def trouver_ticker(nom):
 
 # --- NAVIGATION ---
 st.sidebar.title("🚀 AM-Trading")
-outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor"])
+outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief"])
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
@@ -292,3 +301,52 @@ elif outil == "🌍 Market Monitor":
     nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
     st.subheader(f"📈 Graphique Avancé : {nom_sel}")
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
+
+# ==========================================
+# OUTIL 4 : DAILY BRIEF (INFOS MONDIALES)
+# ==========================================
+elif outil == "📰 Daily Brief":
+    st.title("📰 Daily Market Brief")
+    st.markdown("---")
+
+    col_news1, col_news2 = st.columns(2)
+
+    def afficher_flux(url, titre_section):
+        st.subheader(titre_section)
+        try:
+            flux = feedparser.parse(url)
+            if not flux.entries:
+                st.info("Aucune actualité récente trouvée.")
+                return
+
+            for entry in flux.entries[:5]:
+                # Nettoyage du titre
+                clean_title = entry.title.split(" - ")[0] if " - " in entry.title else entry.title
+                source = entry.source.get('title', 'Presse Finance') if hasattr(entry, 'source') else "Source Inconnue"
+                
+                with st.expander(f"📌 {clean_title}"):
+                    st.write(f"**Source :** {source}")
+                    if 'published' in entry:
+                        st.caption(f"Publié le : {entry.published}")
+                    st.link_button("Lire l'article", entry.link)
+        except Exception:
+            st.error("Impossible de charger ce flux pour le moment.")
+
+    with col_news1:
+            st.subheader("🌍 Flash Marché")
+            url_mkt = "https://news.google.com/rss/search?q=bourse+mondiale+indices&hl=fr&gl=FR&ceid=FR:fr"
+            try:
+                flux_mkt = feedparser.parse(url_mkt)
+                for m_art in flux_mkt.entries[:4]:
+                    m_title = m_art.title.split(" - ")[0]
+                    st.markdown(f"🔹 **{m_art.source.get('title')}**")
+                    st.markdown(f"[{m_title}]({m_art.link})")
+                    st.write("---")
+            except:
+                st.write("Flux indisponible.")
+
+    with col_news2:
+        afficher_flux("https://news.google.com/rss/search?q=crypto+tech+stocks&hl=fr&gl=FR&ceid=FR:fr", "⚡ Tech & Crypto")
+
+
+    # Garde tes colonnes de ressources (Investing, CNN, etc.) en dessous
