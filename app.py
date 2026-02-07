@@ -235,7 +235,8 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "CALENDRIER ÉCO",
     "Fear and Gread Index",
     "INTERETS COMPOSES",
-    "CRYPTO WALLET"
+    "CRYPTO WALLET",
+    "WHALE WATCHER 🐋"
 ])
 
 # --- NOUVELLE FONCTION POUR GRAPHIQUES MULTIPLES ---
@@ -783,3 +784,94 @@ if outil == "MULTI-CHARTS":
                 if st.button(f"CLOSE {ticker}", key=f"close_{idx}"):
                     st.session_state.multi_charts.pop(idx)
                     st.rerun()
+
+# ==========================================
+# OUTIL : WHALE WATCHER (FLUX LIVE)
+# ==========================================
+elif outil == "WHALE WATCHER 🐋":
+    st.title("🐋 BITCOIN WHALE TRACKER")
+    st.write("Surveillance des transactions > 0.5 BTC sur Binance (Flux Temps Réel)")
+
+    # Initialisation de l'historique dans la session
+    if 'whale_logs' not in st.session_state:
+        st.session_state.whale_logs = []
+    if 'pressure_data' not in st.session_state:
+        st.session_state.pressure_data = []
+
+    # Seuil de filtrage
+    seuil_baleine = st.slider("SEUIL DE FILTRAGE (BTC)", 0.1, 5.0, 0.5)
+
+    # Fonction pour récupérer les derniers trades (API Rest car WebSocket est complexe sur Streamlit Cloud)
+    def get_live_trades():
+        try:
+            url = "https://api.binance.com/api/v3/trades?symbol=BTCUSDT&limit=50"
+            res = requests.get(url, timeout=2).json()
+            return res
+        except:
+            return []
+
+    trades = get_live_trades()
+    
+    # Traitement des données
+    new_logs = []
+    for t in trades:
+        qty = float(t['qty'])
+        if qty >= seuil_baleine:
+            is_buyer = t['isBuyerMaker'] # True = Vente, False = Achat
+            color = "🔴" if is_buyer else "🟢"
+            label = "SELL" if is_buyer else "BUY"
+            prix = float(t['price'])
+            time_str = datetime.fromtimestamp(t['time']/1000).strftime('%H:%M:%S')
+            
+            log = f"{color} | {time_str} | {label} {qty:.2f} BTC @ {prix:,.0f} $"
+            if log not in st.session_state.whale_logs:
+                st.session_state.whale_logs.insert(0, log)
+                st.session_state.pressure_data.append(0 if is_buyer else 1)
+
+    # Nettoyage historique (max 15 logs)
+    st.session_state.whale_logs = st.session_state.whale_logs[:15]
+    if len(st.session_state.pressure_data) > 50:
+        st.session_state.pressure_data.pop(0)
+
+    # --- AFFICHAGE ---
+    # 1. Initialisation des variables par défaut pour éviter les erreurs
+    pct_a, pct_v = 50, 50 
+
+    if st.session_state.pressure_data:
+        total = len(st.session_state.pressure_data)
+        achats = sum(st.session_state.pressure_data)
+        ventes = total - achats
+        pct_a = (achats / total) * 100
+        pct_v = (ventes / total) * 100
+
+        st.subheader("📊 BUY vs SELL PRESSURE (Whales)")
+        col_p1, col_p2 = st.columns([max(1, pct_a), max(1, pct_v)]) # Sécurité max(1) pour éviter division par 0
+        col_p1.markdown(f"<div style='background:#00ff00; height:20px; border-radius:5px 0 0 5px; text-align:center; color:black; font-weight:bold;'>{pct_a:.0f}%</div>", unsafe_allow_html=True)
+        col_p2.markdown(f"<div style='background:#ff0000; height:20px; border-radius:0 5px 5px 0; text-align:center; color:white; font-weight:bold;'>{pct_v:.0f}%</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # 2. Historique Visuel et Insights
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        st.subheader("📝 LIVE ACTIVITY LOG")
+        if not st.session_state.whale_logs:
+            # On utilise f-string pour afficher la variable seuil_baleine dynamiquement
+            st.info(f"Searching for whales... (Waiting for trades > {seuil_baleine} BTC)")
+        for l in st.session_state.whale_logs:
+            if "🟢" in l:
+                st.success(l)
+            else:
+                st.error(l)
+    
+    with c2:
+        st.subheader("💡 INSIGHT")
+        # Ici, pct_a existe forcément car on l'a défini à 50 par défaut au début
+        if pct_a > 60:
+            st.info("BULLISH : Les baleines accumulent massivement.")
+        elif pct_v > 60:
+            st.warning("BEARISH : Les baleines déchargent leurs sacs.")
+        else:
+            st.write("NEUTRE : Le marché cherche une direction.")
+
+
