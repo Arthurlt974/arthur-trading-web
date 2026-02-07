@@ -5,4 +5,3 @@ pandas
 requests
 feedparser
 streamlit-autorefresh
-streamlit-lightweight-charts
