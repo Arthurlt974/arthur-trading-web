@@ -166,8 +166,8 @@ def trouver_ticker(nom):
     except: return nom
 
 # --- NAVIGATION ---
-st.sidebar.title("🚀 AM-Trading")
-outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief", "📅 Calendrier Éco"])
+st.sidebar.title("🚀 AM-TERMINAL")
+outil = st.sidebar.radio("SELECT MODULE :", ["[DATA] Analyseur Pro", "[ VS ] Mode Duel", "[ MKT ] Market Monitor", "[ NEWS ] Daily Brief", "[ CAL ] Calendrier Éco"])
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
