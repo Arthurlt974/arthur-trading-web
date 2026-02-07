@@ -6,6 +6,9 @@ import feedparser
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
+import plotly.graph_objects as go
+import numpy as np
+
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
@@ -164,6 +167,47 @@ def trouver_ticker(nom):
         response = requests.get(url, headers=headers).json()
         return response['quotes'][0]['symbol'] if response.get('quotes') else nom
     except: return nom
+
+# --- FONCTIONS DE CALCUL POUR LE FEAR & GREED ---
+def calculer_score_sentiment(ticker):
+    try:
+        data = yf.Ticker(ticker).history(period="1y")
+        if len(data) < 200: return 50, "NEUTRE", "gray"
+        prix_actuel = data['Close'].iloc[-1]
+        ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
+        ratio = (prix_actuel / ma200) - 1
+        score = 50 + (ratio * 300) 
+        score = max(10, min(90, score))
+        if score > 70: return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
+        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
+        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
+        elif score > 30: return score, "PEUR 📉", "#e67e22"
+        else: return score, "PANIQUE TOTALE 💀", "#e74c3c"
+    except: return 50, "ERREUR", "gray"
+
+def afficher_jauge_pro(score, titre, couleur, sentiment):
+    import plotly.graph_objects as go
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = score,
+        number = {'font': {'size': 30, 'color': "white"}, 'suffix': "%"},
+        title = {'text': f"<b>{titre}</b><br><span style='color:{couleur}; font-size:14px;'>{sentiment}</span>", 
+                 'font': {'size': 16, 'color': "white"}},
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+            'bar': {'color': couleur, 'thickness': 0.3},
+            'bgcolor': "rgba(0,0,0,0)",
+            'steps': [
+                {'range': [0, 30], 'color': "rgba(231, 76, 60, 0.2)"},
+                {'range': [30, 45], 'color': "rgba(230, 126, 34, 0.2)"},
+                {'range': [45, 55], 'color': "rgba(241, 196, 15, 0.2)"},
+                {'range': [55, 70], 'color': "rgba(46, 204, 113, 0.2)"},
+                {'range': [70, 100], 'color': "rgba(0, 255, 173, 0.2)"}
+            ],
+        }
+    ))
+    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"}, height=300, margin=dict(l=25, r=25, t=100, b=20))
+    return fig
 
 # --- NAVIGATION ---
 st.sidebar.title("🚀 AM-TERMINAL")
@@ -463,3 +507,37 @@ elif outil == "📅 Calendrier Éco":
     """
     
     components.html(calendrier_tv, height=800, scrolling=True)
+
+# ==========================================
+# OUTIL 6 : FEAR & GREED INDEX
+# ==========================================
+elif outil == "🌡️ Sentiment Index":
+    st.title("🌡️ Market Sentiment Index")
+    st.write("Analyse de la force du marché par rapport à sa moyenne long terme (MA200).")
+    
+    marches = {
+        "^GSPC": "🇺🇸 USA (S&P 500)",
+        "^FCHI": "🇫🇷 France (CAC 40)",
+        "^HSI":  "🇨🇳 Chine (Hang Seng)",
+        "BTC-USD": "₿ Bitcoin",
+        "GC=F": "🟡 Or (Métal Précieux)"
+    }
+    
+    # Affichage en grille
+    c1, c2 = st.columns(2)
+    items = list(marches.items())
+    
+    for i in range(len(items)):
+        ticker, nom = items[i]
+        score, label, couleur = calculer_score_sentiment(ticker)
+        fig = afficher_jauge_pro(score, nom, couleur, label)
+        
+        if i % 2 == 0:
+            c1.plotly_chart(fig, use_container_width=True)
+        else:
+            c2.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+    st.info("💡 **Conseil** : La 'Panique' (0-30%) indique souvent une opportunité d'achat, tandis que l'Euphorie (70-100%) suggère une bulle potentielle.")
+
+
