@@ -16,38 +16,65 @@ st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
 
-# --- STYLE BLOOMBERG TERMINAL ---
+# --- STYLE BLOOMBERG TERMINAL (DARK HEADER) ---
 st.markdown("""
     <style>
-        .stApp { background-color: #0d0d0d; color: #d1d1d1; }
-        [data-testid="stSidebar"] { background-color: #161616; border-right: 1px solid #333; }
-        h1, h2, h3 { color: #ff9800 !important; text-transform: uppercase; }
-        [data-testid="stMetricValue"] { font-size: 28px !important; color: #00ff00 !important; }
+        /* Supprime la ligne blanche/grise en haut et met le header en noir */
+        header[data-testid="stHeader"] {
+            background-color: rgba(0,0,0,0) !important;
+            color: #ff9800 !important;
+        }
+        
+        /* Supprime la bordure décorative de Streamlit en haut */
+        .stApp [data-testid="stDecoration"] {
+            display: none;
+        }
+
+        /* Fond de l'application et texte de base en orange */
+        .stApp { 
+            background-color: #0d0d0d; 
+            color: #ff9800 !important; 
+        }
+        
+        /* Barre latérale */
+        [data-testid="stSidebar"] { 
+            background-color: #161616; 
+            border-right: 1px solid #333; 
+        }
+        
+        /* Tous les textes en orange */
+        h1, h2, h3, p, span, label, div, .stMarkdown { 
+            color: #ff9800 !important; 
+            text-transform: uppercase; 
+        }
+
+        /* Metrics labels */
+        [data-testid="stMetricLabel"] {
+            color: #ff9800 !important;
+        }
+
+        /* Onglets */
+        button[data-baseweb="tab"] p {
+            color: #ff9800 !important;
+        }
         
         /* Boutons */
         .stButton>button {
-            background-color: #1a1a1a; color: #ff9800; border: 1px solid #ff9800;
-            border-radius: 4px; font-weight: bold; width: 100%;
+            background-color: #1a1a1a; 
+            color: #ff9800; 
+            border: 1px solid #ff9800;
+            border-radius: 4px; 
+            font-weight: bold; 
+            width: 100%;
         }
-        .stButton>button:hover { background-color: #ff9800; color: #000; }
-
-        /* Style des fenêtres flottantes (Workspace) */
-        .chart-container {
-            border: 1px solid #333;
-            background-color: #000;
-            padding: 5px;
-            margin-bottom: 20px;
-        }
-        .chart-header {
-            background-color: #1a1a1a;
-            padding: 5px 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #333;
+        .stButton>button:hover { 
+            background-color: #ff9800; 
+            color: #000; 
         }
     </style>
 """, unsafe_allow_html=True)
+
+
 # --- SYSTÈME DE MOT DE PASSE ---
 def check_password():
     if "password_correct" not in st.session_state:
@@ -196,18 +223,18 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
 # --- NAVIGATION ---
 st.sidebar.title("📟 AM-TERMINAL")
 outil = st.sidebar.radio("SELECT MODULE :", [
-    "[ DATA ] ANALYSEUR PRO", 
-    "[ VS ] MODE DUEL", 
-    "[ MKT ] MARKET MONITOR", 
-    "[ NEWS ] DAILY BRIEF", 
-    "[ CAL ] CALENDRIER ÉCO",
-    "🌡️ Sentiment Index"
+    "ANALYSEUR PRO", 
+    "MODE DUEL", 
+    "MARKET MONITOR", 
+    "DAILY BRIEF", 
+    "CALENDRIER ÉCO",
+    "Fear and Gread Index"
 ])
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
 # ==========================================
-if outil == "[ DATA ] ANALYSEUR PRO":
+if outil == "ANALYSEUR PRO":
     nom_entree = st.sidebar.text_input("TICKER SEARCH", value="NVIDIA")
     ticker = trouver_ticker(nom_entree)
     info = get_ticker_info(ticker)
@@ -326,7 +353,7 @@ if outil == "[ DATA ] ANALYSEUR PRO":
 # ==========================================
 # OUTIL 2 : MODE DUEL
 # ==========================================
-elif outil == "[ VS ] MODE DUEL":
+elif outil == "MODE DUEL":
     st.title("» EQUITY DUEL")
     c1, c2 = st.columns(2)
     t1 = c1.text_input("TICKER 1", value="MC.PA")
@@ -354,7 +381,7 @@ elif outil == "[ VS ] MODE DUEL":
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
 # ==========================================
-elif outil == "[ MKT ] MARKET MONITOR":
+elif outil == "MARKET MONITOR":
     st.title("» GLOBAL MARKET MONITOR")
     afficher_horloge_temps_reel()
 
@@ -398,7 +425,7 @@ elif outil == "[ MKT ] MARKET MONITOR":
 # ==========================================
 # OUTIL 4 : DAILY BRIEF
 # ==========================================
-elif outil == "[ NEWS ] DAILY BRIEF":
+elif outil == "DAILY BRIEF":
     st.title("» DAILY BRIEFING")
     st.markdown("---")
     tab_eco, tab_tech, tab_quotidien = st.tabs(["🌍 GLOBAL MACRO", "⚡ TECH & CRYPTO", "📅 DAILY (BOURSORAMA)"])
@@ -440,7 +467,7 @@ elif outil == "[ NEWS ] DAILY BRIEF":
 # ==========================================
 # OUTIL 5 : CALENDRIER ÉCONOMIQUE
 # ==========================================
-elif outil == "[ CAL ] CALENDRIER ÉCO":
+elif outil == "CALENDRIER ÉCO":
     st.title("» ECONOMIC CALENDAR")
     st.info("REAL-TIME GLOBAL MACRO EVENTS.")
     calendrier_tv = """
@@ -464,7 +491,7 @@ elif outil == "[ CAL ] CALENDRIER ÉCO":
 # ==========================================
 # OUTIL 6 : FEAR & GREED INDEX
 # ==========================================
-elif outil == "🌡️ Sentiment Index":
+elif outil == "Fear and Gread Index":
     st.title("🌡️ Market Sentiment Index")
     st.write("Analyse de la force du marché par rapport à sa moyenne long terme (MA200).")
     
