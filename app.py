@@ -1,6 +1,6 @@
 import streamlit as st
 import yfinance as yf
-import pandas as pd
+import pd
 import requests
 import feedparser
 import streamlit.components.v1 as components
@@ -42,22 +42,21 @@ def afficher_horloge_temps_reel():
     """
     components.html(horloge_html, height=100)
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (CORRIGÉE POUR BNP/LVMH) ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (FIX EURONEXT) ---
 def afficher_graphique_pro(symbol, height=600):
-    # Traduction pour les indices et crypto
-    traduction_special = {
-        "^FCHI": "EURONEXT:PX1",       # CAC40 exact
-        "^GSPC": "VANTAGE:SP500",      # S&P500
-        "^IXIC": "NASDAQ:IXIC",        # NASDAQ exact
-        "BTC-USD": "BINANCE:BTCUSDT"
-    }
-    
-    if symbol in traduction_special:
-        tv_symbol = traduction_special[symbol]
+    # Traduction automatique pour TradingView
+    if symbol == "^FCHI":
+        tv_symbol = "EURONEXT:PX1"
+    elif symbol == "^GSPC":
+        tv_symbol = "SPX"
+    elif symbol == "^IXIC":
+        tv_symbol = "NASDAQ:IXIC"
+    elif symbol == "BTC-USD":
+        tv_symbol = "BINANCE:BTCUSDT"
     elif ".PA" in symbol:
-        # Transformation de BNP.PA en EURONEXT:BNP
-        nom_action = symbol.replace(".PA", "")
-        tv_symbol = f"EURONEXT:{nom_action}"
+        # On enlève le .PA et on force EURONEXT
+        nom_net = symbol.replace(".PA", "")
+        tv_symbol = f"EURONEXT:{nom_net}"
     else:
         tv_symbol = symbol
 
@@ -75,9 +74,12 @@ def afficher_graphique_pro(symbol, height=600):
           "locale": "fr",
           "toolbar_bg": "#f1f3f6",
           "enable_publishing": false,
+          "withdateranges": true,
           "hide_side_toolbar": false,
           "allow_symbol_change": true,
           "details": true,
+          "hotlist": true,
+          "calendar": true,
           "container_id": "tradingview_chart"
         }});
         </script>
@@ -135,6 +137,7 @@ if outil == "📊 Analyseur Pro":
 
         st.title(f"📊 {nom} ({ticker})")
 
+        # --- MÉTRIQUES ---
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Prix Actuel", f"{prix:.2f} {devise}")
         c2.metric("Valeur Graham", f"{val_theorique:.2f} {devise}")
@@ -142,12 +145,14 @@ if outil == "📊 Analyseur Pro":
         c4.metric("Secteur", secteur)
 
         st.markdown("---")
+        
+        # --- GRAPHIQUE ---
         st.subheader("📈 Analyse Technique Pro")
-        # Graphique pleine largeur
         afficher_graphique_pro(ticker, height=650)
 
         st.markdown("---")
-        # Détails financiers en bas
+
+        # --- DÉTAILS FINANCIERS ---
         st.subheader("📑 Détails Financiers")
         f1, f2, f3 = st.columns(3)
         with f1:
@@ -160,7 +165,7 @@ if outil == "📊 Analyseur Pro":
             st.write(f"**Payout Ratio :** {payout:.2f} %")
             st.write(f"**Cash/Action :** {cash_action:.2f} {devise}")
 
-        # --- SCORING & ACTUALITÉS RESTENT IDENTIQUES ---
+        # --- SCORING ---
         st.markdown("---")
         st.subheader("⭐ Scoring Qualité (sur 20)")
         score = 0
@@ -189,6 +194,7 @@ if outil == "📊 Analyseur Pro":
             for p in positifs: st.markdown(f'<p style="color:#2ecc71;margin:0;">{p}</p>', unsafe_allow_html=True)
             for n in negatifs: st.markdown(f'<p style="color:#e74c3c;margin:0;">{n}</p>', unsafe_allow_html=True)
 
+        # --- ACTUALITÉS ---
         st.markdown("---")
         st.subheader(f"📰 Actualités : {nom}")
         search_term = nom.replace(" ", "+")
@@ -240,7 +246,7 @@ elif outil == "🌍 Market Monitor":
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (CONSERVÉ)
+# OUTIL 2 : MODE DUEL
 # ==========================================
 elif outil == "⚔️ Mode Duel":
     st.title("⚔️ Duel d'Actions")
