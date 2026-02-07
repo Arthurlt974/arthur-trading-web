@@ -812,21 +812,30 @@ elif outil == "WHALE WATCHER 🐋":
 
     trades = get_live_trades()
     
-    # Traitement des données
+   # Traitement des données
     new_logs = []
-    for t in trades:
-        qty = float(t['qty'])
-        if qty >= seuil_baleine:
-            is_buyer = t['isBuyerMaker'] # True = Vente, False = Achat
-            color = "🔴" if is_buyer else "🟢"
-            label = "SELL" if is_buyer else "BUY"
-            prix = float(t['price'])
-            time_str = datetime.fromtimestamp(t['time']/1000).strftime('%H:%M:%S')
-            
-            log = f"{color} | {time_str} | {label} {qty:.2f} BTC @ {prix:,.0f} $"
-            if log not in st.session_state.whale_logs:
-                st.session_state.whale_logs.insert(0, log)
-                st.session_state.pressure_data.append(0 if is_buyer else 1)
+    if isinstance(trades, list): # Sécurité si l'API renvoie une erreur
+        for t in trades:
+            # Correction ici : les clés de l'API Binance sont en minuscules
+            try:
+                qty = float(t['qty'])
+                if qty >= seuil_baleine:
+                    is_buyer = t['isBuyerMaker'] # True = Vente, False = Achat
+                    color = "🔴" if is_buyer else "🟢"
+                    label = "SELL" if is_buyer else "BUY"
+                    prix = float(t['price'])
+                    # On formate l'heure proprement
+                    time_str = datetime.fromtimestamp(t['time']/1000).strftime('%H:%M:%S')
+                    
+                    log = f"{color} | {time_str} | {label} {qty:.2f} BTC @ {prix:,.0f} $"
+                    
+                    # On vérifie si ce log n'est pas déjà présent pour éviter les doublons
+                    if log not in st.session_state.whale_logs:
+                        st.session_state.whale_logs.insert(0, log)
+                        st.session_state.pressure_data.append(0 if is_buyer else 1)
+            except KeyError as e:
+                # Si une clé manque, on passe au trade suivant sans faire planter l'app
+                continue
 
     # Nettoyage historique (max 15 logs)
     st.session_state.whale_logs = st.session_state.whale_logs[:15]
