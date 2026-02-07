@@ -15,6 +15,9 @@ st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 # --- INITIALISATION DU WORKSPACE (FÊNETRES MULTIPLES) ---
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
+# AJOUTEZ CETTE LIGNE ICI :
+if "multi_charts" not in st.session_state:
+    st.session_state.multi_charts = []
 
 # --- STYLE BLOOMBERG TERMINAL (DARK HEADER) ---
 st.markdown("""
@@ -224,7 +227,8 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
 # --- NAVIGATION ---
 st.sidebar.title("📟 AM-TERMINAL")
 outil = st.sidebar.radio("SELECT MODULE :", [
-    "ANALYSEUR PRO", 
+    "ANALYSEUR PRO",
+    "MULTI-CHARTS",
     "MODE DUEL", 
     "MARKET MONITOR", 
     "DAILY BRIEF", 
@@ -233,6 +237,32 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "INTERETS COMPOSES",
     "CRYPTO WALLET"
 ])
+
+# --- NOUVELLE FONCTION POUR GRAPHIQUES MULTIPLES ---
+def afficher_mini_graphique(symbol, chart_id):
+    traduction_symbols = {"^FCHI": "CAC40", "^GSPC": "VANTAGE:SP500", "^IXIC": "NASDAQ", "BTC-USD": "BINANCE:BTCUSDT"}
+    tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
+    if ".PA" in symbol and symbol not in traduction_symbols:
+        tv_symbol = f"EURONEXT:{tv_symbol}"
+
+    # On utilise chart_id pour éviter les conflits de DOM entre les fenêtres
+    tradingview_html = f"""
+        <div id="tv_chart_{chart_id}" style="height:400px;"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script type="text/javascript">
+        new TradingView.widget({{
+          "autosize": true,
+          "symbol": "{tv_symbol}",
+          "interval": "D",
+          "timezone": "Europe/Paris",
+          "theme": "dark",
+          "style": "1",
+          "locale": "fr",
+          "container_id": "tv_chart_{chart_id}"
+        }});
+        </script>
+    """
+    components.html(tradingview_html, height=410)
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
@@ -721,3 +751,49 @@ elif outil == "CRYPTO WALLET":
         m3.metric("MARCHÉ", "BTC/USDT", "LIVE")
     else:
         st.error("ERREUR DE CONNEXION À L'API BINANCE")
+# ==========================================
+# NOUVEAU MODULE : MULTI-CHARTS
+# ==========================================
+if outil == "MULTI-CHARTS":
+    st.title("🖥️ MULTI-WINDOW WORKSPACE")
+    
+    # Barre de recherche pour ajouter des fenêtres
+    with st.container():
+        c_search, c_btn, c_clear = st.columns([3, 1, 1])
+        new_ticker = c_search.text_input("ADD TICKER TO WORKSPACE (ex: AAPL, TSLA, MC.PA)", key="add_chart_input")
+        if c_btn.button("➕ ADD WINDOW"):
+            if new_ticker:
+                ticker_to_add = trouver_ticker(new_ticker)
+                if ticker_to_add not in st.session_state.multi_charts:
+                    st.session_state.multi_charts.append(ticker_to_add)
+                    st.rerun()
+        
+        if c_clear.button("🗑️ CLEAR ALL"):
+            st.session_state.multi_charts = []
+            st.rerun()
+
+    st.markdown("---")
+
+    # Affichage en grille (2 colonnes)
+    if not st.session_state.multi_charts:
+        st.info("Votre espace est vide. Ajoutez un ticker ci-dessus pour ouvrir une fenêtre.")
+    else:
+        # On crée une grille de 2 colonnes (tu peux passer à 3 pour plus de fenêtres)
+        cols = st.columns(2)
+        for idx, ticker in enumerate(st.session_state.multi_charts):
+            col_index = idx % 2
+            with cols[col_index]:
+                # En-tête de la mini fenêtre
+                st.markdown(f"""
+                    <div style="background:#1a1a1a; padding:5px 10px; border:1px solid #ff9800; border-bottom:none; display:flex; justify-content:space-between;">
+                        <span style="color:#ff9800; font-weight:bold;">📟 {ticker}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Affichage du graphique
+                afficher_mini_graphique(ticker, idx)
+                
+                # Bouton pour fermer cette fenêtre précise
+                if st.button(f"CLOSE {ticker}", key=f"close_{idx}"):
+                    st.session_state.multi_charts.pop(idx)
+                    st.rerun()
