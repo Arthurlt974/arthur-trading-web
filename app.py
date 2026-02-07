@@ -409,3 +409,21 @@ elif outil == "📰 Daily Brief":
         # Recherche ciblée exclusivement sur Boursorama
         url_boursorama = "https://news.google.com/rss/search?q=site:boursorama.com&hl=fr&gl=FR&ceid=FR:fr"
         afficher_flux_daily(url_boursorama, filtre_boursorama_24h=True)
+
+        # --- CALENDRIER ÉCONOMIQUE (SIDEBAR) ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("📅 Calendrier Économique")
+
+# Code du Widget Investing.com
+calendrier_html = """
+<div style="height: 500px; overflow: hidden;">
+    <iframe src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&category=_main&features=datepicker,timezone&countries=25,32,6,37,7,5&calType=day&timeZone=58&lang=5" 
+    width="100%" height="500" frameborder="0" allowtransparency="true" marginwidth="0" marginheight="0"></iframe>
+    <div style="font-size:11px; font-family:Arial, Helvetica, sans-serif; text-align:right;">
+        <a href="https://fr.investing.com/" rel="nofollow" target="_blank">Calendrier économique fourni par Investing.com France</a>
+    </div>
+</div>
+"""
+
+with st.sidebar:
+    components.html(calendrier_html, height=520)
