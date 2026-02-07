@@ -6,6 +6,50 @@ import feedparser
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
+import plotly.graph_objects as go
+
+def calculer_score_sentiment(ticker):
+    try:
+        data = yf.Ticker(ticker).history(period="1y")
+        if len(data) < 200: return 50, "NEUTRAL", "gray"
+        
+        prix_actuel = data['Close'].iloc[-1]
+        ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
+        ratio = (prix_actuel / ma200) - 1
+        
+        # Transformation du ratio en score 0-100
+        # -15% ou moins = 0 (Extreme Fear) | +15% ou plus = 100 (Extreme Greed)
+        score = 50 + (ratio * 333) 
+        score = max(0, min(100, score))
+        
+        if score > 75: return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
+        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
+        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
+        elif score > 25: return score, "PEUR 📉", "#e67e22"
+        else: return score, "PANIQUE TOTALE 💀", "#e74c3c"
+    except:
+        return 50, "ERREUR", "gray"
+
+def afficher_jauge(score, titre, couleur, sentiment):
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = score,
+        title = {'text': f"<b>{titre}</b><br><span style='font-size:0.8em;color:{couleur}'>{sentiment}</span>"},
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1},
+            'bar': {'color': couleur},
+            'bgcolor': "#131722",
+            'steps': [
+                {'range': [0, 25], 'color': "#4d0000"},
+                {'range': [25, 45], 'color': "#4d2600"},
+                {'range': [45, 55], 'color': "#333300"},
+                {'range': [55, 75], 'color': "#003300"},
+                {'range': [75, 100], 'color': "#004d33"}
+            ],
+        }
+    ))
+    fig.update_layout(paper_bgcolor="#131722", font={'color': "white", 'family': "Arial"}, height=300, margin=dict(l=20, r=20, t=50, b=20))
+    return fig
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading", layout="wide")
@@ -141,7 +185,7 @@ def trouver_ticker(nom):
 
 # --- NAVIGATION ---
 st.sidebar.title("🚀 AM-Trading")
-outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief", "📅 Calendrier Éco"])
+outil = st.sidebar.radio("Choisir un outil :", ["📊 Analyseur Pro", "🌡️ Sentiment Index", "⚔️ Mode Duel", "🌍 Market Monitor", "📰 Daily Brief", "📅 Calendrier Éco"])
 
 # ==========================================
 # OUTIL 1 : ANALYSEUR PRO
@@ -437,3 +481,34 @@ elif outil == "📅 Calendrier Éco":
     """
     
     components.html(calendrier_tv, height=800, scrolling=True)
+
+# ==========================================
+# OUTIL 6 : FEAR & GREED INDEX PRO
+# ==========================================
+elif outil == "🌡️ Sentiment Index":
+    st.title("🌡️ Market Fear & Greed Index")
+    st.markdown("Ce score mesure l'écart entre le prix actuel et la **Moyenne Mobile 200 jours**. Plus l'écart est grand, plus l'euphorie est forte.")
+    
+    marches = {
+        "^GSPC": "🇺🇸 USA (S&P 500)",
+        "^FCHI": "🇫🇷 France (CAC 40)",
+        "^HSI":  "🇭🇰 Asie (Hang Kong)",
+        "BTC-USD": "₿ Crypto (Bitcoin)",
+        "GC=F": "🟡 Or (Gold)",
+        "NVDA": "🤖 Tech (NVIDIA)"
+    }
+    
+    # Affichage en grille (2 colonnes)
+    cols = st.columns(2)
+    for i, (ticker, nom) in enumerate(marches.items()):
+        score, label, couleur = calculer_score_sentiment(ticker)
+        fig = afficher_jauge(score, nom, couleur, label)
+        cols[i % 2].plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("💡 Guide d'interprétation")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.error("**Zone 0-25 (Extreme Fear)** : Les investisseurs paniquent. Historiquement, c'est souvent une zone d'accumulation (achat).")
+    with c2:
+        st.success("**Zone 75-100 (Extreme Greed)** : Le marché est en surchauffe. Risque élevé de correction brutale.")
