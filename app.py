@@ -13,18 +13,19 @@ st_autorefresh(interval=15000, key="global_refresh")
 
 # --- FONCTION GRAPHIQUE TRADINGVIEW PRO (TRADUCTION DES SYMBOLES) ---
 def afficher_graphique_pro(symbol, height=600):
-    # Dictionnaire de traduction Yahoo Finance -> TradingView pour les indices
+    # Dictionnaire de traduction précis pour TradingView
     traduction_symbols = {
-        "^FCHI": "EURONEXT:PX1",     # CAC 40
-        "SP500": "INDEX cfd VANTAGE",        # S&P 500
-        "^IXIC": "NASDAQ:IXIC",      # NASDAQ
-        "BTC-USD": "BINANCE:BTCUSDT" # Bitcoin
+        "^FCHI": "EURONEXT:PX1",      # CAC 40
+        "^GSPC": "CME_MINI:ES1!",     # S&P 500 (Futures) ou "INDEX:SPX"
+        "^IXIC": "NASDAQ:IXIC",       # NASDAQ
+        "BTC-USD": "BINANCE:BTCUSDT"  # Bitcoin
     }
     
     # Choix du symbole : priorité à la traduction, sinon traitement automatique
     if symbol in traduction_symbols:
         tv_symbol = traduction_symbols[symbol]
     else:
+        # Pour les actions (ex: MC.PA -> EURONEXT:MC)
         tv_symbol = symbol.replace(".PA", "")
         if ".PA" in symbol:
             tv_symbol = f"EURONEXT:{tv_symbol}"
@@ -212,7 +213,7 @@ elif outil == "⚔️ Mode Duel":
             st.table(df)
             m1 = (d1['valeur']-d1['prix'])/d1['prix']
             m2 = (d2['valeur']-d2['prix'])/d2['prix']
-            st.success(f"🏆 Gagnant sur la marge : {d1['nom'] if m1 > m2 else d2['nom']}")
+            st.success(f"🏆 Gagnant : {d1['nom'] if m1 > m2 else d2['nom']}")
         except: st.error("Erreur de données.")
 
 # ==========================================
@@ -252,9 +253,8 @@ elif outil == "🌍 Market Monitor":
         except: pass
 
     st.markdown("---")
-    indices_noms = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
-    nom_sel = indices_noms.get(st.session_state.index_selectionne, "Indice")
+    nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
     st.subheader(f"📈 Graphique Avancé : {nom_sel}")
     
-    # Appel de la fonction avec traduction intégrée
+    # Appel du graphique avec la traduction automatique des indices
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
