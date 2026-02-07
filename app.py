@@ -16,16 +16,13 @@ st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
 
-# --- STYLE BLOOMBERG TERMINAL (DARK HEADER) ---
+# --- STYLE BLOOMBERG TERMINAL (ORANGE & GREEN) ---
 st.markdown("""
     <style>
-        /* Supprime la ligne blanche/grise en haut et met le header en noir */
+        /* Supprime la barre blanche en haut */
         header[data-testid="stHeader"] {
             background-color: rgba(0,0,0,0) !important;
-            color: #ff9800 !important;
         }
-        
-        /* Supprime la bordure décorative de Streamlit en haut */
         .stApp [data-testid="stDecoration"] {
             display: none;
         }
@@ -42,15 +39,16 @@ st.markdown("""
             border-right: 1px solid #333; 
         }
         
-        /* Tous les textes en orange */
+        /* Textes, labels et titres en orange */
         h1, h2, h3, p, span, label, div, .stMarkdown { 
             color: #ff9800 !important; 
             text-transform: uppercase; 
         }
 
-        /* Metrics labels */
-        [data-testid="stMetricLabel"] {
-            color: #ff9800 !important;
+        /* LES CHIFFRES EN VERT (Metrics et Valeurs) */
+        [data-testid="stMetricValue"], .st-emotion-cache-1wivap2, [data-testid="stTable"] td {
+            color: #00ff00 !important;
+            font-family: 'Courier New', monospace;
         }
 
         /* Onglets */
@@ -65,7 +63,6 @@ st.markdown("""
             border: 1px solid #ff9800;
             border-radius: 4px; 
             font-weight: bold; 
-            width: 100%;
         }
         .stButton>button:hover { 
             background-color: #ff9800; 
