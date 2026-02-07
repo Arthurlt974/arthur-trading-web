@@ -82,14 +82,15 @@ def afficher_graphique_pro(symbol, height=600):
     components.html(tradingview_html, height=height + 10)
 
 # --- FONCTIONS DE MISE EN CACHE ---
-@st.cache_data(ttl=3600)
+# MODIFICATION ICI : ttl=5 pour rafraîchir le prix quasiment en direct
+@st.cache_data(ttl=5) 
 def get_ticker_info(ticker):
     try:
         data = yf.Ticker(ticker)
         return data.info
     except: return None
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=5)
 def get_ticker_history(ticker, period="2d"):
     try:
         data = yf.Ticker(ticker)
