@@ -9,22 +9,26 @@ from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading", layout="wide")
-# Note: L'autorefresh est mis à 15s pour ne pas réinitialiser les dessins trop souvent
 st_autorefresh(interval=15000, key="global_refresh")
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (AVEC CRAYONS & INDICATEURS) ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (TRADUCTION DES SYMBOLES) ---
 def afficher_graphique_pro(symbol, height=600):
-    # Traduction du symbole pour TradingView (ex: MC.PA -> EURONEXT:MC)
-    tv_symbol = symbol
-    if ".PA" in symbol:
-        tv_symbol = f"EURONEXT:{symbol.replace('.PA', '')}"
-    elif "^FCHI" in symbol:
-        tv_symbol = "INDEX:PX1"
-    elif "^GSPC" in symbol:
-        tv_symbol = "SPX"
-    elif "^IXIC" in symbol:
-        tv_symbol = "NASDAQ:IXIC"
+    # Dictionnaire de traduction Yahoo Finance -> TradingView pour les indices
+    traduction_symbols = {
+        "^FCHI": "EURONEXT:PX1",     # CAC 40
+        "^GSPC": "INDEX:SPX",        # S&P 500
+        "^IXIC": "NASDAQ:IXIC",      # NASDAQ
+        "BTC-USD": "BINANCE:BTCUSDT" # Bitcoin
+    }
     
+    # Choix du symbole : priorité à la traduction, sinon traitement automatique
+    if symbol in traduction_symbols:
+        tv_symbol = traduction_symbols[symbol]
+    else:
+        tv_symbol = symbol.replace(".PA", "")
+        if ".PA" in symbol:
+            tv_symbol = f"EURONEXT:{tv_symbol}"
+
     tradingview_html = f"""
         <div id="tradingview_chart" style="height:{height}px;"></div>
         <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
@@ -41,7 +45,6 @@ def afficher_graphique_pro(symbol, height=600):
           "enable_publishing": false,
           "hide_side_toolbar": false,
           "allow_symbol_change": true,
-          "save_image": false,
           "container_id": "tradingview_chart"
         }});
         </script>
@@ -113,9 +116,7 @@ if outil == "📊 Analyseur Pro":
         st.subheader("📈 Analyse Technique (TradingView)")
         
         col_graph, col_data = st.columns([2, 1])
-        
         with col_graph:
-            # Affichage du graphique complet avec outils de dessin
             afficher_graphique_pro(ticker)
 
         with col_data:
@@ -174,7 +175,6 @@ if outil == "📊 Analyseur Pro":
                             st.write(f"**Source :** {entry.source.get('title', 'Presse Finance')}")
                             st.caption(f"Publié le : {entry.published}")
                             st.link_button("Lire l'article", entry.link)
-                else: st.info("Aucune actualité trouvée.")
             except: st.error("Erreur de flux d'actualités.")
         with col_m:
             st.subheader("🌍 Flash Marché")
@@ -184,7 +184,6 @@ if outil == "📊 Analyseur Pro":
                 for m_art in flux_mkt.entries[:4]:
                     m_title = m_art.title.split(" - ")[0]
                     st.markdown(f"🔹 **{m_art.source.get('title')}**\n[{m_title}]({m_art.link})")
-                    st.write("---")
             except: st.write("Flux indisponible.")
 
 # ==========================================
@@ -195,7 +194,6 @@ elif outil == "⚔️ Mode Duel":
     c1, c2 = st.columns(2)
     t1 = c1.text_input("Action 1", value="MC.PA")
     t2 = c2.text_input("Action 2", value="RMS.PA")
-    
     if st.button("Lancer le Duel"):
         def get_d(t):
             ticker_id = trouver_ticker(t)
@@ -204,7 +202,6 @@ elif outil == "⚔️ Mode Duel":
             b = i.get('trailingEps') or i.get('forwardEps') or 0
             v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
             return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "dette": i.get('debtToEquity', 0), "yield": (i.get('dividendYield', 0) or 0)*100}
-        
         try:
             d1, d2 = get_d(t1), get_d(t2)
             df = pd.DataFrame({
@@ -227,7 +224,6 @@ elif outil == "🌍 Market Monitor":
     st.title("🌍 Market Monitor (UTC+4)")
     st.subheader(f"🕒 Heure actuelle : {maintenant.strftime('%H:%M:%S')}")
 
-    st.markdown("### 🕒 Statut des Bourses")
     data_horaires = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
         "Ouverture (REU)": ["05:30", "12:00", "18:30"],
@@ -256,6 +252,9 @@ elif outil == "🌍 Market Monitor":
         except: pass
 
     st.markdown("---")
-    st.subheader(f"📈 Graphique Avancé : {indices[st.session_state.index_selectionne]}")
-    # Graphique interactif complet pour le moniteur de marché
+    indices_noms = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
+    nom_sel = indices_noms.get(st.session_state.index_selectionne, "Indice")
+    st.subheader(f"📈 Graphique Avancé : {nom_sel}")
+    
+    # Appel de la fonction avec traduction intégrée
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
