@@ -16,13 +16,16 @@ st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
 
-# --- STYLE BLOOMBERG TERMINAL (ORANGE & GREEN) ---
+# --- STYLE BLOOMBERG TERMINAL (DARK HEADER) ---
 st.markdown("""
     <style>
-        /* Supprime la barre blanche en haut */
+        /* Supprime la ligne blanche/grise en haut et met le header en noir */
         header[data-testid="stHeader"] {
             background-color: rgba(0,0,0,0) !important;
+            color: #ff9800 !important;
         }
+        
+        /* Supprime la bordure décorative de Streamlit en haut */
         .stApp [data-testid="stDecoration"] {
             display: none;
         }
@@ -39,16 +42,15 @@ st.markdown("""
             border-right: 1px solid #333; 
         }
         
-        /* Textes, labels et titres en orange */
+        /* Tous les textes en orange */
         h1, h2, h3, p, span, label, div, .stMarkdown { 
             color: #ff9800 !important; 
             text-transform: uppercase; 
         }
 
-        /* LES CHIFFRES EN VERT (Metrics et Valeurs) */
-        [data-testid="stMetricValue"], .st-emotion-cache-1wivap2, [data-testid="stTable"] td {
-            color: #00ff00 !important;
-            font-family: 'Courier New', monospace;
+        /* Metrics labels */
+        [data-testid="stMetricLabel"] {
+            color: #ff9800 !important;
         }
 
         /* Onglets */
@@ -63,6 +65,7 @@ st.markdown("""
             border: 1px solid #ff9800;
             border-radius: 4px; 
             font-weight: bold; 
+            width: 100%;
         }
         .stButton>button:hover { 
             background-color: #ff9800; 
@@ -225,7 +228,9 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "MARKET MONITOR", 
     "DAILY BRIEF", 
     "CALENDRIER ÉCO",
-    "Fear and Gread Index"
+    "Fear and Gread Index",
+    "INTERETS COMPOSES",
+    "CRYPTO WALLET"
 ])
 
 # ==========================================
@@ -348,33 +353,94 @@ if outil == "ANALYSEUR PRO":
             st.error("ERROR FETCHING NEWS FEED.")
 
 # ==========================================
-# OUTIL 2 : MODE DUEL
+# OUTIL 2 : MODE DUEL (VERSION AMÉLIORÉE)
 # ==========================================
 elif outil == "MODE DUEL":
-    st.title("» EQUITY DUEL")
+    st.title("⚔️ EQUITY DUEL : PRO COMPARISON")
+    st.write("Comparez deux actifs pour identifier le meilleur point d'entrée.")
+
     c1, c2 = st.columns(2)
-    t1 = c1.text_input("TICKER 1", value="MC.PA")
-    t2 = c2.text_input("TICKER 2", value="RMS.PA")
-    if st.button("EXECUTE COMPARISON"):
-        def get_d(t):
+    with c1:
+        t1 = st.text_input("TICKER 1", value="MC.PA").upper()
+    with c2:
+        t2 = st.text_input("TICKER 2", value="RMS.PA").upper()
+
+    if st.button("RUN DEEP ANALYSIS"):
+        def get_full_data(t):
             ticker_id = trouver_ticker(t)
             i = get_ticker_info(ticker_id)
+            hist = get_ticker_history(ticker_id, period="1y")
+            
             p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
             b = i.get('trailingEps') or 0
-            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
-            return {"nom": i.get('shortName', t), "prix": p, "valeur": v, "yield": (i.get('dividendYield', 0) or 0)*100}
-        try:
-            d1, d2 = get_d(t1), get_d(t2)
-            df = pd.DataFrame({
-                "CRITERIA": ["PRICE", "GRAHAM VAL", "DIV. YIELD"],
-                d1['nom']: [f"{d1['prix']:.2f}", f"{d1['valeur']:.2f}", f"{d1['yield']:.2f}%"],
-                d2['nom']: [f"{d2['prix']:.2f}", f"{d2['valeur']:.2f}", f"{d2['yield']:.2f}%"]
-            })
-            st.table(df)
-            m1, m2 = (d1['valeur']-d1['prix'])/d1['prix'], (d2['valeur']-d2['prix'])/d2['prix']
-            st.success(f"» ALPHA PICK : {d1['nom'] if m1 > m2 else d2['nom']}")
-        except: st.error("DATA ERROR.")
+            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5 # Formule Graham
+            
+            return {
+                "nom": i.get('shortName', t),
+                "prix": p,
+                "valeur": v,
+                "yield": (i.get('dividendYield', 0) or 0) * 100,
+                "per": i.get('trailingPE', 0),
+                "marge": (i.get('profitMargins', 0) or 0) * 100,
+                "cap": i.get('marketCap', 0),
+                "hist": hist,
+                "potential": ((v - p) / p) * 100 if p > 0 else 0
+            }
 
+        try:
+            with st.spinner('Extracting Market Data...'):
+                d1 = get_full_data(t1)
+                d2 = get_full_data(t2)
+
+            # --- HEADER DE COMPARAISON ---
+            col_a, col_vs, col_b = st.columns([2, 1, 2])
+            with col_a:
+                st.markdown(f"### {d1['nom']}")
+                st.markdown(f"<h1 style='color:#00ff00; margin:0;'>{d1['prix']:.2f}</h1>", unsafe_allow_html=True)
+            with col_vs:
+                st.markdown("<h1 style='text-align:center; color:#ff9800; padding-top:20px;'>VS</h1>", unsafe_allow_html=True)
+            with col_b:
+                st.markdown(f"### {d2['nom']}")
+                st.markdown(f"<h1 style='color:#00ff00; margin:0; text-align:right;'>{d2['prix']:.2f}</h1>", unsafe_allow_html=True)
+
+            st.markdown("---")
+
+            # --- TABLEAU DE COMPARAISON TECHNIQUE ---
+            data_comp = {
+                "INDICATOR": ["GRAHAM VALUE", "UPSIDE POTENTIAL", "P/E RATIO", "DIV. YIELD", "PROFIT MARGIN"],
+                d1['nom']: [f"{d1['valeur']:.2f}", f"{d1['potential']:+.2f}%", f"{d1['per']:.2f}", f"{d1['yield']:.2f}%", f"{d1['marge']:.2f}%"],
+                d2['nom']: [f"{d2['valeur']:.2f}", f"{d2['potential']:+.2f}%", f"{d2['per']:.2f}", f"{d2['yield']:.2f}%", f"{d2['marge']:.2f}%"]
+            }
+            st.table(pd.DataFrame(data_comp))
+
+            # --- ANALYSE GRAPHIQUE ---
+            st.subheader("» 1 YEAR PERFORMANCE CORRELATION")
+            fig = go.Figure()
+            # Normalisation à 100 pour comparer la croissance (%)
+            for d in [d1, d2]:
+                if not d['hist'].empty:
+                    norm_price = (d['hist']['Close'] / d['hist']['Close'].iloc[0]) * 100
+                    fig.add_trace(go.Scatter(x=d['hist'].index, y=norm_price, name=d['nom']))
+
+            fig.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#ff9800"), xaxis=dict(gridcolor="#333"), yaxis=dict(gridcolor="#333", title="Base 100"),
+                height=400, margin=dict(l=0, r=0, t=30, b=0)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # --- VERDICT FINAL ---
+            st.markdown("---")
+            winner = d1['nom'] if d1['potential'] > d2['potential'] else d2['nom']
+            st.markdown(f"""
+                <div style="background:#1a1a1a; border: 2px solid #ff9800; padding:20px; border-radius:10px; text-align:center;">
+                    <h2 style="color:#ff9800; margin:0;">🏆 ALPHA PICK : {winner}</h2>
+                    <p style="color:#00ff00; margin:0;">Basé sur le potentiel de décote Graham et les marges opérationnelles.</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+        except Exception as e:
+            st.error(f"ENGINE ERROR : {str(e)}")
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
 # ==========================================
@@ -516,3 +582,141 @@ elif outil == "Fear and Gread Index":
 
     st.markdown("---")
     st.info("💡 **Conseil** : La 'Panique' (0-30%) indique souvent une opportunité d'achat, tandis que l'Euphorie (70-100%) suggère une bulle potentielle.")
+
+# ==========================================
+# NOUVEL OUTIL : SIMULATEUR D'INTÉRÊTS COMPOSÉS
+# ==========================================
+elif outil == "INTERETS COMPOSES":
+    st.title("💰 SIMULATEUR D'INTÉRÊTS COMPOSÉS")
+    st.write("Visualisez la puissance de la capitalisation sur le long terme.")
+
+    # Zone de saisie
+    col1, col2 = st.columns(2)
+    with col1:
+        cap_depart = st.number_input("Capital de départ (€)", value=1000.0, step=100.0)
+        v_mensuel = st.number_input("Versement mensuel (€)", value=100.0, step=10.0)
+    with col2:
+        rendement = st.number_input("Taux annuel espéré (%)", value=8.0, step=0.5) / 100
+        duree = st.number_input("Durée (années)", value=10, step=1)
+
+    # Calculs
+    total = cap_depart
+    total_investi = cap_depart
+    historique = []
+
+    for i in range(1, int(duree) + 1):
+        for mois in range(12):
+            total += total * (rendement / 12)
+            total += v_mensuel
+            total_investi += v_mensuel
+        
+        historique.append({
+            "Année": i,
+            "Total": round(total, 2),
+            "Investi": round(total_investi, 2),
+            "Intérêts": round(total - total_investi, 2)
+        })
+
+    # Affichage des résultats
+    res1, res2, res3 = st.columns(3)
+    res1.metric("VALEUR FINALE", f"{total:,.2f} €")
+    res2.metric("TOTAL INVESTI", f"{total_investi:,.2f} €")
+    res3.metric("GAIN NET", f"{(total - total_investi):,.2f} €")
+
+    # Graphique de croissance
+    df_plot = pd.DataFrame(historique)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df_plot["Année"], y=df_plot["Total"], name="Valeur Totale", line=dict(color='#00ff00')))
+    fig.add_trace(go.Scatter(x=df_plot["Année"], y=df_plot["Investi"], name="Capital Investi", line=dict(color='#ff9800')))
+    
+    fig.update_layout(
+        title="Évolution de votre patrimoine",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#ff9800"),
+        xaxis=dict(gridcolor="#333"),
+        yaxis=dict(gridcolor="#333")
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Tableau détaillé
+    with st.expander("VOIR LE DÉTAIL ANNÉE PAR ANNÉE"):
+        st.table(df_plot)
+
+# ==========================================
+# OUTIL 8 : CRYPTO WALLET TRACKER
+# ==========================================
+elif outil == "CRYPTO WALLET":
+    st.title("₿ CRYPTO PROFIT TRACKER")
+    
+    # Configuration du Portefeuille dans la barre latérale ou en haut
+    st.subheader("» CONFIGURATION DES POSITIONS")
+    c1, c2 = st.columns(2)
+    with c1:
+        achat_btc = st.number_input("PRIX D'ACHAT MOYEN BTC ($)", value=40000.0)
+        qte_btc = st.number_input("QUANTITÉ BTC DÉTENUE", value=0.01, format="%.4f")
+    with c2:
+        achat_eth = st.number_input("PRIX D'ACHAT MOYEN ETH ($)", value=2500.0)
+        qte_eth = st.number_input("QUANTITÉ ETH DÉTENUE", value=0.1, format="%.4f")
+
+    # Fonction pour récupérer le prix live (API Binance)
+    def get_crypto_price(symbol):
+        try:
+            url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
+            return float(requests.get(url).json()['price'])
+        except: return None
+
+    # Récupération des données
+    p_btc = get_crypto_price("BTC")
+    p_eth = get_crypto_price("ETH")
+
+    if p_btc and p_eth:
+        st.markdown("---")
+        st.subheader("» LIVE PERFORMANCE")
+        
+        # Calculs
+        def display_crypto_card(nom, actuel, achat, qte):
+            profit_unit = actuel - achat
+            profit_total = profit_unit * qte
+            perf_pct = (actuel - achat) / achat * 100
+            couleur = "#00ff00" if perf_pct >= 0 else "#ff0000"
+            signe = "+" if perf_pct >= 0 else ""
+            
+            st.markdown(f"""
+                <div style="border: 1px solid #333; padding: 20px; border-radius: 5px; background: #111;">
+                    <h3 style="margin:0; color:#ff9800;">{nom}</h3>
+                    <p style="margin:0; font-size:12px; color:#666;">PRIX ACTUEL</p>
+                    <h2 style="margin:0; color:#00ff00;">{actuel:,.2f} $</h2>
+                    <hr style="border:0.5px solid #222;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <div>
+                            <p style="margin:0; font-size:12px; color:#666;">PERFORMANCE</p>
+                            <p style="margin:0; color:{couleur}; font-weight:bold;">{signe}{perf_pct:.2f} %</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="margin:0; font-size:12px; color:#666;">PROFIT TOTAL</p>
+                            <p style="margin:0; color:{couleur}; font-weight:bold;">{signe}{profit_total:,.2f} $</p>
+                        </div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        col_btc, col_eth = st.columns(2)
+        with col_btc:
+            display_crypto_card("BITCOIN", p_btc, achat_btc, qte_btc)
+        with col_eth:
+            display_crypto_card("ETHEREUM", p_eth, achat_eth, qte_eth)
+
+        # Résumé du Wallet
+        total_val = (p_btc * qte_btc) + (p_eth * qte_eth)
+        total_investi = (achat_btc * qte_btc) + (achat_eth * qte_eth)
+        profit_global = total_val - total_investi
+        perf_globale = (profit_global / total_investi) * 100 if total_investi > 0 else 0
+
+        st.markdown("---")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("VALEUR TOTALE PORTFOLIO", f"{total_val:,.2f} $")
+        m2.metric("PROFIT GLOBAL ($)", f"{profit_global:,.2f} $", f"{perf_globale:+.2f}%")
+        m3.metric("MARCHÉ", "BTC/USDT", "LIVE")
+    else:
+        st.error("ERREUR DE CONNEXION À L'API BINANCE")
