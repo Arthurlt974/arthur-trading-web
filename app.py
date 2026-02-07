@@ -417,7 +417,7 @@ elif outil == "📅 Calendrier Éco":
     st.title("📅 Calendrier Économique")
     st.info("Annonces macroéconomiques mondiales (Source: TradingView)")
     
-    # Widget TradingView (beaucoup plus stable sur Streamlit)
+    # Widget TradingView (très stable)
     calendrier_tv = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
@@ -436,6 +436,3 @@ elif outil == "📅 Calendrier Éco":
     """
     
     components.html(calendrier_tv, height=800)
-    """
-    
-    components.html(calendrier_html, height=850, scrolling=True)
