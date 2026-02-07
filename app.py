@@ -15,7 +15,7 @@ st_autorefresh(interval=15000, key="global_refresh")
 def afficher_graphique_pro(symbol, height=600):
     # Dictionnaire de traduction selon tes sources demandées
     traduction_symbols = {
-        "^FCHI": "TVC:CAC40",            # Indice CAC40 par TVC
+        "^FCHI": "PHILLIPE NOVA:CAC40",            # Indice CAC40 par TVC
         "^GSPC": "VANTAGE:SP500",      # S&P index cash CFD par VANTAGE
         "^IXIC": "NASDAQ:NDX",         # Indice Nasdaq 100 par NASDAQ
         "BTC-USD": "BINANCE:BTCUSDT"   # Bitcoin
