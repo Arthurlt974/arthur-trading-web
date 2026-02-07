@@ -928,40 +928,21 @@ elif outil == "CORRÉLATION DASH 📊":
 # ==========================================
 # OUTIL : GESTION WATCHLIST
 # ==========================================
-# --- CONSTRUCTION DU TEXTE DÉFILANT ---
-if "watchlist" not in st.session_state:
-    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "MC.PA", "NVDA", "GOOGL"]
+elif outil == "WATCHLIST MGMT 📋":
+    st.title("📋 MANAGE YOUR WATCHLIST")
+    
+    c1, c2 = st.columns([3, 1])
+    new_fav = c1.text_input("ADD TICKER (ex: NVDA, GOOGL, MSFT)")
+    if c2.button("➕ ADD") and new_fav:
+        tkr_clean = trouver_ticker(new_fav)
+        if tkr_clean not in st.session_state.watchlist:
+            st.session_state.watchlist.append(tkr_clean)
+            st.rerun()
 
-ticker_data_string = ""
-
-for tkr in st.session_state.watchlist:
-    try:
-        t_info = yf.Ticker(tkr).fast_info
-        price = t_info['last_price']
-        change = ((price - t_info['previous_close']) / t_info['previous_close']) * 100
-        color = "#00ffad" if change >= 0 else "#ff4b4b"
-        sign = "+" if change >= 0 else ""
-        
-        # On crée un segment de texte stylé pour chaque actif
-        ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 30px;">{tkr.replace("-USD", "")}:</span>'
-        ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px;">{price:.2f} ({sign}{change:.2f}%)</span>'
-    except:
-        continue
-
-# --- AFFICHAGE DU MARQUEE (HTML/CSS) ---
-marquee_html = f"""
-<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 10px 0; border-top: 1px solid #333; border-bottom: 1px solid #333;">
-    <div style="display: inline-block; padding-left: 100%; animation: marquee 30s linear infinite;">
-        {ticker_data_string} {ticker_data_string}  </div>
-</div>
-
-<style>
-@keyframes marquee {{
-    0% {{ transform: translate(0, 0); }}
-    100% {{ transform: translate(-100%, 0); }}
-}}
-</style>
-"""
-
-st.components.v1.html(marquee_html, height=50)
-st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("### CURRENT FAVORITES")
+    for i, f in enumerate(st.session_state.watchlist):
+        col_name, col_del = st.columns([4, 1])
+        col_name.write(f"**{i+1}. {f}**")
+        if col_del.button("🗑️", key=f"del_{f}"):
+            st.session_state.watchlist.remove(f)
+            st.rerun()
