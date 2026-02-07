@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION GLOBALE ---
-st.set_page_config(page_title="AM-Trading", layout="wide")
+st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 
 # --- STYLE BLOOMBERG TERMINAL ---
 st.markdown("""
