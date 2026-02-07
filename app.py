@@ -220,15 +220,51 @@ if outil == "📊 Analyseur Pro":
 
         st.markdown("---")
         st.subheader(f"📰 Actualités : {nom}")
+        
+        # Sous-onglets pour l'action spécifique
+        tab_action_24h, tab_action_archive = st.tabs(["🔥 Direct (24h)", "📚 Archive (7 jours)"])
+        
         search_term = nom.replace(" ", "+")
         url_rss = f"https://news.google.com/rss/search?q={search_term}+stock+bourse&hl=fr&gl=FR&ceid=FR:fr"
+        
         try:
+            import time
             flux = feedparser.parse(url_rss)
-            for entry in flux.entries[:5]:
-                with st.expander(f"📌 {entry.title.split(' - ')[0]}"):
-                    st.write(f"**Source :** {entry.source.get('title')}")
-                    st.link_button("Lire l'article", entry.link)
-        except: st.error("Erreur de flux d'actualités.")
+            maintenant = time.time()
+            secondes_par_jour = 24 * 3600
+            
+            # Tri par date (récent en premier)
+            articles = sorted(flux.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
+
+            # --- ONGLET 1 : DIRECT 24H ---
+            with tab_action_24h:
+                trouve_24h = False
+                for entry in articles:
+                    pub_time = time.mktime(entry.published_parsed) if 'published_parsed' in entry else maintenant
+                    if (maintenant - pub_time) < secondes_par_jour:
+                        trouve_24h = True
+                        clean_title = entry.title.split(' - ')[0]
+                        with st.expander(f"🆕 {clean_title}"):
+                            st.write(f"**Source :** {entry.source.get('title')}")
+                            st.caption(f"🕒 Publié le : {entry.published}")
+                            st.link_button("Lire l'article", entry.link)
+                if not trouve_24h:
+                    st.info("Aucune actualité sur les dernières 24h.")
+
+            # --- ONGLET 2 : ARCHIVE (Style précédent, sans limite stricte) ---
+            with tab_action_archive:
+                # On affiche les 10 derniers articles, peu importe la date
+                if not articles:
+                    st.write("Aucune archive disponible.")
+                for entry in articles[:10]:
+                    clean_title = entry.title.split(' - ')[0]
+                    with st.expander(f"📌 {clean_title}"):
+                        st.write(f"**Source :** {entry.source.get('title')}")
+                        st.caption(f"📅 Date : {entry.published}")
+                        st.link_button("Voir l'archive", entry.link)
+                        
+        except Exception:
+            st.error("Erreur de flux d'actualités.")
 
 # ==========================================
 # OUTIL 2 : MODE DUEL
@@ -303,50 +339,65 @@ elif outil == "🌍 Market Monitor":
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
 
 # ==========================================
-# OUTIL 4 : DAILY BRIEF (INFOS MONDIALES)
+# OUTIL 4 : DAILY BRIEF (AVEC FOCUS BOURSORAMA)
 # ==========================================
 elif outil == "📰 Daily Brief":
     st.title("📰 Daily Market Brief")
     st.markdown("---")
 
-    col_news1, col_news2 = st.columns(2)
+    # Création des 3 sous-onglets
+    tab_eco, tab_tech, tab_quotidien = st.tabs(["🌍 Économie Mondiale", "⚡ Tech & Crypto", "📅 Le Quotidien (Boursorama)"])
 
-    def afficher_flux(url, titre_section):
-        st.subheader(titre_section)
+    def afficher_flux_daily(url, filtre_boursorama_24h=False):
         try:
+            import time
             flux = feedparser.parse(url)
             if not flux.entries:
-                st.info("Aucune actualité récente trouvée.")
+                st.info("Aucune actualité trouvée.")
                 return
 
-            for entry in flux.entries[:5]:
-                # Nettoyage du titre
-                clean_title = entry.title.split(" - ")[0] if " - " in entry.title else entry.title
-                source = entry.source.get('title', 'Presse Finance') if hasattr(entry, 'source') else "Source Inconnue"
+            maintenant = time.time()
+            secondes_par_jour = 24 * 3600
+            
+            # Tri par date (le plus récent en haut)
+            articles = sorted(flux.entries, key=lambda x: x.get('published_parsed', 0), reverse=True)
+            
+            trouve = False
+            # On affiche les 15 derniers articles pour le quotidien
+            for entry in articles[:15]:
+                pub_time = time.mktime(entry.published_parsed) if 'published_parsed' in entry else maintenant
                 
-                with st.expander(f"📌 {clean_title}"):
-                    st.write(f"**Source :** {source}")
-                    if 'published' in entry:
-                        st.caption(f"Publié le : {entry.published}")
-                    st.link_button("Lire l'article", entry.link)
+                # Condition : Si c'est l'onglet Daily, on applique le RESET 24H
+                if not filtre_boursorama_24h or (maintenant - pub_time) < secondes_par_jour:
+                    trouve = True
+                    # Nettoyage du titre (on enlève le suffixe Boursorama répétitif)
+                    clean_title = entry.title.replace(" - Boursorama", "").split(" - ")[0]
+                    
+                    with st.expander(f"⚡ {clean_title}"):
+                        st.write(f"**Source :** Boursorama Actualités")
+                        if 'published' in entry:
+                            st.caption(f"🕒 Publié le : {entry.published}")
+                        st.link_button("Lire l'article complet", entry.link)
+            
+            if not trouve and filtre_boursorama_24h:
+                st.warning("En attente de nouveaux articles Boursorama pour aujourd'hui...")
+
         except Exception:
-            st.error("Impossible de charger ce flux pour le moment.")
+            st.error("Erreur lors de la récupération des données.")
 
-    with col_news1:
-            st.subheader("🌍 Flash Marché")
-            url_mkt = "https://news.google.com/rss/search?q=bourse+mondiale+indices&hl=fr&gl=FR&ceid=FR:fr"
-            try:
-                flux_mkt = feedparser.parse(url_mkt)
-                for m_art in flux_mkt.entries[:4]:
-                    m_title = m_art.title.split(" - ")[0]
-                    st.markdown(f"🔹 **{m_art.source.get('title')}**")
-                    st.markdown(f"[{m_title}]({m_art.link})")
-                    st.write("---")
-            except:
-                st.write("Flux indisponible.")
+    # --- DISTRIBUTION DES ONGLETS ---
+    with tab_eco:
+        # Flux général sans limite de temps stricte
+        url_eco = "https://news.google.com/rss/search?q=bourse+economie+mondiale&hl=fr&gl=FR&ceid=FR:fr"
+        afficher_flux_daily(url_eco, filtre_boursorama_24h=False)
 
-    with col_news2:
-        afficher_flux("https://news.google.com/rss/search?q=crypto+tech+stocks&hl=fr&gl=FR&ceid=FR:fr", "⚡ Tech & Crypto")
+    with tab_tech:
+        # Flux tech sans limite de temps stricte
+        url_tech = "https://news.google.com/rss/search?q=crypto+nasdaq+nvidia&hl=fr&gl=FR&ceid=FR:fr"
+        afficher_flux_daily(url_tech, filtre_boursorama_24h=False)
 
-
-    # Garde tes colonnes de ressources (Investing, CNN, etc.) en dessous
+    with tab_quotidien:
+        st.subheader("🗞️ Le Direct Boursorama (Dernières 24h)")
+        # Recherche ciblée exclusivement sur Boursorama
+        url_boursorama = "https://news.google.com/rss/search?q=site:boursorama.com&hl=fr&gl=FR&ceid=FR:fr"
+        afficher_flux_daily(url_boursorama, filtre_boursorama_24h=True)
