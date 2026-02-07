@@ -9,6 +9,36 @@ from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading", layout="wide")
+
+# --- SYSTÈME DE MOT DE PASSE ---
+def check_password():
+    """Retourne True si l'utilisateur a saisi le bon mot de passe."""
+    def password_entered():
+        # MODIFIE LE MOT DE PASSE CI-DESSOUS
+        if st.session_state["password"] == "1234": 
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.markdown("### 🔒 Accès Restreint")
+        st.text_input("Veuillez saisir le mot de passe pour accéder à AM-Trading :", 
+                     type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.markdown("### 🔒 Accès Restreint")
+        st.text_input("Veuillez saisir le mot de passe pour accéder à AM-Trading :", 
+                     type="password", on_change=password_entered, key="password")
+        st.error("❌ Mot de passe incorrect")
+        return False
+    else:
+        return True
+
+if not check_password():
+    st.stop() # Arrête le code ici si le mot de passe n'est pas bon
+
+# --- LA SUITE DU CODE (S'exécute seulement si le MDP est correct) ---
 st_autorefresh(interval=30000, key="global_refresh")
 
 # --- FONCTION HORLOGE TEMPS RÉEL (JS) ---
@@ -229,7 +259,6 @@ elif outil == "🌍 Market Monitor":
     st.markdown("### 🕒 Statut des Bourses")
     h = (datetime.utcnow() + timedelta(hours=4)).hour
     
-    # Tableau avec Ouverture et Fermeture
     data_horaires = {
         "Session": ["CHINE (HK)", "EUROPE (PARIS)", "USA (NY)"],
         "Ouverture (REU)": ["05:30", "12:00", "18:30"],
