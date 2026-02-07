@@ -6,54 +6,33 @@ import feedparser
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
-import plotly.graph_objects as go
-
-def calculer_score_sentiment(ticker):
-    try:
-        data = yf.Ticker(ticker).history(period="1y")
-        if len(data) < 200: return 50, "NEUTRE", "gray"
-        
-        prix_actuel = data['Close'].iloc[-1]
-        ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
-        
-        # Calcul de l'écart relatif (Ratio)
-        ratio = (prix_actuel / ma200) - 1
-        
-        # Formule lissée pour éviter le 0/100 immédiat
-        score = 50 + (ratio * 150) 
-        score = max(10, min(90, score)) # Bloqué entre 10 et 90 pour la lisibilité visuelle
-        
-        if score > 70: return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
-        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
-        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
-        elif score > 30: return score, "PEUR 📉", "#e67e22"
-        else: return score, "PANIQUE TOTALE 💀", "#e74c3c"
-    except:
-        return 50, "ERREUR", "gray"
-
 def afficher_jauge_pro(score, titre, couleur, sentiment):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = score,
         domain = {'x': [0, 1], 'y': [0, 1]},
-        number = {'font': {'size': 50, 'color': "white"}, 'suffix': "%"},
-        title = {'text': f"<b style='font-size:24px; color:white;'>{titre}</b><br><span style='font-size:18px; color:{couleur};'>{sentiment}</span>", 'padding': {'b': 20}},
+        number = {'font': {'size': 45, 'color': "white"}, 'suffix': "%"},
+        # On sépare le texte du titre pour éviter l'erreur Plotly
+        title = {
+            'text': f"{titre}<br><span style='color:{couleur}; font-size:18px;'>{sentiment}</span>", 
+            'font': {'size': 22, 'color': "white"}
+        },
         gauge = {
-            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white", 'tickfont': {'size': 12}},
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
             'bar': {'color': couleur, 'thickness': 0.3},
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 2,
             'bordercolor': "#242733",
             'steps': [
-                {'range': [0, 30], 'color': "rgba(231, 76, 60, 0.3)"}, # Panique
-                {'range': [30, 45], 'color': "rgba(230, 126, 34, 0.3)"}, # Peur
-                {'range': [45, 55], 'color': "rgba(241, 196, 15, 0.3)"}, # Neutre
-                {'range': [55, 70], 'color': "rgba(46, 204, 113, 0.3)"}, # Optimisme
-                {'range': [70, 100], 'color': "rgba(0, 255, 173, 0.3)"}  # Euphorie
+                {'range': [0, 30], 'color': "rgba(231, 76, 60, 0.2)"},
+                {'range': [30, 45], 'color': "rgba(230, 126, 34, 0.2)"},
+                {'range': [45, 55], 'color': "rgba(241, 196, 15, 0.2)"},
+                {'range': [55, 70], 'color': "rgba(46, 204, 113, 0.2)"},
+                {'range': [70, 100], 'color': "rgba(0, 255, 173, 0.2)"}
             ],
             'threshold': {
-                'line': {'color': "white", 'width': 5},
-                'thickness': 0.8,
+                'line': {'color': "white", 'width': 4},
+                'thickness': 0.75,
                 'value': score
             }
         }
@@ -63,8 +42,8 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font={'color': "white", 'family': "Arial"},
-        height=400, # Augmenté pour éviter les coupures
-        margin=dict(l=50, r=50, t=100, b=50)
+        height=380, 
+        margin=dict(l=50, r=50, t=100, b=20)
     )
     return fig
 
