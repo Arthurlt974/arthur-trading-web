@@ -11,11 +11,11 @@ from streamlit_autorefresh import st_autorefresh
 st.set_page_config(page_title="AM-Trading", layout="wide")
 st_autorefresh(interval=15000, key="global_refresh")
 
-# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (TRADUCTION PRÉCISE) ---
+# --- FONCTION GRAPHIQUE TRADINGVIEW PRO (TRADUCTION EXACTE) ---
 def afficher_graphique_pro(symbol, height=600):
-    # Dictionnaire de traduction selon tes sources spécifiques
+    # Dictionnaire de traduction selon tes sources demandées
     traduction_symbols = {
-        "^FCHI": "indice CAC40",            # Indice CAC40 par TVC
+        "^FCHI": "TVC:PX1",            # Indice CAC40 par TVC
         "^GSPC": "VANTAGE:SP500",      # S&P index cash CFD par VANTAGE
         "^IXIC": "NASDAQ:NDX",         # Indice Nasdaq 100 par NASDAQ
         "BTC-USD": "BINANCE:BTCUSDT"   # Bitcoin
@@ -25,6 +25,7 @@ def afficher_graphique_pro(symbol, height=600):
     if symbol in traduction_symbols:
         tv_symbol = traduction_symbols[symbol]
     else:
+        # Pour les actions françaises (ex: MC.PA)
         tv_symbol = symbol.replace(".PA", "")
         if ".PA" in symbol:
             tv_symbol = f"EURONEXT:{tv_symbol}"
@@ -45,6 +46,10 @@ def afficher_graphique_pro(symbol, height=600):
           "enable_publishing": false,
           "hide_side_toolbar": false,
           "allow_symbol_change": true,
+          "details": true,
+          "hotlist": true,
+          "calendar": true,
+          "show_popup_button": true,
           "container_id": "tradingview_chart"
         }});
         </script>
@@ -252,7 +257,9 @@ elif outil == "🌍 Market Monitor":
         except: pass
 
     st.markdown("---")
-    nom_sel = indices.get(st.session_state.index_selectionne, "Indice")
+    indices_noms = {"^FCHI": "CAC 40", "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "BTC-USD": "Bitcoin"}
+    nom_sel = indices_noms.get(st.session_state.index_selectionne, "Indice")
     st.subheader(f"📈 Graphique Avancé : {nom_sel}")
     
+    # Affichage du graphique avec les flux spécifiques (TVC, VANTAGE, NASDAQ)
     afficher_graphique_pro(st.session_state.index_selectionne, height=700)
