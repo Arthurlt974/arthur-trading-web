@@ -83,21 +83,14 @@ if not check_password():
 # --- LA SUITE DU CODE (S'exécute seulement si le MDP est correct) ---
 st_autorefresh(interval=30000, key="global_refresh")
 
-# --- FONCTION HORLOGE TEMPS RÉEL (JS) ---
+# --- FONCTION HORLOGE BLOOMBERG (JS) ---
 def afficher_horloge_temps_reel():
     horloge_html = """
-        <div id="clock" style="
-            font-size: 28px; 
-            font-family: 'Source Code Pro', monospace; 
-            color: #26a69a; 
-            font-weight: bold;
-            padding: 15px;
-            border-radius: 8px;
-            background: #131722;
-            border: 1px solid #242733;
-            text-align: center;
-            margin-bottom: 20px;
-        ">--:--:--</div>
+        <div style="border: 1px solid #ff9800; padding: 10px; background: #000; text-align: center; font-family: monospace;">
+            <div style="color: #ff9800; font-size: 12px;">SYSTEM TIME / REUNION UTC+4</div>
+            <div id="clock" style="font-size: 32px; color: #00ff00; font-weight: bold;">--:--:--</div>
+            <div style="color: #444; font-size: 10px; margin-top:5px;">REAL-TIME FINANCIAL DATA FEED</div>
+        </div>
         <script>
             function updateClock() {
                 const now = new Date();
@@ -112,7 +105,7 @@ def afficher_horloge_temps_reel():
             updateClock();
         </script>
     """
-    components.html(horloge_html, height=100)
+    components.html(horloge_html, height=120)
 
 # --- FONCTION GRAPHIQUE TRADINGVIEW PRO ---
 def afficher_graphique_pro(symbol, height=600):
