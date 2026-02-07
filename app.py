@@ -384,11 +384,14 @@ if outil == "ANALYSEUR PRO":
             st.error("ERROR FETCHING NEWS FEED.")
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (VERSION AMÉLIORÉE)
+# OUTIL 2 : MODE DUEL (FIXED PERSISTENCE)
 # ==========================================
 elif outil == "MODE DUEL":
     st.title("⚔️ EQUITY DUEL : PRO COMPARISON")
-    st.write("Comparez deux actifs pour identifier le meilleur point d'entrée.")
+    
+    # Initialisation de la mémoire du duel si elle n'existe pas
+    if 'duel_result' not in st.session_state:
+        st.session_state.duel_result = None
 
     c1, c2 = st.columns(2)
     with c1:
@@ -396,82 +399,61 @@ elif outil == "MODE DUEL":
     with c2:
         t2 = st.text_input("TICKER 2", value="RMS.PA").upper()
 
+    # Si on clique sur le bouton, on calcule et on enregistre dans le session_state
     if st.button("RUN DEEP ANALYSIS"):
         def get_full_data(t):
             ticker_id = trouver_ticker(t)
             i = get_ticker_info(ticker_id)
             hist = get_ticker_history(ticker_id, period="1y")
-            
             p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
             b = i.get('trailingEps') or 0
-            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5 # Formule Graham
-            
+            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
             return {
-                "nom": i.get('shortName', t),
-                "prix": p,
-                "valeur": v,
+                "nom": i.get('shortName', t), "prix": p, "valeur": v,
                 "yield": (i.get('dividendYield', 0) or 0) * 100,
-                "per": i.get('trailingPE', 0),
-                "marge": (i.get('profitMargins', 0) or 0) * 100,
-                "cap": i.get('marketCap', 0),
-                "hist": hist,
-                "potential": ((v - p) / p) * 100 if p > 0 else 0
+                "per": i.get('trailingPE', 0), "marge": (i.get('profitMargins', 0) or 0) * 100,
+                "hist": hist, "potential": ((v - p) / p) * 100 if p > 0 else 0
             }
 
         try:
             with st.spinner('Extracting Market Data...'):
-                d1 = get_full_data(t1)
-                d2 = get_full_data(t2)
-
-            # --- HEADER DE COMPARAISON ---
-            col_a, col_vs, col_b = st.columns([2, 1, 2])
-            with col_a:
-                st.markdown(f"### {d1['nom']}")
-                st.markdown(f"<h1 style='color:#00ff00; margin:0;'>{d1['prix']:.2f}</h1>", unsafe_allow_html=True)
-            with col_vs:
-                st.markdown("<h1 style='text-align:center; color:#ff9800; padding-top:20px;'>VS</h1>", unsafe_allow_html=True)
-            with col_b:
-                st.markdown(f"### {d2['nom']}")
-                st.markdown(f"<h1 style='color:#00ff00; margin:0; text-align:right;'>{d2['prix']:.2f}</h1>", unsafe_allow_html=True)
-
-            st.markdown("---")
-
-            # --- TABLEAU DE COMPARAISON TECHNIQUE ---
-            data_comp = {
-                "INDICATOR": ["GRAHAM VALUE", "UPSIDE POTENTIAL", "P/E RATIO", "DIV. YIELD", "PROFIT MARGIN"],
-                d1['nom']: [f"{d1['valeur']:.2f}", f"{d1['potential']:+.2f}%", f"{d1['per']:.2f}", f"{d1['yield']:.2f}%", f"{d1['marge']:.2f}%"],
-                d2['nom']: [f"{d2['valeur']:.2f}", f"{d2['potential']:+.2f}%", f"{d2['per']:.2f}", f"{d2['yield']:.2f}%", f"{d2['marge']:.2f}%"]
-            }
-            st.table(pd.DataFrame(data_comp))
-
-            # --- ANALYSE GRAPHIQUE ---
-            st.subheader("» 1 YEAR PERFORMANCE CORRELATION")
-            fig = go.Figure()
-            # Normalisation à 100 pour comparer la croissance (%)
-            for d in [d1, d2]:
-                if not d['hist'].empty:
-                    norm_price = (d['hist']['Close'] / d['hist']['Close'].iloc[0]) * 100
-                    fig.add_trace(go.Scatter(x=d['hist'].index, y=norm_price, name=d['nom']))
-
-            fig.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#ff9800"), xaxis=dict(gridcolor="#333"), yaxis=dict(gridcolor="#333", title="Base 100"),
-                height=400, margin=dict(l=0, r=0, t=30, b=0)
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-            # --- VERDICT FINAL ---
-            st.markdown("---")
-            winner = d1['nom'] if d1['potential'] > d2['potential'] else d2['nom']
-            st.markdown(f"""
-                <div style="background:#1a1a1a; border: 2px solid #ff9800; padding:20px; border-radius:10px; text-align:center;">
-                    <h2 style="color:#ff9800; margin:0;">🏆 ALPHA PICK : {winner}</h2>
-                    <p style="color:#00ff00; margin:0;">Basé sur le potentiel de décote Graham et les marges opérationnelles.</p>
-                </div>
-            """, unsafe_allow_html=True)
-
+                res_d1 = get_full_data(t1)
+                res_d2 = get_full_data(t2)
+                # On stocke tout dans la mémoire
+                st.session_state.duel_result = (res_d1, res_d2)
         except Exception as e:
             st.error(f"ENGINE ERROR : {str(e)}")
+
+    # AFFICHAGE (indépendant du bouton, basé sur la mémoire)
+    if st.session_state.duel_result:
+        d1, d2 = st.session_state.duel_result
+        
+        col_a, col_vs, col_b = st.columns([2, 1, 2])
+        with col_a:
+            st.markdown(f"### {d1['nom']}")
+            st.markdown(f"<h1 style='color:#00ff00; margin:0;'>{d1['prix']:.2f}</h1>", unsafe_allow_html=True)
+        with col_vs:
+            st.markdown("<h1 style='text-align:center; color:#ff9800; padding-top:20px;'>VS</h1>", unsafe_allow_html=True)
+        with col_b:
+            st.markdown(f"### {d2['nom']}")
+            st.markdown(f"<h1 style='color:#00ff00; margin:0; text-align:right;'>{d2['prix']:.2f}</h1>", unsafe_allow_html=True)
+
+        st.table(pd.DataFrame({
+            "INDICATOR": ["GRAHAM VALUE", "UPSIDE POTENTIAL", "P/E RATIO", "DIV. YIELD", "PROFIT MARGIN"],
+            d1['nom']: [f"{d1['valeur']:.2f}", f"{d1['potential']:+.2f}%", f"{d1['per']:.2f}", f"{d1['yield']:.2f}%", f"{d1['marge']:.2f}%"],
+            d2['nom']: [f"{d2['valeur']:.2f}", f"{d2['potential']:+.2f}%", f"{d2['per']:.2f}", f"{d2['yield']:.2f}%", f"{d2['marge']:.2f}%"]
+        }))
+
+        # Graphique
+        fig = go.Figure()
+        for d in [d1, d2]:
+            if not d['hist'].empty:
+                norm_price = (d['hist']['Close'] / d['hist']['Close'].iloc[0]) * 100
+                fig.add_trace(go.Scatter(x=d['hist'].index, y=norm_price, name=d['nom']))
+        
+        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#ff9800"), height=400)
+        st.plotly_chart(fig, use_container_width=True)
+
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
 # ==========================================
