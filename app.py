@@ -120,6 +120,22 @@ def afficher_horloge_temps_reel():
     """
     components.html(horloge_html, height=120)
 
+# Fonction améliorée pour récupérer le prix live (API Binance)
+    def get_crypto_price(symbol):
+        try:
+            # On ajoute un 'headers' pour éviter d'être bloqué par le pare-feu de Binance
+            url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(url, headers=headers, timeout=5)
+            
+            if response.status_code == 200:
+                return float(response.json()['price'])
+            else:
+                return None
+        except Exception as e:
+            return None
+
+
 # --- FONCTION GRAPHIQUE TRADINGVIEW PRO ---
 def afficher_graphique_pro(symbol, height=600):
     traduction_symbols = {
