@@ -277,7 +277,8 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "WHALE WATCHER",
     "CORRÉLATION DASH",
     "BITCOIN DOMINANCE",
-    "HEATMAP LIQUIDATIONS"
+    "HEATMAP LIQUIDATIONS",
+    "THE COUNCIL 🏛️"
 ])
 # --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
 if "watchlist" not in st.session_state:
@@ -1201,5 +1202,99 @@ elif outil == "HEATMAP LIQUIDATIONS":
             <span>MISE À JOUR: TEMPS RÉEL (COINGLASS)</span>
         </div>
     """, unsafe_allow_html=True)
+
+# ==========================================
+# OUTIL : THE COUNCIL (EXPERT SYSTEM) 🏛️
+# ==========================================
+elif outil == "THE COUNCIL 🏛️":
+    st.markdown("<h1 style='text-align: center; color: #ff9800;'>🏛️ THE WALL STREET COUNCIL</h1>", unsafe_allow_html=True)
+    st.write("CONSULTATION DES GRANDS MAÎTRES DE L'INVESTISSEMENT SUR VOTRE ACTIF.")
+
+    nom_entree = st.text_input("📝 NOM DE L'ACTION À EXPERTISER :", value="LVMH")
+    
+    if nom_entree:
+        with st.spinner("Consultation des Maîtres en cours..."):
+            ticker = trouver_ticker(nom_entree)
+            action = yf.Ticker(ticker)
+            info = action.info
+            
+            if info and ('currentPrice' in info or 'regularMarketPrice' in info):
+                # --- EXTRACTION DES DONNÉES ---
+                nom = info.get('longName', ticker)
+                prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                bpa = info.get('trailingEps') or info.get('forwardEps') or 0
+                per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 50)
+                roe = (info.get('returnOnEquity', 0)) * 100
+                marge_op = (info.get('operatingMargins', 0)) * 100
+                croissance = (info.get('earningsGrowth', 0.08)) * 100 
+                devise = info.get('currency', '€')
+
+                # --- CALCULS DES SCORES (LOGIQUE ORIGINALE AMÉLIORÉE) ---
+                # 1. Graham (Value)
+                val_graham = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
+                score_graham = int(min(5, max(0, (val_graham / prix) * 2.5)))
+
+                # 2. Buffett (Moat/ROE)
+                score_buffett = int(min(5, (roe / 4))) 
+                if marge_op > 20: score_buffett = min(5, score_buffett + 1)
+
+                # 3. Lynch (PEG)
+                peg = per / croissance if croissance > 0 else 5
+                score_lynch = int(max(0, 5 - (peg * 1.2))) 
+
+                # 4. Greenblatt (Magic Formula)
+                score_joel = int(min(5, (roe / 5) + (25 / per)))
+
+                total = min(20, score_graham + score_buffett + score_lynch + score_joel)
+
+                # --- AFFICHAGE HEADER ---
+                st.markdown(f"### 📊 ANALYSE STRATÉGIQUE : {nom}")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("COURS", f"{prix:.2f} {devise}")
+                c2.metric("ROE", f"{roe:.1f} %")
+                c3.metric("P/E RATIO", f"{per:.1f}")
+
+                st.markdown("---")
+
+                # --- AFFICHAGE DES MAÎTRES ---
+                def afficher_expert(nom_m, score, avis, detail):
+                    col_m1, col_m2 = st.columns([1, 3])
+                    with col_m1:
+                        st.markdown(f"**{nom_m}**")
+                        stars = "★" * score + "☆" * (5 - score)
+                        color = "#00ff00" if score >= 4 else "#ff9800" if score >= 2 else "#ff0000"
+                        st.markdown(f"<span style='color:{color}; font-size:20px;'>{stars}</span>", unsafe_allow_html=True)
+                    with col_m2:
+                        st.markdown(f"*'{avis}'*")
+                        st.caption(detail)
+
+                afficher_expert("BENJAMIN GRAHAM", score_graham, "Décote / Valeur Intrinsèque", f"Valeur théorique Graham : {val_graham:.2f} {devise}")
+                afficher_expert("WARREN BUFFETT", score_buffett, "Moat / Rentabilité des Capitaux", f"La marge opérationnelle de {marge_op:.1f}% indique un avantage compétitif.")
+                afficher_expert("PETER LYNCH", score_lynch, "Prix payé pour la Croissance", f"Analyse basée sur le PEG (P/E divisé par la croissance).")
+                afficher_expert("JOEL GREENBLATT", score_joel, "Efficience Magique (ROE/PER)", "Recherche des meilleures entreprises au prix le moins cher.")
+
+                st.markdown("---")
+
+                # --- SCORE FINAL ET VERDICT ---
+                c_score1, c_score2 = st.columns([1, 2])
+                with c_score1:
+                    st.subheader("🏆 SCORE FINAL")
+                    # Couleur dynamique du score
+                    c_final = "#00ff00" if total >= 15 else "#ff9800" if total >= 10 else "#ff0000"
+                    st.markdown(f"<h1 style='color:{c_final}; font-size:60px;'>{total}/20</h1>", unsafe_allow_html=True)
+                
+                with c_score2:
+                    st.subheader("💡 VERDICT DU CONSEIL")
+                    if total >= 16:
+                        st.success("💎 PÉPITE : Les Maîtres sont unanimes. L'actif présente une qualité exceptionnelle et un prix attractif.")
+                    elif total >= 12:
+                        st.info("✅ SOLIDE : Un investissement de qualité qui respecte la majorité des critères fondamentaux.")
+                    elif total >= 8:
+                        st.warning("⚖️ MOYEN : Des points de friction subsistent. Attendre un meilleur point d'entrée ou une amélioration des marges.")
+                    else:
+                        st.error("🛑 RISQUÉ : Trop de points faibles. L'actif est soit surévalué, soit ses fondamentaux sont en déclin.")
+
+            else:
+                st.error("❌ TICKER NON TROUVÉ OU DONNÉES INCOMPLÈTES.")
 
 
