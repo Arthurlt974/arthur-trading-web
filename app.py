@@ -9,6 +9,13 @@ from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 import numpy as np
 
+# INITIALISATION : On crée un "coffre-fort" s'il n'existe pas encore
+if "multi_charts" not in st.session_state:
+    st.session_state.multi_charts = []
+
+if "whale_logs" not in st.session_state:
+    st.session_state.whale_logs = []
+
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 
@@ -820,6 +827,9 @@ elif outil == "WHALE WATCHER 🐋":
             return []
 
     trades = get_live_trades()
+
+    # LIGNE DE TEST : Elle affichera "50" si la connexion est OK
+    st.sidebar.write(f"Trades reçus : {len(trades)}")
     
     # Traitement des données
     for t in trades:
