@@ -278,7 +278,7 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "CORRÉLATION DASH",
     "BITCOIN DOMINANCE",
     "HEATMAP LIQUIDATIONS",
-    "THE COUNCIL 🏛️"
+    "EXPERT SYSTEM"
 ])
 # --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
 if "watchlist" not in st.session_state:
@@ -1206,7 +1206,7 @@ elif outil == "HEATMAP LIQUIDATIONS":
 # ==========================================
 # OUTIL : THE COUNCIL (EXPERT SYSTEM) 🏛️
 # ==========================================
-elif outil == "THE COUNCIL 🏛️":
+elif outil == "EXPERT SYSTEM":
     st.markdown("<h1 style='text-align: center; color: #ff9800;'>🏛️ THE WALL STREET COUNCIL</h1>", unsafe_allow_html=True)
     st.write("CONSULTATION DES GRANDS MAÎTRES DE L'INVESTISSEMENT SUR VOTRE ACTIF.")
 
