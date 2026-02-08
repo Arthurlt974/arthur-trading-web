@@ -276,7 +276,8 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "CRYPTO WALLET",
     "WHALE WATCHER 🐋",
     "CORRÉLATION DASH 📊",
-    "BITCOIN DOMINANCE 📊"
+    "BITCOIN DOMINANCE 📊",
+    "HEATMAP LIQUIDATIONS"
 ])
 # --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
 if "watchlist" not in st.session_state:
@@ -1158,3 +1159,47 @@ elif outil == "BITCOIN DOMINANCE 📊":
         </script>
     """
     components.html(tv_html_dom, height=600)
+
+# ==========================================
+# OUTIL : HEATMAP LIQUIDATIONS 🔥 (FULL BLACK PRO)
+# ==========================================
+elif outil == "HEATMAP LIQUIDATIONS":
+    # Titre stylisé Bloomberg
+    st.markdown("<h1 style='text-align: center; color: #ff9800;'>🔥 MARKET LIQUIDATION HEATMAP</h1>", unsafe_allow_html=True)
+    
+    # Barre d'infos supérieure pour combler l'espace
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("<div style='border:1px solid #333; padding:10px; text-align:center;'><b>ASSET:</b> BTC/USDT</div>", unsafe_allow_html=True)
+    with c2:
+        st.markdown("<div style='border:1px solid #333; padding:10px; text-align:center;'><b>SOURCE:</b> BINANCE FUTURES</div>", unsafe_allow_html=True)
+    with c3:
+        st.markdown("<div style='border:1px solid #333; padding:10px; text-align:center;'><b>MODE:</b> PRO FEED LIVE</div>", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Conteneur avec fond noir pur et bordure orange fine
+    # On utilise "background-color: #000" pour éliminer les flashs blancs au chargement
+    hauteur_pro = 950
+    
+    st.markdown(f"""
+        <div style="background-color: #000000; padding: 5px; border: 1px solid #ff9800; border-radius: 8px;">
+            <iframe 
+                src="https://www.coinglass.com/fr/pro/futures/LiquidationHeatMap" 
+                width="100%" 
+                height="{hauteur_pro}px" 
+                style="border:none; filter: brightness(0.9) contrast(1.1);"
+                scrolling="yes">
+            </iframe>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Footer avec légende technique
+    st.markdown("""
+        <div style="margin-top:10px; display:flex; justify-content:space-between; color:#666; font-size:12px;">
+            <span>GRADIENT: JAUNE (HAUTE DENSITÉ) > VIOLET (BASSE DENSITÉ)</span>
+            <span>MISE À JOUR: TEMPS RÉEL (COINGLASS)</span>
+        </div>
+    """, unsafe_allow_html=True)
+
+
