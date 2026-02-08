@@ -261,25 +261,41 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"}, height=300, margin=dict(l=25, r=25, t=100, b=20))
     return fig
 
+# --- SYSTÈME DE MENUS CATÉGORISÉS ---
+st.sidebar.markdown("### 🗂️ NAVIGATION")
+categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", ["🌐 MARCHÉ CRYPTO", "📈 ACTIONS & BOURSE", "🛠️ BOITE À OUTILS"])
 
-# --- NAVIGATION ---
-st.sidebar.title("📟 AM-TERMINAL")
-outil = st.sidebar.radio("SELECT MODULE :", [
-    "ANALYSEUR PRO",
-    "MULTI-CHARTS",
-    "MODE DUEL", 
-    "MARKET MONITOR", 
-    "DAILY BRIEF", 
-    "CALENDRIER ÉCO",
-    "Fear and Gread Index",
-    "INTERETS COMPOSES",
-    "CRYPTO WALLET",
-    "WHALE WATCHER",
-    "CORRÉLATION DASH",
-    "BITCOIN DOMINANCE",
-    "HEATMAP LIQUIDATIONS",
-    "EXPERT SYSTEM"
-])
+st.sidebar.markdown("---")
+
+if categorie == "🌐 MARCHÉ CRYPTO":
+    outil = st.sidebar.radio("MODULES CRYPTO :", [
+        "MARKET MONITOR", 
+        "WHALE WATCHER", 
+        "BITCOIN DOMINANCE", 
+        "HEATMAP LIQUIDATIONS",
+        "CRYPTO WALLET"
+    ])
+
+elif categorie == "📈 ACTIONS & BOURSE":
+    outil = st.sidebar.radio("MODULES ACTIONS :", [
+        "EXPERT SYSTEM️", 
+        "ANALYSEUR PRO", 
+        "MULTI-CHARTS",
+        "MODE DUEL"
+    ])
+
+elif categorie == "🛠️ BOITE À OUTILS":
+    outil = st.sidebar.radio("MES OUTILS :", [
+        "DAILY BRIEF",
+        "CALENDRIER ÉCO",
+        "Fear and Gread Index",
+        "INTERETS COMPOSES",
+        "CORRÉLATION DASH"
+    ])
+
+st.sidebar.markdown("---")
+st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
+
 # --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
 if "watchlist" not in st.session_state:
     st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "NVDA", "INTC", "AMD", "GOOGL", "MSFT", "PEP", "KO", "MC.PA", "TTE", "BNP.PA"]
@@ -1296,5 +1312,4 @@ elif outil == "EXPERT SYSTEM":
 
             else:
                 st.error("❌ TICKER NON TROUVÉ OU DONNÉES INCOMPLÈTES.")
-
 
