@@ -263,11 +263,11 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
 
 # --- SYSTÈME DE MENUS CATÉGORISÉS ---
 st.sidebar.markdown("### 🗂️ NAVIGATION")
-categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", ["🌐 MARCHÉ CRYPTO", "📈 ACTIONS & BOURSE", "🛠️ BOITE À OUTILS"])
+categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", ["MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS"])
 
 st.sidebar.markdown("---")
 
-if categorie == "🌐 MARCHÉ CRYPTO":
+if categorie == "MARCHÉ CRYPTO":
     outil = st.sidebar.radio("MODULES CRYPTO :", [
         "MARKET MONITOR", 
         "WHALE WATCHER", 
@@ -276,15 +276,15 @@ if categorie == "🌐 MARCHÉ CRYPTO":
         "CRYPTO WALLET"
     ])
 
-elif categorie == "📈 ACTIONS & BOURSE":
+elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
-        "EXPERT SYSTEM️", 
+        "EXPERT SYSTEM", 
         "ANALYSEUR PRO", 
         "MULTI-CHARTS",
         "MODE DUEL"
     ])
 
-elif categorie == "🛠️ BOITE À OUTILS":
+elif categorie == "BOITE À OUTILS":
     outil = st.sidebar.radio("MES OUTILS :", [
         "DAILY BRIEF",
         "CALENDRIER ÉCO",
