@@ -793,7 +793,7 @@ elif outil == "WHALE WATCHER 🐋":
     # Traitement des données
     new_logs = []
     for t in trades:
-        qty = float(t['qty'])
+        qty = float(t.get('qty', 0))
         if qty >= seuil_baleine:
             is_buyer = t['isBuyerMaker'] # True = Vente, False = Achat
             color = "🔴" if is_buyer else "🟢"
