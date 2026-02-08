@@ -9,13 +9,6 @@ from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 import numpy as np
 
-# INITIALISATION : On crée un "coffre-fort" s'il n'existe pas encore
-if "multi_charts" not in st.session_state:
-    st.session_state.multi_charts = []
-
-if "whale_logs" not in st.session_state:
-    st.session_state.whale_logs = []
-
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 
@@ -827,9 +820,6 @@ elif outil == "WHALE WATCHER 🐋":
             return []
 
     trades = get_live_trades()
-
-    # LIGNE DE TEST : Elle affichera "50" si la connexion est OK
-    st.sidebar.write(f"Trades reçus : {len(trades)}")
     
     # Traitement des données
     for t in trades:
@@ -1006,49 +996,95 @@ elif outil == "WATCHLIST MGMT 📋":
             st.rerun()
 
 # ==========================================
-# NOUVEAU MODULE : MULTI-CHARTS
+# OUTIL : MULTI-CHARTS (FENÊTRES AMOVIBLES)
 # ==========================================
-if outil == "MULTI-CHARTS":
+elif outil == "MULTI-CHARTS":
     st.title("🖥️ MULTI-WINDOW WORKSPACE")
     
-    # Barre de recherche pour ajouter des fenêtres
-    with st.container():
-        c_search, c_btn, c_clear = st.columns([3, 1, 1])
-        new_ticker = c_search.text_input("ADD TICKER TO WORKSPACE (ex: AAPL, TSLA, MC.PA)", key="add_chart_input")
-        if c_btn.button("➕ ADD WINDOW"):
-            if new_ticker:
-                ticker_to_add = trouver_ticker(new_ticker)
-                if ticker_to_add not in st.session_state.multi_charts:
-                    st.session_state.multi_charts.append(ticker_to_add)
-                    st.rerun()
-        
-        if c_clear.button("🗑️ CLEAR ALL"):
+    # 1. Barre de contrôle
+    col_input, col_add, col_clear = st.columns([3, 1, 1])
+    with col_input:
+        new_ticker = st.text_input("SYMBOLE (ex: BTC-USD, AAPL)", key="add_chart_input").upper()
+    with col_add:
+        if st.button("OUVRIR FENÊTRE +"):
+            if new_ticker and new_ticker not in st.session_state.multi_charts:
+                st.session_state.multi_charts.append(new_ticker)
+                st.rerun()
+    with col_clear:
+        if st.button("TOUT FERMER"):
             st.session_state.multi_charts = []
             st.rerun()
 
-    st.markdown("---")
-
-    # Affichage en grille (2 colonnes)
-    if not st.session_state.multi_charts:
-        st.info("Votre espace est vide. Ajoutez un ticker ci-dessus pour ouvrir une fenêtre.")
-    else:
-        # On crée une grille de 2 colonnes (tu peux passer à 3 pour plus de fenêtres)
-        cols = st.columns(2)
-        for idx, ticker in enumerate(st.session_state.multi_charts):
-            col_index = idx % 2
-            with cols[col_index]:
-                # En-tête de la mini fenêtre
-                st.markdown(f"""
-                    <div style="background:#1a1a1a; padding:5px 10px; border:1px solid #ff9800; border-bottom:none; display:flex; justify-content:space-between;">
-                        <span style="color:#ff9800; font-weight:bold;">📟 {ticker}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # Affichage du graphique
-                afficher_mini_graphique(ticker, idx)
-                
-                # Bouton pour fermer cette fenêtre précise
-                if st.button(f"CLOSE {ticker}", key=f"close_{idx}"):
-                    st.session_state.multi_charts.pop(idx)
-                    st.rerun()
+    if st.session_state.multi_charts:
+        # On prépare le code HTML de TOUTES les fenêtres
+        all_windows_html = ""
         
+        for i, ticker_chart in enumerate(st.session_state.multi_charts):
+            traduction_symbols = {"^FCHI": "CAC40", "^GSPC": "VANTAGE:SP500", "^IXIC": "NASDAQ", "BTC-USD": "BINANCE:BTCUSDT"}
+            tv_symbol = traduction_symbols.get(ticker_chart, ticker_chart.replace(".PA", ""))
+            if ".PA" in ticker_chart and ticker_chart not in traduction_symbols:
+                tv_symbol = f"EURONEXT:{tv_symbol}"
+
+            # Chaque fenêtre a une ID unique et la classe 'floating-window'
+            all_windows_html += f"""
+            <div id="win_{i}" class="floating-window" style="
+                width: 450px; height: 350px; 
+                position: absolute; top: {50 + (i*40)}px; left: {50 + (i*40)}px; 
+                background: #0d0d0d; border: 2px solid #ff9800; z-index: {100 + i};
+                display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            ">
+                <div class="window-header" style="
+                    background: #1a1a1a; color: #ff9800; padding: 10px; 
+                    cursor: move; font-family: monospace; border-bottom: 1px solid #ff9800;
+                    display: flex; justify-content: space-between; align-items: center;
+                ">
+                    <span>📟 {ticker_chart}</span>
+                    <span style="font-size: 9px; color: #555;">[DRAG HEADER]</span>
+                </div>
+                <div id="tv_chart_{i}" style="flex-grow: 1; width: 100%;"></div>
+            </div>
+            
+            <script>
+            new TradingView.widget({{
+              "autosize": true, "symbol": "{tv_symbol}", "interval": "D",
+              "timezone": "Europe/Paris", "theme": "dark", "style": "1",
+              "locale": "fr", "container_id": "tv_chart_{i}"
+            }});
+            </script>
+            """
+
+        # Injection finale du HTML + JQuery UI
+        full_component_code = f"""
+        <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+        <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        
+        <style>
+            body {{ background-color: transparent; overflow: hidden; margin: 0; }}
+            .floating-window {{ border-radius: 4px; overflow: hidden; }}
+            /* Style pour la poignée de redimensionnement en bas à droite */
+            .ui-resizable-se {{ background: #ff9800; width: 12px; height: 12px; bottom: 0; right: 0; }}
+        </style>
+
+        <div id="desktop" style="width: 100%; height: 100vh; position: relative;">
+            {all_windows_html}
+        </div>
+
+        <script>
+            $(function() {{
+                $(".floating-window").draggable({{ 
+                    handle: ".window-header",
+                    containment: "#desktop",
+                    stack: ".floating-window"
+                }});
+                $(".floating-window").resizable({{
+                    minHeight: 250,
+                    minWidth: 350,
+                    handles: "se"
+                }});
+            }});
+        </script>
+        """
+        
+        # IMPORTANT : On définit une grande hauteur (ex: 800px) pour que les fenêtres puissent bouger
+        components.html(full_component_code, height=900, scrolling=False)
