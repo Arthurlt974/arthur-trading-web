@@ -269,19 +269,19 @@ st.sidebar.markdown("---")
 
 if categorie == "MARCHÉ CRYPTO":
     outil = st.sidebar.radio("MODULES CRYPTO :", [
-        "MARKET MONITOR", 
-        "WHALE WATCHER", 
-        "BITCOIN DOMINANCE", 
+        "BITCOIN DOMINANCE",
+        "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
-        "CRYPTO WALLET"
+        "WHALE WATCHER"
     ])
 
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
-        "EXPERT SYSTEM", 
         "ANALYSEUR PRO", 
         "MULTI-CHARTS",
-        "MODE DUEL"
+        "EXPERT SYSTEM",
+        "MODE DUEL",
+        "MARKET MONITOR"
     ])
 
 elif categorie == "BOITE À OUTILS":
@@ -289,8 +289,9 @@ elif categorie == "BOITE À OUTILS":
         "DAILY BRIEF",
         "CALENDRIER ÉCO",
         "Fear and Gread Index",
-        "INTERETS COMPOSES",
-        "CORRÉLATION DASH"
+        "CORRÉLATION DASH",
+        "INTERETS COMPOSES"
+        
     ])
 
 st.sidebar.markdown("---")
