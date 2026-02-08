@@ -793,7 +793,30 @@ elif outil == "WHALE WATCHER 🐋":
     # Traitement des données
     new_logs = []
     for t in trades:
-        qty = float(t.get('qty', 0))
+        # --- VERSION SÉCURISÉE DU CALCUL DE PORTEFEUILLE ---
+total_valeur_portefeuille = 0
+
+for t in portfolio:
+    # On vérifie si 't' est bien un dictionnaire
+    if isinstance(t, dict):
+        # On récupère les valeurs avec .get() par sécurité
+        try:
+            # Conversion forcée en float pour éviter les erreurs de calcul
+            p_achat = float(t.get('buy_price', 0))
+            qty = float(t.get('qty', 0))
+            symbole = t.get('symbol', 'Unknown')
+            
+            # Récupération du prix actuel
+            prix_actuel = get_crypto_price(symbole)
+            
+            if prix_actuel:
+                total_valeur_portefeuille += prix_actuel * qty
+                display_crypto_card(t.get('name', symbole), prix_actuel, p_achat, qty)
+        except (ValueError, TypeError):
+            # Si une conversion échoue, on ignore cette ligne plutôt que de crasher
+            continue
+    else:
+        st.error("Format de donnée invalide dans le portfolio")
         if qty >= seuil_baleine:
             is_buyer = t['isBuyerMaker'] # True = Vente, False = Achat
             color = "🔴" if is_buyer else "🟢"
