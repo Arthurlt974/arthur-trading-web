@@ -274,9 +274,9 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "Fear and Gread Index",
     "INTERETS COMPOSES",
     "CRYPTO WALLET",
-    "WHALE WATCHER 🐋",
-    "CORRÉLATION DASH 📊",
-    "BITCOIN DOMINANCE 📊",
+    "WHALE WATCHER",
+    "CORRÉLATION DASH",
+    "BITCOIN DOMINANCE",
     "HEATMAP LIQUIDATIONS"
 ])
 # --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
@@ -821,7 +821,7 @@ elif outil == "CRYPTO WALLET":
 # ==========================================
 # OUTIL : WHALE WATCHER (FLUX LIVE)
 # ==========================================
-elif outil == "WHALE WATCHER 🐋":
+elif outil == "WHALE WATCHER":
     st.title("🐋 BITCOIN WHALE TRACKER")
     st.write("Surveillance des transactions sur Binance (Flux Temps Réel)")
 
@@ -921,7 +921,7 @@ elif outil == "WHALE WATCHER 🐋":
 # ==========================================
 # OUTIL : DASHBOARD DE CORRÉLATION
 # ==========================================
-elif outil == "CORRÉLATION DASH 📊":
+elif outil == "CORRÉLATION DASH":
     st.title("📊 ASSET CORRELATION MATRIX")
     st.write("Analyse de la corrélation sur les 30 derniers jours (Données Daily)")
 
@@ -1117,7 +1117,7 @@ elif outil == "MULTI-CHARTS":
 # ==========================================
 # OUTIL : BITCOIN DOMINANCE (BTC.D)
 # ==========================================
-elif outil == "BITCOIN DOMINANCE 📊":
+elif outil == "BITCOIN DOMINANCE":
     st.title("📊 BITCOIN DOMINANCE (BTC.D)")
     st.write("Analyse de la part de marché du Bitcoin par rapport au reste du marché crypto.")
 
