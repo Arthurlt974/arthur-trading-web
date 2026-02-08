@@ -9,6 +9,29 @@ from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 import numpy as np
 
+# --- FONCTIONS UTILES ---
+def get_crypto_price(symbol):
+    try:
+        # On essaie d'abord via l'API Binance (plus rapide)
+        url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
+        res = requests.get(url, timeout=2).json()
+        return float(res['price'])
+    except:
+        try:
+            # Si Binance échoue, on tente Yahoo Finance
+            tkr = symbol + "-USD"
+            data = yf.Ticker(tkr).fast_info
+            return data['last_price']
+        except:
+            return None
+
+# INITIALISATION : On crée un "coffre-fort" s'il n'existe pas encore
+if "multi_charts" not in st.session_state:
+    st.session_state.multi_charts = []
+
+if "whale_logs" not in st.session_state:
+    st.session_state.whale_logs = []
+
 # --- CONFIGURATION GLOBALE ---
 st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 
@@ -252,7 +275,8 @@ outil = st.sidebar.radio("SELECT MODULE :", [
     "INTERETS COMPOSES",
     "CRYPTO WALLET",
     "WHALE WATCHER 🐋",
-    "CORRÉLATION DASH 📊"
+    "CORRÉLATION DASH 📊",
+    "BITCOIN DOMINANCE 📊"
 ])
 # --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
 if "watchlist" not in st.session_state:
@@ -1088,3 +1112,49 @@ elif outil == "MULTI-CHARTS":
         
         # IMPORTANT : On définit une grande hauteur (ex: 800px) pour que les fenêtres puissent bouger
         components.html(full_component_code, height=900, scrolling=False)
+
+# ==========================================
+# OUTIL : BITCOIN DOMINANCE (BTC.D)
+# ==========================================
+elif outil == "BITCOIN DOMINANCE 📊":
+    st.title("📊 BITCOIN DOMINANCE (BTC.D)")
+    st.write("Analyse de la part de marché du Bitcoin par rapport au reste du marché crypto.")
+
+    # --- INDICATEURS RAPIDES ---
+    col1, col2, col3 = st.columns(3)
+    
+    # Récupération du prix BTC pour le contexte
+    p_btc = get_crypto_price("BTC")
+    
+    with col1:
+        st.metric("BTC PRICE", f"{p_btc:,.0f} $" if p_btc else "N/A")
+    with col2:
+        st.info("💡 Si BTC.D monte + BTC monte = Altcoins souffrent.")
+    with col3:
+        st.info("💡 Si BTC.D baisse + BTC stagne = Altseason.")
+
+    st.markdown("---")
+
+    # --- GRAPHIQUE TRADINGVIEW (BTC.D) ---
+    # On utilise l'ID 'CRYPTOCAP:BTC.D' qui est le standard TradingView
+    tv_html_dom = """
+        <div id="tv_chart_dom" style="height:600px;"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script>
+        new TradingView.widget({
+          "autosize": true,
+          "symbol": "CRYPTOCAP:BTC.D",
+          "interval": "D",
+          "timezone": "Europe/Paris",
+          "theme": "dark",
+          "style": "1",
+          "locale": "fr",
+          "toolbar_bg": "#f1f3f6",
+          "enable_publishing": false,
+          "hide_top_toolbar": false,
+          "save_image": false,
+          "container_id": "tv_chart_dom"
+        });
+        </script>
+    """
+    components.html(tv_html_dom, height=600)
