@@ -281,7 +281,7 @@ outil = st.sidebar.radio("SELECT MODULE :", [
 ])
 # --- CONSTRUCTION DU TEXTE DÉFILANT (MARQUEE) ---
 if "watchlist" not in st.session_state:
-    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "NVDA", "GOOGL", "MC.PA", "TTE"]
+    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "NVDA", "GOOGL", "MC.PA", "TTE", "BNP"]
 
 ticker_data_string = ""
 
