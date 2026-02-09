@@ -1454,7 +1454,7 @@ elif outil == "THE GRAND COUNCIL️":
 # ==========================================
 # OUTIL : SCREENER CAC 40 🇫🇷 (LOGIQUE PRO)
 # ==========================================
-elif outil == "SCREENER CAC 40 🇫🇷":
+elif outil == "SCREENER CAC 40":
     st.markdown("<h1 style='text-align: center; color: #ff9800;'>🇫🇷 SCREENER CAC 40 STRATÉGIQUE</h1>", unsafe_allow_html=True)
     st.info("Ce screener scanne l'intégralité du CAC 40 en appliquant ta méthode 'Analyseur Pro' ( Graham + Score de Qualité ).")
 
