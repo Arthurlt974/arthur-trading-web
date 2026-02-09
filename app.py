@@ -120,7 +120,7 @@ def check_password():
 if not check_password():
     st.stop()
 
-st_autorefresh(interval=60000, key="global_refresh")
+st_autorefresh(interval=600000, key="global_refresh")
 
 # --- FONCTION HORLOGE BLOOMBERG (JS) ---
 def afficher_horloge_temps_reel():
