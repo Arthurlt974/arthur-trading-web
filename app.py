@@ -1361,3 +1361,54 @@ elif outil == "THE GRAND COUNCIL️":
                             <p style="color:#bbb; font-size:13px; margin-top:10px; line-height: 1.4;"><i>"{row['Avis']}"</i></p>
                         </div>
                         """, unsafe_allow_html=True)
+            # --- IMPORTATION (À mettre en haut du fichier app.py) ---
+from fpdf import FPDF
+import io
+
+# --- DANS LE MODULE THE GRAND COUNCIL (après le score final) ---
+
+# Préparation du bouton de téléchargement
+st.markdown("### 📄 EXPORTER L'EXPERTISE")
+
+def generate_pdf(ticker_name, final_score, results_df):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Header
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(190, 10, f"RAPPORT D'EXPERTISE : {ticker_name}", ln=True, align='C')
+    pdf.set_font("Arial", 'B', 25)
+    pdf.set_text_color(255, 152, 0) # Orange Bloomberg
+    pdf.cell(190, 20, f"SCORE FINAL : {final_score}/20", ln=True, align='C')
+    
+    pdf.set_text_color(0, 0, 0) # Retour au noir
+    pdf.set_font("Arial", 'I', 10)
+    pdf.cell(190, 10, f"Genere le : {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='R')
+    pdf.ln(10)
+
+    # Détails par Expert
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(190, 10, "DETAIL DU CONSEIL DES 15 :", ln=True)
+    pdf.ln(5)
+    
+    for _, row in results_df.iterrows():
+        pdf.set_font("Arial", 'B', 11)
+        pdf.cell(190, 7, f"{row['Expert']} ({row['Style']})", ln=True)
+        pdf.set_font("Arial", '', 10)
+        stars = "*" * row['Note']
+        pdf.cell(190, 5, f"Note : {stars}/5", ln=True)
+        pdf.set_font("Arial", 'I', 9)
+        pdf.multi_cell(190, 5, f"Avis : {row['Avis']}")
+        pdf.ln(3)
+
+    return pdf.output(dest='S').encode('latin-1')
+
+# Bouton Streamlit
+pdf_data = generate_pdf(info.get('longName', ticker), final_score_20, df_scores)
+
+st.download_button(
+    label="📥 TÉLÉCHARGER LE RAPPORT PDF",
+    data=pdf_data,
+    file_name=f"Rapport_Conseil_{ticker}.pdf",
+    mime="application/pdf"
+)
