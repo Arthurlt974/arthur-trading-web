@@ -1525,11 +1525,11 @@ elif outil == "SCREENER CAC 40":
             except Exception:
                 continue
 
-        # --- AFFICHAGE DES RÉSULTATS ---
+        # --- TRAITEMENT DES RÉSULTATS ---
         status_text.success("✅ Analyse du CAC 40 terminée.")
         df_res = pd.DataFrame(resultats).sort_values(by="Score", ascending=False)
 
-        # Affichage du Top 3 en colonnes
+        # --- AFFICHAGE TOP 3 ---
         st.markdown("---")
         st.subheader("🏆 TOP OPPORTUNITÉS DÉTECTÉES")
         c1, c2, c3 = st.columns(3)
@@ -1545,29 +1545,43 @@ elif outil == "SCREENER CAC 40":
         st.markdown("---")
         st.subheader("📋 CLASSEMENT COMPLET DES ACTIONS")
 
-        # --- STYLE DEEP BLACK POUR LE TABLEAU ---
-        def style_dataframe(df):
+        # --- STYLE "DEEP BLACK" DU TABLEAU ---
+        def style_noir_complet(df):
             return df.style.set_table_styles([
-                # En-tête (Noir & Orange)
-                {'selector': 'th', 'props': [('background-color', '#111'), ('color', '#ff9800'), ('border', '1px solid #333'), ('text-align', 'center')]},
-                # Cellules (Noir & Gris)
-                {'selector': 'td', 'props': [('background-color', '#000'), ('color', '#ccc'), ('border', '1px solid #222'), ('text-align', 'center')]}
-            ]).applymap(lambda v: f'color: {"#00ff00" if v >= 15 else "#ff9800" if v >= 10 else "#ff4b4b"}; font-weight: bold;', subset=['Score'])
+                # Style de l'en-tête (Header)
+                {'selector': 'th', 'props': [
+                    ('background-color', '#111111'), 
+                    ('color', '#ff9800'), 
+                    ('border', '1px solid #333333'),
+                    ('font-weight', 'bold')
+                ]},
+                # Style des cellules
+                {'selector': 'td', 'props': [
+                    ('background-color', '#000000'), 
+                    ('color', '#ffffff'), 
+                    ('border', '1px solid #222222')
+                ]},
+                # Style du tableau entier
+                {'selector': '', 'props': [('background-color', '#000000')]}
+            ]).applymap(
+                lambda v: f'color: {"#00ff00" if v >= 15 else "#ff9800" if v >= 10 else "#ff4b4b"}; font-weight: bold;', 
+                subset=['Score']
+            )
 
         # Affichage du tableau stylisé
         st.dataframe(
-            style_dataframe(df_res),
+            style_noir_complet(df_res),
             use_container_width=True,
             height=600
         )
 
-        # Graphique récapitulatif
+        # --- GRAPHIQUE ---
         fig_screener = go.Figure(data=[go.Bar(
             x=df_res['Nom'], y=df_res['Score'],
             marker_color=['#00ff00' if s >= 15 else '#ff9800' if s >= 10 else '#ff4b4b' for s in df_res['Score']]
         )])
         fig_screener.update_layout(
-            title="Comparaison des Scores de Qualité (Notation Analyseur Pro)",
+            title="Comparaison des Scores (Logic: Analyseur Pro)",
             template="plotly_dark",
             paper_bgcolor='black',
             plot_bgcolor='black'
