@@ -284,7 +284,8 @@ elif categorie == "ACTIONS & BOURSE":
         "EXPERT SYSTEM",
         "THE GRAND COUNCIL️",
         "MODE DUEL",
-        "MARKET MONITOR"
+        "MARKET MONITOR",
+        "SCREENER CAC 40"
     ])
 
 elif categorie == "BOITE À OUTILS":
@@ -1449,3 +1450,93 @@ elif outil == "THE GRAND COUNCIL️":
                         """, unsafe_allow_html=True)
             else:
                 st.error("❌ Données boursières introuvables.")
+
+# ==========================================
+# OUTIL : SCREENER CAC 40 🇫🇷
+# ==========================================
+elif outil == "SCREENER CAC 40 🇫🇷":
+    st.markdown("<h1 style='text-align: center; color: #ff9800;'>🇫🇷 SCREENER CAC 40 PRO</h1>", unsafe_allow_html=True)
+    st.write("Analyse automatique des 40 fleurons de l'économie française.")
+
+    if st.button("🚀 LANCER LE SCAN COMPLET"):
+        # Liste officielle du CAC40 (Ticker Yahoo Finance)
+        cac40_tickers = [
+            "AIR.PA", "AIRP.PA", "ALO.PA", "MT.PA", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA",
+            "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EDF.PA", "ENGI.PA", "EL.PA", "RMS.PA",
+            "KER.PA", "OR.PA", "LR.PA", "MC.PA", "ML.PA", "ORP.PA", "RI.PA", "PUB.PA",
+            "RNO.PA", "SAF.PA", "SGO.PA", "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA",
+            "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"
+        ]
+
+        resultats = []
+        barre_progression = st.progress(0)
+        status_text = st.empty()
+
+        for i, t in enumerate(cac40_tickers):
+            status_text.text(f"Analyse en cours : {t} ({i+1}/40)")
+            barre_progression.progress((i + 1) / len(cac40_tickers))
+            
+            try:
+                action = yf.Ticker(t)
+                info = action.info
+                nom = info.get('longName', t)
+                
+                # --- CALCUL SCORE SIMPLIFIÉ (Version Screener) ---
+                prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                bpa = info.get('trailingEps') or 0.1
+                per = info.get('trailingPE') or (prix/bpa)
+                roe = (info.get('returnOnEquity', 0)) * 100
+                marge = (info.get('operatingMargins', 0)) * 100
+                
+                # Logique de score rapide (sur 20)
+                score = 0
+                if per < 15: score += 5
+                elif per < 25: score += 3
+                if roe > 15: score += 5
+                if marge > 15: score += 5
+                if info.get('dividendYield', 0) > 0.03: score += 5
+                
+                resultats.append({
+                    "Ticker": t,
+                    "Nom": nom,
+                    "Score": score,
+                    "P/E": round(per, 1),
+                    "ROE %": round(roe, 1),
+                    "Marge %": round(marge, 1),
+                    "Prix": f"{round(prix, 2)} €"
+                })
+            except:
+                continue
+
+        # --- AFFICHAGE DES RÉSULTATS ---
+        df_res = pd.DataFrame(resultats).sort_values(by="Score", ascending=False)
+        
+        st.markdown("---")
+        st.subheader("🏆 TOP 3 OPPORTUNITÉS")
+        top_cols = st.columns(3)
+        for idx, row in df_res.head(3).iterrows():
+            with top_cols[list(df_res.head(3).index).index(idx)]:
+                st.metric(label=row['Nom'], value=f"{row['Score']}/20", delta=f"PE: {row['P/E']}")
+
+        st.markdown("---")
+        st.subheader("📋 CLASSEMENT COMPLET")
+        
+        # Style du tableau
+        def color_score(val):
+            color = '#00ff00' if val >= 15 else '#ff9800' if val >= 10 else '#ff4b4b'
+            return f'color: {color}; font-weight: bold'
+
+        st.dataframe(df_res.style.applymap(color_score, subset=['Score']), use_container_width=True)
+
+        # Graphique de comparaison
+        fig_screener = go.Figure(data=[go.Bar(
+            x=df_res['Nom'], y=df_res['Score'],
+            marker_color=['#00ff00' if s >= 15 else '#ff9800' if s >= 10 else '#ff4b4b' for s in df_res['Score']]
+        )])
+        fig_screener.update_layout(
+            title="Comparaison des Scores CAC 40",
+            template="plotly_dark",
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+        st.plotly_chart(fig_screener, use_container_width=True)
