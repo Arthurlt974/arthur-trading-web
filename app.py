@@ -110,7 +110,7 @@ def check_password():
     st.markdown("### [ SECURITY ] TERMINAL ACCESS REQUIRED")
     pwd = st.text_input("ENTER ACCESS CODE :", type="password")
     if st.button("EXECUTE LOGIN"):
-        if pwd == "1234":
+        if pwd == "bitcoin":
             st.session_state["password_correct"] = True
             st.rerun()
         else:
