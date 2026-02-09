@@ -1454,7 +1454,7 @@ elif outil == "THE GRAND COUNCIL️":
 # ==========================================
 # OUTIL : SCREENER CAC 40 🇫🇷
 # ==========================================
-elif outil == "SCREENER CAC 40 🇫🇷":
+elif outil == "SCREENER CAC 40":
     st.markdown("<h1 style='text-align: center; color: #ff9800;'>🇫🇷 SCREENER CAC 40 PRO</h1>", unsafe_allow_html=True)
     st.write("Analyse automatique des 40 fleurons de l'économie française.")
 
