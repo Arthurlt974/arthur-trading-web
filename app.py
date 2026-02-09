@@ -1543,15 +1543,20 @@ elif outil == "SCREENER CAC 40":
             with c3: st.metric(top_3[2]['Nom'], f"{top_3[2]['Score']}/20", f"{top_3[2]['Potentiel %']}% Pot.")
 
         st.markdown("---")
-
-        # Tableau avec coloration conditionnelle
-        def color_score(val):
-            color = '#00ff00' if val >= 15 else '#ff9800' if val >= 10 else '#ff4b4b'
-            return f'color: {color}; font-weight: bold'
-
         st.subheader("📋 CLASSEMENT COMPLET DES ACTIONS")
+
+        # --- STYLE DEEP BLACK POUR LE TABLEAU ---
+        def style_dataframe(df):
+            return df.style.set_table_styles([
+                # En-tête (Noir & Orange)
+                {'selector': 'th', 'props': [('background-color', '#111'), ('color', '#ff9800'), ('border', '1px solid #333'), ('text-align', 'center')]},
+                # Cellules (Noir & Gris)
+                {'selector': 'td', 'props': [('background-color', '#000'), ('color', '#ccc'), ('border', '1px solid #222'), ('text-align', 'center')]}
+            ]).applymap(lambda v: f'color: {"#00ff00" if v >= 15 else "#ff9800" if v >= 10 else "#ff4b4b"}; font-weight: bold;', subset=['Score'])
+
+        # Affichage du tableau stylisé
         st.dataframe(
-            df_res.style.applymap(color_score, subset=['Score']),
+            style_dataframe(df_res),
             use_container_width=True,
             height=600
         )
