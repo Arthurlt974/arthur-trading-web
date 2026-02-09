@@ -1320,7 +1320,7 @@ elif outil == "EXPERT SYSTEM":
 # ==========================================
 # OUTIL : THE GRAND COUNCIL (15 EXPERTS) 🏛️
 # ==========================================
-elif outil == "THE GRAND COUNCIL (15 EXPERTS) 🏛️":
+elif outil == "THE GRAND COUNCIL️":
     st.markdown("<h1 style='text-align: center; color: #ff9800;'>🏛️ THE GRAND COUNCIL OF WALL STREET</h1>", unsafe_allow_html=True)
     
     nom_entree = st.text_input("📝 ANALYSE GLOBALE DE L'ACTIF :", value="AAPL")
