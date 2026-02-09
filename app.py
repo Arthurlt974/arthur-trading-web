@@ -1452,91 +1452,119 @@ elif outil == "THE GRAND COUNCIL️":
                 st.error("❌ Données boursières introuvables.")
 
 # ==========================================
-# OUTIL : SCREENER CAC 40 🇫🇷
+# OUTIL : SCREENER CAC 40 🇫🇷 (LOGIQUE PRO)
 # ==========================================
-elif outil == "SCREENER CAC 40":
-    st.markdown("<h1 style='text-align: center; color: #ff9800;'>🇫🇷 SCREENER CAC 40 PRO</h1>", unsafe_allow_html=True)
-    st.write("Analyse automatique des 40 fleurons de l'économie française.")
+elif outil == "SCREENER CAC 40 🇫🇷":
+    st.markdown("<h1 style='text-align: center; color: #ff9800;'>🇫🇷 SCREENER CAC 40 STRATÉGIQUE</h1>", unsafe_allow_html=True)
+    st.info("Ce screener scanne l'intégralité du CAC 40 en appliquant ta méthode 'Analyseur Pro' ( Graham + Score de Qualité ).")
 
     if st.button("🚀 LANCER LE SCAN COMPLET"):
-        # Liste officielle du CAC40 (Ticker Yahoo Finance)
+        # Liste officielle des tickers du CAC 40
         cac40_tickers = [
             "AIR.PA", "AIRP.PA", "ALO.PA", "MT.PA", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA",
-            "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "EDF.PA", "ENGI.PA", "EL.PA", "RMS.PA",
+            "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "ENGI.PA", "EL.PA", "RMS.PA",
             "KER.PA", "OR.PA", "LR.PA", "MC.PA", "ML.PA", "ORP.PA", "RI.PA", "PUB.PA",
             "RNO.PA", "SAF.PA", "SGO.PA", "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA",
             "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"
         ]
 
         resultats = []
-        barre_progression = st.progress(0)
+        progress_bar = st.progress(0)
         status_text = st.empty()
 
         for i, t in enumerate(cac40_tickers):
-            status_text.text(f"Analyse en cours : {t} ({i+1}/40)")
-            barre_progression.progress((i + 1) / len(cac40_tickers))
+            status_text.text(f"Analyse de {t} ({i+1}/40)...")
+            progress_bar.progress((i + 1) / len(cac40_tickers))
             
             try:
                 action = yf.Ticker(t)
                 info = action.info
-                nom = info.get('longName', t)
-                
-                # --- CALCUL SCORE SIMPLIFIÉ (Version Screener) ---
+                if not info or 'currentPrice' not in info: continue
+
+                # --- EXTRACTION DATA (LOGIQUE ANALYSEUR PRO) ---
+                nom = info.get('shortName') or t
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
-                bpa = info.get('trailingEps') or 0.1
-                per = info.get('trailingPE') or (prix/bpa)
-                roe = (info.get('returnOnEquity', 0)) * 100
-                marge = (info.get('operatingMargins', 0)) * 100
+                bpa = info.get('trailingEps') or info.get('forwardEps') or 0
+                per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
+                dette_equity = info.get('debtToEquity')
+                payout = (info.get('payoutRatio') or 0) * 100
                 
-                # Logique de score rapide (sur 20)
+                # Formule de Graham
+                val_theorique = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
+                marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 else 0
+
+                # --- CALCUL DU QUALITY SCORE (TA NOTATION) ---
                 score = 0
-                if per < 15: score += 5
-                elif per < 25: score += 3
-                if roe > 15: score += 5
-                if marge > 15: score += 5
-                if info.get('dividendYield', 0) > 0.03: score += 5
+                if bpa > 0:
+                    if per < 12: score += 5
+                    elif per < 20: score += 4
+                    else: score += 1
+                else: score -= 5
                 
+                if dette_equity is not None:
+                    if dette_equity < 50: score += 4
+                    elif dette_equity < 100: score += 3
+                    elif dette_equity > 200: score -= 4
+                
+                if 10 < payout <= 80: score += 4
+                elif payout > 95: score -= 4
+                
+                if marge_pourcent > 30: score += 5
+
+                score_f = min(20, max(0, score))
+
                 resultats.append({
                     "Ticker": t,
                     "Nom": nom,
-                    "Score": score,
+                    "Score": score_f,
+                    "Potentiel %": round(marge_pourcent, 1),
                     "P/E": round(per, 1),
-                    "ROE %": round(roe, 1),
-                    "Marge %": round(marge, 1),
-                    "Prix": f"{round(prix, 2)} €"
+                    "Dette/Eq %": round(dette_equity, 1) if dette_equity else "N/A",
+                    "Prix": f"{prix:.2f} €"
                 })
-            except:
+            except Exception:
                 continue
 
         # --- AFFICHAGE DES RÉSULTATS ---
+        status_text.success("✅ Analyse du CAC 40 terminée.")
         df_res = pd.DataFrame(resultats).sort_values(by="Score", ascending=False)
-        
+
+        # Affichage du Top 3 en colonnes
         st.markdown("---")
-        st.subheader("🏆 TOP 3 OPPORTUNITÉS")
-        top_cols = st.columns(3)
-        for idx, row in df_res.head(3).iterrows():
-            with top_cols[list(df_res.head(3).index).index(idx)]:
-                st.metric(label=row['Nom'], value=f"{row['Score']}/20", delta=f"PE: {row['P/E']}")
+        st.subheader("🏆 TOP OPPORTUNITÉS DÉTECTÉES")
+        c1, c2, c3 = st.columns(3)
+        top_3 = df_res.head(3).to_dict('records')
+        
+        if len(top_3) >= 1:
+            with c1: st.metric(top_3[0]['Nom'], f"{top_3[0]['Score']}/20", f"{top_3[0]['Potentiel %']}% Pot.")
+        if len(top_3) >= 2:
+            with c2: st.metric(top_3[1]['Nom'], f"{top_3[1]['Score']}/20", f"{top_3[1]['Potentiel %']}% Pot.")
+        if len(top_3) >= 3:
+            with c3: st.metric(top_3[2]['Nom'], f"{top_3[2]['Score']}/20", f"{top_3[2]['Potentiel %']}% Pot.")
 
         st.markdown("---")
-        st.subheader("📋 CLASSEMENT COMPLET")
-        
-        # Style du tableau
+
+        # Tableau avec coloration conditionnelle
         def color_score(val):
             color = '#00ff00' if val >= 15 else '#ff9800' if val >= 10 else '#ff4b4b'
             return f'color: {color}; font-weight: bold'
 
-        st.dataframe(df_res.style.applymap(color_score, subset=['Score']), use_container_width=True)
+        st.subheader("📋 CLASSEMENT COMPLET DES ACTIONS")
+        st.dataframe(
+            df_res.style.applymap(color_score, subset=['Score']),
+            use_container_width=True,
+            height=600
+        )
 
-        # Graphique de comparaison
+        # Graphique récapitulatif
         fig_screener = go.Figure(data=[go.Bar(
             x=df_res['Nom'], y=df_res['Score'],
             marker_color=['#00ff00' if s >= 15 else '#ff9800' if s >= 10 else '#ff4b4b' for s in df_res['Score']]
         )])
         fig_screener.update_layout(
-            title="Comparaison des Scores CAC 40",
+            title="Comparaison des Scores de Qualité (Notation Analyseur Pro)",
             template="plotly_dark",
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
+            paper_bgcolor='black',
+            plot_bgcolor='black'
         )
         st.plotly_chart(fig_screener, use_container_width=True)
