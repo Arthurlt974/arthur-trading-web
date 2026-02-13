@@ -690,6 +690,25 @@ if outil == "ANALYSEUR PRO":
     ticker = trouver_ticker(nom_entree)
     info = get_ticker_info(ticker)
 
+    if info:
+    nom = info.get('longName') or info.get('shortName') or ticker
+    # On cherche le prix dans plusieurs clés possibles
+    prix = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('ask') or info.get('bid')
+    
+    # Fallback ultime sur l'historique si le dictionnaire info est incomplet
+    if not prix or prix == 0:
+        try:
+            hist = yf.Ticker(ticker).history(period="1d")
+            if not hist.empty:
+                prix = float(hist['Close'].iloc[-1])
+        except:
+            prix = None
+
+    if prix: # Si on a enfin un prix, on continue
+        # ... reste de votre code ...
+    else:
+        st.error(f"⚠️ DONNÉES DE PRIX INDISPONIBLES POUR {ticker}")
+
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
