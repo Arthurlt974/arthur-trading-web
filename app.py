@@ -588,7 +588,7 @@ if categorie == "MARCHÉ CRYPTO":
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
         "ON-CHAIN ANALYSIS",
-        "NFT TRACKER",
+        "CRYPTO BUBBLE CHART",
         "WHALE WATCHER"
     ])
 
@@ -4905,288 +4905,354 @@ elif outil == "ON-CHAIN ANALYSIS":
             st.code(traceback.format_exc())
 
 # ==========================================
-# MODULE : NFT TRACKER 🎨
+# MODULE : CRYPTO BUBBLE CHART 💎
 # ==========================================
 
-elif outil == "NFT TRACKER":
+elif outil == "CRYPTO BUBBLE CHART":
     st.markdown("""
         <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
-            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>🎨 NFT TRACKER</h1>
-            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Floor Prices & Market Analysis</p>
+            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>💎 CRYPTO BUBBLE CHART</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Top 50 Cryptos - Visualisation Interactive</p>
         </div>
     """, unsafe_allow_html=True)
     
-    # Note: Les vraies données NFT nécessiteraient des APIs comme OpenSea, Reservoir, Blur, etc.
-    # Ici on simule avec des données réalistes
+    # Options de visualisation
+    col_opt1, col_opt2 = st.columns(2)
     
-    # Sélection de la blockchain
-    blockchain = st.selectbox(
-        "🌐 BLOCKCHAIN",
-        ["Ethereum", "Polygon", "Solana", "Arbitrum", "Optimism"],
-        key="nft_blockchain"
-    )
+    with col_opt1:
+        metric_choice = st.selectbox(
+            "📊 TAILLE DES BULLES",
+            ["Volume 24h", "Market Cap", "Variation 24h"],
+            key="bubble_metric"
+        )
     
-    # Collections NFT populaires (données simulées mais réalistes)
-    nft_collections = {
-        "Ethereum": [
-            {"name": "Bored Ape Yacht Club", "symbol": "BAYC", "floor": 28.5, "volume_24h": 450.2, "change_24h": -2.3, "owners": 6400, "supply": 10000, "sales_24h": 12},
-            {"name": "CryptoPunks", "symbol": "PUNK", "floor": 45.8, "volume_24h": 320.5, "change_24h": +1.5, "owners": 3711, "supply": 10000, "sales_24h": 8},
-            {"name": "Azuki", "symbol": "AZUKI", "floor": 12.3, "volume_24h": 180.4, "change_24h": +5.2, "owners": 5200, "supply": 10000, "sales_24h": 15},
-            {"name": "Mutant Ape Yacht Club", "symbol": "MAYC", "floor": 6.8, "volume_24h": 210.3, "change_24h": -1.8, "owners": 12000, "supply": 19423, "sales_24h": 25},
-            {"name": "Doodles", "symbol": "DOODLE", "floor": 4.2, "volume_24h": 95.6, "change_24h": +3.1, "owners": 5800, "supply": 10000, "sales_24h": 18},
-            {"name": "CloneX", "symbol": "CLONEX", "floor": 3.5, "volume_24h": 120.8, "change_24h": +2.7, "owners": 9100, "supply": 20000, "sales_24h": 22},
-            {"name": "Pudgy Penguins", "symbol": "PPG", "floor": 5.1, "volume_24h": 140.2, "change_24h": +4.5, "owners": 4500, "supply": 8888, "sales_24h": 20},
-            {"name": "Otherdeed for Otherside", "symbol": "OTHERDEED", "floor": 0.8, "volume_24h": 85.3, "change_24h": -0.5, "owners": 34000, "supply": 100000, "sales_24h": 95},
-        ],
-        "Polygon": [
-            {"name": "Trump Digital Trading Cards", "symbol": "TRUMP", "floor": 0.15, "volume_24h": 12.5, "change_24h": +8.2, "owners": 18000, "supply": 45000, "sales_24h": 120},
-            {"name": "y00ts", "symbol": "Y00TS", "floor": 0.42, "volume_24h": 8.3, "change_24h": +2.1, "owners": 8500, "supply": 15000, "sales_24h": 25},
-        ],
-        "Solana": [
-            {"name": "DeGods", "symbol": "DEGODS", "floor": 145.0, "volume_24h": 2500.0, "change_24h": +3.2, "owners": 7200, "supply": 10000, "sales_24h": 18},
-            {"name": "Mad Lads", "symbol": "MADLADS", "floor": 85.5, "volume_24h": 1200.0, "change_24h": +5.8, "owners": 8900, "supply": 10000, "sales_24h": 22},
-            {"name": "Okay Bears", "symbol": "OKAYBEARS", "floor": 28.2, "volume_24h": 450.0, "change_24h": -1.5, "owners": 9100, "supply": 10000, "sales_24h": 15},
-        ],
-        "Arbitrum": [
-            {"name": "Smolverse", "symbol": "SMOL", "floor": 0.35, "volume_24h": 15.2, "change_24h": +1.8, "owners": 5200, "supply": 10000, "sales_24h": 42},
-        ],
-        "Optimism": [
-            {"name": "Optimism Quests NFT", "symbol": "OPQUEST", "floor": 0.08, "volume_24h": 5.5, "change_24h": +0.5, "owners": 12000, "supply": 50000, "sales_24h": 85},
-        ]
-    }
+    with col_opt2:
+        color_choice = st.selectbox(
+            "🎨 COULEUR PAR",
+            ["Performance 24h", "Market Cap", "Volume"],
+            key="bubble_color"
+        )
     
-    collections = nft_collections.get(blockchain, [])
-    
-    if collections:
-        # Statistiques globales
-        st.markdown("### 📊 STATISTIQUES DU MARCHÉ NFT")
-        
-        total_volume = sum([c['volume_24h'] for c in collections])
-        total_sales = sum([c['sales_24h'] for c in collections])
-        avg_floor = sum([c['floor'] for c in collections]) / len(collections)
-        
-        col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
-        
-        with col_stats1:
-            currency = "ETH" if blockchain in ["Ethereum", "Polygon", "Arbitrum", "Optimism"] else "SOL"
-            st.metric("Volume 24h", f"{total_volume:,.1f} {currency}")
-        
-        with col_stats2:
-            st.metric("Ventes 24h", f"{total_sales}")
-        
-        with col_stats3:
-            st.metric("Floor Moyen", f"{avg_floor:,.2f} {currency}")
-        
-        with col_stats4:
-            st.metric("Collections", len(collections))
-        
-        st.markdown("---")
-        
-        # Tableau des collections
-        st.markdown("### 🏆 TOP COLLECTIONS")
-        
-        # Trier par volume
-        collections_sorted = sorted(collections, key=lambda x: x['volume_24h'], reverse=True)
-        
-        for idx, collection in enumerate(collections_sorted):
-            col_nft1, col_nft2 = st.columns([3, 1])
-            
-            with col_nft1:
-                # Déterminer la couleur selon le changement
-                change_color = "#00ff00" if collection['change_24h'] >= 0 else "#ff0000"
-                rank_emoji = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else "📊"
+    if st.button("🚀 GÉNÉRER LE BUBBLE CHART", key="gen_bubble"):
+        try:
+            with st.spinner("Chargement des Top 50 cryptos..."):
                 
-                st.markdown(f"""
-                    <div style='padding: 20px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border-radius: 12px; margin: 10px 0; border: 2px solid #333;'>
-                        <div style='display: flex; justify-content: space-between; align-items: center;'>
-                            <div>
-                                <h3 style='color: #ff9800; margin: 0 0 5px 0;'>{rank_emoji} {collection['name']}</h3>
-                                <p style='color: #666; font-size: 12px; margin: 0;'>{collection['symbol']} • {collection['supply']:,} items • {collection['owners']:,} owners</p>
-                            </div>
-                        </div>
+                # Liste des Top 50 cryptos par market cap
+                top_cryptos = [
+                    "BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "AVAX", "DOGE", "DOT", "MATIC",
+                    "LINK", "UNI", "ATOM", "LTC", "BCH", "NEAR", "APT", "ICP", "FIL", "ARB",
+                    "OP", "HBAR", "VET", "ALGO", "ETC", "MKR", "AAVE", "STX", "INJ", "GRT",
+                    "SAND", "MANA", "AXS", "CHZ", "FTM", "THETA", "EOS", "XTZ", "EGLD", "RUNE",
+                    "ZEC", "CAKE", "SNX", "COMP", "BAT", "ZIL", "ENJ", "LRC", "CRV", "1INCH"
+                ]
+                
+                crypto_data = []
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                for idx, crypto in enumerate(top_cryptos):
+                    status_text.text(f"Chargement {crypto} ({idx+1}/50)...")
+                    progress_bar.progress((idx + 1) / len(top_cryptos))
+                    
+                    try:
+                        ticker = f"{crypto}-USD"
+                        df = yf.download(ticker, period="5d", progress=False)
                         
-                        <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 15px;'>
-                            <div>
-                                <p style='color: #999; font-size: 11px; margin: 0;'>FLOOR PRICE</p>
-                                <h4 style='color: white; margin: 5px 0 0 0;'>{collection['floor']:.2f} {currency}</h4>
-                            </div>
-                            <div>
-                                <p style='color: #999; font-size: 11px; margin: 0;'>VOLUME 24H</p>
-                                <h4 style='color: white; margin: 5px 0 0 0;'>{collection['volume_24h']:.1f} {currency}</h4>
-                            </div>
-                            <div>
-                                <p style='color: #999; font-size: 11px; margin: 0;'>CHANGE 24H</p>
-                                <h4 style='color: {change_color}; margin: 5px 0 0 0;'>{collection['change_24h']:+.1f}%</h4>
-                            </div>
-                            <div>
-                                <p style='color: #999; font-size: 11px; margin: 0;'>SALES 24H</p>
-                                <h4 style='color: white; margin: 5px 0 0 0;'>{collection['sales_24h']}</h4>
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-            
-            with col_nft2:
-                # Calculer quelques métriques
-                market_cap = collection['floor'] * collection['supply']
-                owner_ratio = (collection['owners'] / collection['supply']) * 100
+                        if not df.empty:
+                            if isinstance(df.columns, pd.MultiIndex):
+                                df.columns = df.columns.get_level_values(0)
+                            
+                            # Prix et variations
+                            current_price = float(df['Close'].iloc[-1])
+                            price_yesterday = float(df['Close'].iloc[-2]) if len(df) >= 2 else current_price
+                            change_24h = ((current_price - price_yesterday) / price_yesterday) * 100
+                            
+                            # Volume
+                            volume_24h = float(df['Volume'].iloc[-1])
+                            
+                            # Market cap simulé (prix * volume comme proxy)
+                            market_cap = current_price * volume_24h
+                            
+                            crypto_data.append({
+                                'Symbol': crypto,
+                                'Price': current_price,
+                                'Change_24h': change_24h,
+                                'Volume_24h': volume_24h,
+                                'Market_Cap': market_cap
+                            })
+                    except:
+                        continue
                 
-                st.markdown(f"""
-                    <div style='padding: 20px; background: #0a0a0a; border-radius: 12px; margin: 10px 0; border: 2px solid #222; height: 150px; display: flex; flex-direction: column; justify-content: center;'>
-                        <div style='text-align: center; margin-bottom: 10px;'>
-                            <p style='color: #666; font-size: 10px; margin: 0;'>MARKET CAP</p>
-                            <h4 style='color: #7fff00; margin: 5px 0;'>{market_cap:,.0f} {currency}</h4>
+                status_text.success(f"✅ {len(crypto_data)} cryptos chargées")
+                progress_bar.empty()
+                
+                if crypto_data:
+                    df_crypto = pd.DataFrame(crypto_data)
+                    
+                    # Statistiques globales
+                    st.markdown("### 📊 STATISTIQUES GLOBALES")
+                    
+                    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                    
+                    with col_stat1:
+                        total_volume = df_crypto['Volume_24h'].sum()
+                        st.metric("Volume Total 24h", f"${total_volume/1e9:.2f}B")
+                    
+                    with col_stat2:
+                        positive_count = len(df_crypto[df_crypto['Change_24h'] > 0])
+                        positive_pct = (positive_count / len(df_crypto)) * 100
+                        st.metric("Cryptos en Hausse", f"{positive_count}/50", f"{positive_pct:.0f}%")
+                    
+                    with col_stat3:
+                        avg_change = df_crypto['Change_24h'].mean()
+                        st.metric("Variation Moyenne", f"{avg_change:+.2f}%")
+                    
+                    with col_stat4:
+                        top_gainer = df_crypto.loc[df_crypto['Change_24h'].idxmax()]
+                        st.metric("Top Gainer", top_gainer['Symbol'], f"{top_gainer['Change_24h']:+.1f}%")
+                    
+                    st.markdown("---")
+                    
+                    # BUBBLE CHART
+                    st.markdown("### 💎 BUBBLE CHART INTERACTIF")
+                    
+                    # Déterminer la taille des bulles
+                    if metric_choice == "Volume 24h":
+                        size_values = df_crypto['Volume_24h']
+                        size_label = "Volume 24h"
+                    elif metric_choice == "Market Cap":
+                        size_values = df_crypto['Market_Cap']
+                        size_label = "Market Cap"
+                    else:
+                        size_values = abs(df_crypto['Change_24h']) * 1e8  # Amplifier pour visibilité
+                        size_label = "Variation 24h"
+                    
+                    # Déterminer la couleur
+                    if color_choice == "Performance 24h":
+                        color_values = df_crypto['Change_24h']
+                        colorscale = 'RdYlGn'
+                        color_label = "Change 24h (%)"
+                    elif color_choice == "Market Cap":
+                        color_values = df_crypto['Market_Cap']
+                        colorscale = 'Viridis'
+                        color_label = "Market Cap"
+                    else:
+                        color_values = df_crypto['Volume_24h']
+                        colorscale = 'Blues'
+                        color_label = "Volume 24h"
+                    
+                    # Créer le bubble chart
+                    fig_bubble = go.Figure()
+                    
+                    fig_bubble.add_trace(go.Scatter(
+                        x=df_crypto.index,
+                        y=df_crypto['Change_24h'],
+                        mode='markers+text',
+                        marker=dict(
+                            size=size_values,
+                            sizemode='diameter',
+                            sizeref=size_values.max() / (50**2),  # Normalisation
+                            color=color_values,
+                            colorscale=colorscale,
+                            showscale=True,
+                            colorbar=dict(
+                                title=color_label,
+                                thickness=20,
+                                len=0.7
+                            ),
+                            line=dict(color='white', width=2),
+                            opacity=0.8
+                        ),
+                        text=df_crypto['Symbol'],
+                        textposition='middle center',
+                        textfont=dict(
+                            size=10,
+                            color='white',
+                            family='Arial Black'
+                        ),
+                        hovertemplate=(
+                            '<b>%{text}</b><br>' +
+                            'Prix: $%{customdata[0]:,.4f}<br>' +
+                            'Change 24h: %{y:+.2f}%<br>' +
+                            'Volume 24h: $%{customdata[1]:,.0f}<br>' +
+                            'Market Cap: $%{customdata[2]:,.0f}<br>' +
+                            '<extra></extra>'
+                        ),
+                        customdata=df_crypto[['Price', 'Volume_24h', 'Market_Cap']].values
+                    ))
+                    
+                    fig_bubble.update_layout(
+                        template='plotly_dark',
+                        paper_bgcolor='#0d0d0d',
+                        plot_bgcolor='#0d0d0d',
+                        height=700,
+                        title=dict(
+                            text=f"<b>Top 50 Cryptos - Bulles par {metric_choice}</b>",
+                            font=dict(size=20, color='#ff9800'),
+                            x=0.5,
+                            xanchor='center'
+                        ),
+                        xaxis=dict(
+                            title="",
+                            showgrid=False,
+                            showticklabels=False,
+                            zeroline=False
+                        ),
+                        yaxis=dict(
+                            title="Variation 24h (%)",
+                            gridcolor='#333',
+                            zeroline=True,
+                            zerolinecolor='#ff9800',
+                            zerolinewidth=2
+                        ),
+                        hovermode='closest'
+                    )
+                    
+                    st.plotly_chart(fig_bubble, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # Top Gainers & Losers
+                    st.markdown("### 🏆 TOP PERFORMERS")
+                    
+                    col_gain, col_loss = st.columns(2)
+                    
+                    with col_gain:
+                        st.markdown("#### 🟢 TOP 5 GAINERS")
+                        top_gainers = df_crypto.nlargest(5, 'Change_24h')
+                        
+                        for idx, row in top_gainers.iterrows():
+                            st.markdown(f"""
+                                <div style='padding: 12px; background: #00ff0022; border-left: 4px solid #00ff00; border-radius: 5px; margin: 8px 0;'>
+                                    <div style='display: flex; justify-content: space-between; align-items: center;'>
+                                        <div>
+                                            <b style='color: #00ff00; font-size: 16px;'>{row['Symbol']}</b><br>
+                                            <small style='color: #ccc;'>${row['Price']:,.4f}</small>
+                                        </div>
+                                        <div style='text-align: right;'>
+                                            <b style='color: white; font-size: 18px;'>{row['Change_24h']:+.2f}%</b><br>
+                                            <small style='color: #999;'>Vol: ${row['Volume_24h']/1e6:.1f}M</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                    
+                    with col_loss:
+                        st.markdown("#### 🔴 TOP 5 LOSERS")
+                        top_losers = df_crypto.nsmallest(5, 'Change_24h')
+                        
+                        for idx, row in top_losers.iterrows():
+                            st.markdown(f"""
+                                <div style='padding: 12px; background: #ff000022; border-left: 4px solid #ff0000; border-radius: 5px; margin: 8px 0;'>
+                                    <div style='display: flex; justify-content: space-between; align-items: center;'>
+                                        <div>
+                                            <b style='color: #ff0000; font-size: 16px;'>{row['Symbol']}</b><br>
+                                            <small style='color: #ccc;'>${row['Price']:,.4f}</small>
+                                        </div>
+                                        <div style='text-align: right;'>
+                                            <b style='color: white; font-size: 18px;'>{row['Change_24h']:+.2f}%</b><br>
+                                            <small style='color: #999;'>Vol: ${row['Volume_24h']/1e6:.1f}M</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    
+                    # Distribution des performances
+                    st.markdown("### 📊 DISTRIBUTION DES PERFORMANCES")
+                    
+                    fig_dist = go.Figure()
+                    
+                    fig_dist.add_trace(go.Histogram(
+                        x=df_crypto['Change_24h'],
+                        nbinsx=20,
+                        marker_color='cyan',
+                        marker_line_color='black',
+                        marker_line_width=1.5,
+                        name='Distribution'
+                    ))
+                    
+                    # Ligne de la moyenne
+                    fig_dist.add_vline(
+                        x=avg_change,
+                        line_dash="dash",
+                        line_color="orange",
+                        line_width=3,
+                        annotation_text=f"Moyenne: {avg_change:+.2f}%",
+                        annotation_position="top"
+                    )
+                    
+                    # Ligne du zéro
+                    fig_dist.add_vline(
+                        x=0,
+                        line_dash="solid",
+                        line_color="white",
+                        line_width=2
+                    )
+                    
+                    fig_dist.update_layout(
+                        template='plotly_dark',
+                        paper_bgcolor='black',
+                        plot_bgcolor='black',
+                        title="Distribution des Variations 24h",
+                        xaxis_title="Variation (%)",
+                        yaxis_title="Nombre de Cryptos",
+                        height=400,
+                        showlegend=False
+                    )
+                    
+                    st.plotly_chart(fig_dist, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # Tableau complet
+                    st.markdown("### 📋 TABLEAU COMPLET - TOP 50")
+                    
+                    df_display = df_crypto.copy()
+                    df_display = df_display.sort_values('Volume_24h', ascending=False)
+                    df_display['Rank'] = range(1, len(df_display) + 1)
+                    df_display['Price'] = df_display['Price'].apply(lambda x: f"${x:,.4f}")
+                    df_display['Change_24h'] = df_display['Change_24h'].apply(lambda x: f"{x:+.2f}%")
+                    df_display['Volume_24h'] = df_display['Volume_24h'].apply(lambda x: f"${x/1e6:,.1f}M")
+                    df_display['Market_Cap'] = df_display['Market_Cap'].apply(lambda x: f"${x/1e9:,.2f}B")
+                    
+                    st.dataframe(
+                        df_display[['Rank', 'Symbol', 'Price', 'Change_24h', 'Volume_24h', 'Market_Cap']],
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    st.markdown("---")
+                    
+                    # Sentiment du marché
+                    st.markdown("### 💡 SENTIMENT DU MARCHÉ")
+                    
+                    if positive_pct >= 70:
+                        sentiment = "TRÈS HAUSSIER 🚀"
+                        sentiment_color = "#00ff00"
+                    elif positive_pct >= 50:
+                        sentiment = "HAUSSIER 📈"
+                        sentiment_color = "#7fff00"
+                    elif positive_pct >= 30:
+                        sentiment = "NEUTRE ➡️"
+                        sentiment_color = "#ff9800"
+                    else:
+                        sentiment = "BAISSIER 📉"
+                        sentiment_color = "#ff0000"
+                    
+                    st.markdown(f"""
+                        <div style='text-align: center; padding: 25px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px;'>
+                            <h1 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h1>
+                            <p style='color: white; font-size: 20px; margin: 10px 0;'>{positive_count}/50 cryptos en hausse</p>
+                            <p style='color: #ccc; font-size: 16px; margin: 0;'>Variation moyenne du marché: {avg_change:+.2f}%</p>
                         </div>
-                        <div style='text-align: center;'>
-                            <p style='color: #666; font-size: 10px; margin: 0;'>UNIQUE OWNERS</p>
-                            <h4 style='color: #00bfff; margin: 5px 0;'>{owner_ratio:.0f}%</h4>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Graphique de comparaison
-        st.markdown("### 📊 COMPARAISON DES FLOOR PRICES")
-        
-        fig_nft = go.Figure()
-        
-        # Bar chart des floor prices
-        fig_nft.add_trace(go.Bar(
-            x=[c['name'][:20] for c in collections_sorted],
-            y=[c['floor'] for c in collections_sorted],
-            marker_color=['#00ff00' if c['change_24h'] >= 0 else '#ff0000' for c in collections_sorted],
-            text=[f"{c['floor']:.2f}" for c in collections_sorted],
-            textposition='auto',
-            hovertemplate='<b>%{x}</b><br>Floor: %{y:.2f} ' + currency + '<br><extra></extra>'
-        ))
-        
-        fig_nft.update_layout(
-            template="plotly_dark",
-            paper_bgcolor='black',
-            plot_bgcolor='black',
-            title="Floor Price par Collection",
-            xaxis_title="Collection",
-            yaxis_title=f"Floor Price ({currency})",
-            height=400,
-            xaxis=dict(tickangle=-45)
-        )
-        
-        st.plotly_chart(fig_nft, use_container_width=True)
-        
-        st.markdown("---")
-        
-        # Top movers
-        st.markdown("### 🚀 TOP MOVERS (24H)")
-        
-        col_gain, col_loss = st.columns(2)
-        
-        # Top gainers
-        gainers = sorted([c for c in collections if c['change_24h'] > 0], key=lambda x: x['change_24h'], reverse=True)[:3]
-        
-        with col_gain:
-            st.markdown("#### 🟢 TOP GAINERS")
-            for collection in gainers:
-                st.markdown(f"""
-                    <div style='padding: 12px; background: #00ff0022; border-left: 4px solid #00ff00; border-radius: 5px; margin: 8px 0;'>
-                        <div style='display: flex; justify-content: space-between;'>
-                            <b style='color: #00ff00; font-size: 14px;'>{collection['name'][:25]}</b>
-                            <b style='color: white; font-size: 14px;'>{collection['change_24h']:+.1f}%</b>
-                        </div>
-                        <small style='color: #ccc;'>Floor: {collection['floor']:.2f} {currency} • Vol: {collection['volume_24h']:.1f} {currency}</small>
-                    </div>
-                """, unsafe_allow_html=True)
-        
-        # Top losers
-        losers = sorted([c for c in collections if c['change_24h'] < 0], key=lambda x: x['change_24h'])[:3]
-        
-        with col_loss:
-            st.markdown("#### 🔴 TOP LOSERS")
-            for collection in losers:
-                st.markdown(f"""
-                    <div style='padding: 12px; background: #ff000022; border-left: 4px solid #ff0000; border-radius: 5px; margin: 8px 0;'>
-                        <div style='display: flex; justify-content: space-between;'>
-                            <b style='color: #ff0000; font-size: 14px;'>{collection['name'][:25]}</b>
-                            <b style='color: white; font-size: 14px;'>{collection['change_24h']:+.1f}%</b>
-                        </div>
-                        <small style='color: #ccc;'>Floor: {collection['floor']:.2f} {currency} • Vol: {collection['volume_24h']:.1f} {currency}</small>
-                    </div>
-                """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Distribution du volume
-        st.markdown("### 📊 DISTRIBUTION DU VOLUME")
-        
-        fig_volume = go.Figure(data=[go.Pie(
-            labels=[c['name'][:20] for c in collections_sorted],
-            values=[c['volume_24h'] for c in collections_sorted],
-            hole=0.4,
-            marker=dict(
-                colors=['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#74b9ff', '#a29bfe']
-            ),
-            textinfo='label+percent',
-            textposition='auto',
-            hovertemplate='<b>%{label}</b><br>Volume: %{value:.1f} ' + currency + '<br>%{percent}<br><extra></extra>'
-        )])
-        
-        fig_volume.update_layout(
-            template="plotly_dark",
-            paper_bgcolor='black',
-            height=500,
-            title="Répartition du Volume 24h"
-        )
-        
-        st.plotly_chart(fig_volume, use_container_width=True)
-        
-        st.markdown("---")
-        
-        # Analyse du marché
-        st.markdown("### 💡 ANALYSE DU MARCHÉ NFT")
-        
-        # Calculer des indicateurs
-        positive_count = len([c for c in collections if c['change_24h'] > 0])
-        negative_count = len([c for c in collections if c['change_24h'] < 0])
-        positive_pct = (positive_count / len(collections)) * 100
-        
-        # Sentiment
-        if positive_pct >= 70:
-            sentiment = "TRÈS HAUSSIER 🚀"
-            sentiment_color = "#00ff00"
-        elif positive_pct >= 50:
-            sentiment = "HAUSSIER 📈"
-            sentiment_color = "#7fff00"
-        elif positive_pct >= 30:
-            sentiment = "NEUTRE ➡️"
-            sentiment_color = "#ff9800"
-        else:
-            sentiment = "BAISSIER 📉"
-            sentiment_color = "#ff0000"
-        
-        col_analysis1, col_analysis2 = st.columns(2)
-        
-        with col_analysis1:
-            st.markdown(f"""
-                <div style='text-align: center; padding: 25px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px;'>
-                    <h2 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h2>
-                    <p style='color: white; font-size: 18px; margin: 10px 0;'>{positive_count}/{len(collections)} collections en hausse</p>
-                    <p style='color: #ccc; font-size: 14px; margin: 0;'>{positive_pct:.0f}% du marché positif</p>
-                </div>
-            """, unsafe_allow_html=True)
-        
-        with col_analysis2:
-            # Collection la plus active
-            most_active = max(collections, key=lambda x: x['sales_24h'])
-            
-            st.markdown(f"""
-                <div style='text-align: center; padding: 25px; background: #00bfff22; border: 3px solid #00bfff; border-radius: 15px;'>
-                    <h4 style='color: #00bfff; margin: 0 0 10px 0;'>🔥 PLUS ACTIVE</h4>
-                    <h3 style='color: white; margin: 0;'>{most_active['name'][:25]}</h3>
-                    <p style='color: #ccc; font-size: 14px; margin: 10px 0 0 0;'>{most_active['sales_24h']} ventes aujourd'hui</p>
-                </div>
-            """, unsafe_allow_html=True)
-        
-        st.caption("⚠️ Les données NFT sont simulées à des fins de démonstration. Pour des données en temps réel, utilisez les APIs OpenSea, Blur ou Reservoir.")
-    
-    else:
-        st.info(f"Aucune collection disponible pour {blockchain}")
+                    """, unsafe_allow_html=True)
+                
+                else:
+                    st.error("Impossible de charger les données")
+                    
+        except Exception as e:
+            st.error(f"Erreur: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
