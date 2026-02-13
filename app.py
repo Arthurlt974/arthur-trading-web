@@ -705,8 +705,7 @@ if outil == "ANALYSEUR PRO":
                 prix = None
     
     if prix: 
-        # Si on a enfin un prix, on continue
-        # ... reste de votre code ...
+            pass  # Dit à Python : "Il n'y a rien ici pour l'instant, mais c'est normal"
         else:
             st.error(f"⚠️ DONNÉES DE PRIX INDISPONIBLES POUR {ticker}")
 
