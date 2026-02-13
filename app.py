@@ -2291,8 +2291,8 @@ elif outil == "THE GRAND COUNCIL️":
                         pdf.set_font("Arial", 'I', 8)
                         pdf.multi_cell(190, 4, "AVERTISSEMENT : Ce rapport est genere automatiquement a des fins educatives. Il ne constitue pas un conseil financier. Effectuez vos propres recherches avant tout investissement.")
                         
-                        # pdf.output() retourne déjà un bytearray, pas besoin d'encoder
-                        return pdf.output(dest='S')
+                        # pdf.output() retourne un bytearray, on le convertit en bytes
+                        return bytes(pdf.output(dest='S'))
 
                     pdf_bytes = generate_pdf(nom_complet, final_score_20, verdict, df_scores)
                     
