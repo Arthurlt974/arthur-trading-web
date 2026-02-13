@@ -683,7 +683,7 @@ components.html(marquee_html, height=60)
 # st.markdown("---") # Tu peux garder ou enlever cette ligne selon tes préférences visuelles
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO (CORRIGÉ)
+# OUTIL 1 : ANALYSEUR PRO (VERSION 4 MÉTHODES)
 # ==========================================
 if outil == "ANALYSEUR PRO":
     nom_entree = st.sidebar.text_input("TICKER SEARCH", value="NVIDIA")
@@ -712,22 +712,42 @@ if outil == "ANALYSEUR PRO":
         payout = (info.get('payoutRatio') or 0) * 100
         cash_action = info.get('totalCashPerShare') or 0
         
-        # FORMULE DE GRAHAM CORRIGÉE
-        book_value = info.get('bookValue', 0)
-        if bpa > 0 and book_value > 0:
-            val_theorique = (22.5 * bpa * book_value) ** 0.5
-        else:
-            val_theorique = 0
+        # ========================================
+        # VALORISATION AVEC 4 MÉTHODES (CONSENSUS)
+        # ========================================
+        calculator = ValuationCalculator(ticker)
+        valuation_results = calculator.get_comprehensive_valuation()
         
-        marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 and val_theorique > 0 else 0
+        if "consensus" in valuation_results:
+            val_consensus = valuation_results["consensus"]["fair_value"]
+            marge_pourcent = valuation_results["consensus"]["upside_pct"]
+            methods_count = valuation_results["consensus"]["methods_used"]
+            recommendation = valuation_results["consensus"]["recommendation"]
+        else:
+            val_consensus = 0
+            marge_pourcent = 0
+            methods_count = 0
+            recommendation = "N/A"
 
         st.title(f"» {nom} // {ticker}")
 
+        # HEADER avec consensus 4 méthodes
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("LAST PRICE", f"{prix:.2f} {devise}")
-        c2.metric("GRAHAM VAL", f"{val_theorique:.2f} {devise}" if val_theorique > 0 else "N/A")
-        c3.metric("POTENTIAL", f"{marge_pourcent:+.2f}%" if val_theorique > 0 else "N/A")
+        c2.metric("CONSENSUS VALUE", f"{val_consensus:.2f} {devise}" if val_consensus > 0 else "N/A")
+        c3.metric("POTENTIAL", f"{marge_pourcent:+.2f}%" if val_consensus > 0 else "N/A")
         c4.metric("SECTOR", secteur)
+        
+        # Affichage de la recommandation
+        if recommendation != "N/A":
+            if "ACHAT" in recommendation:
+                st.success(f"**RECOMMANDATION : {recommendation}** 🚀")
+            elif "VENTE" in recommendation:
+                st.error(f"**RECOMMANDATION : {recommendation}** ⚠️")
+            else:
+                st.info(f"**RECOMMANDATION : {recommendation}** ⚖️")
+        
+        st.caption(f"Basé sur {methods_count} méthode(s) de valorisation : Graham + DCF + P/E + P/B")
 
         st.markdown("---")
         st.subheader("» ADVANCED TECHNICAL CHART")
@@ -739,6 +759,7 @@ if outil == "ANALYSEUR PRO":
         with f1:
             st.write(f"**EPS (BPA) :** {bpa:.2f} {devise}")
             st.write(f"**P/E RATIO :** {per:.2f}")
+            book_value = info.get('bookValue', 0)
             st.write(f"**BOOK VALUE :** {book_value:.2f} {devise}")
         with f2:
             st.write(f"**DEBT/EQUITY :** {dette_equity if dette_equity is not None else 'N/A'} %")
@@ -747,6 +768,82 @@ if outil == "ANALYSEUR PRO":
             st.write(f"**PAYOUT RATIO :** {payout:.2f} %")
             st.write(f"**CASH/SHARE :** {cash_action:.2f} {devise}")
 
+        st.markdown("---")
+        
+        # ========================================
+        # DÉTAILS DES 4 MÉTHODES DE VALORISATION
+        # ========================================
+        st.subheader("» MÉTHODES DE VALORISATION DÉTAILLÉES")
+        
+        # Filtrer les méthodes disponibles (exclure consensus et dcf de l'affichage)
+        methods_available = [method for method in valuation_results.keys() if method not in ["consensus", "dcf"]]
+        
+        if methods_available:
+            tabs = st.tabs([method.upper() for method in methods_available])
+            
+            for idx, method in enumerate(methods_available):
+                with tabs[idx]:
+                    data = valuation_results[method]
+                    
+                    if "error" in data:
+                        st.warning(f"⚠️ {data['error']}")
+                    else:
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.metric("VALEUR JUSTE", f"${data['fair_value']:.2f}")
+                        with col2:
+                            st.metric("PRIX ACTUEL", f"${data['current_price']:.2f}")
+                        with col3:
+                            upside_val = data['upside_pct']
+                            color = "normal" if abs(upside_val) < 10 else ("inverse" if upside_val > 0 else "off")
+                            st.metric("POTENTIEL", f"{upside_val:+.1f}%", delta_color=color)
+                        
+                        st.markdown("---")
+                        st.markdown("**PARAMÈTRES DE LA MÉTHODE:**")
+                        
+                        # Affichage spécifique selon la méthode
+                        if method == "graham":
+                            col_param = st.columns(3)
+                            with col_param[0]:
+                                st.info(f"**EPS:** ${data['eps']:.2f}")
+                            with col_param[1]:
+                                st.info(f"**Book Value:** ${data['book_value']:.2f}")
+                            with col_param[2]:
+                                st.info(f"**Formule:** √(22.5 × EPS × BV)")
+                            st.caption("📚 Formule de Benjamin Graham - Investissement Value")
+                        
+                        elif method == "pe":
+                            col_param = st.columns(3)
+                            with col_param[0]:
+                                st.info(f"**P/E Actuel:** {data['current_pe']}")
+                            with col_param[1]:
+                                st.info(f"**P/E Cible:** {data['target_pe']}")
+                            with col_param[2]:
+                                st.info(f"**EPS:** ${data['eps']:.2f}")
+                            st.write(f"- Type EPS: **{data['eps_type']}**")
+                        
+                        elif method == "pb":
+                            col_param = st.columns(3)
+                            with col_param[0]:
+                                st.info(f"**Valeur Comptable:** ${data['book_value']:.2f}")
+                            with col_param[1]:
+                                st.info(f"**P/B Actuel:** {data['current_pb']:.2f}")
+                            with col_param[2]:
+                                st.info(f"**P/B Cible:** {data['target_pb']:.2f}")
+                        
+                        elif method == "nvt":
+                            col_param = st.columns(3)
+                            with col_param[0]:
+                                st.info(f"**NVT Ratio:** {data['nvt_ratio']:.2f}")
+                            with col_param[1]:
+                                st.info(f"**Status:** {data['status']}")
+                            with col_param[2]:
+                                st.info(f"**Market Cap:** ${data['market_cap']:,.0f}")
+                            st.write(f"- Volume quotidien moyen: **${data['daily_tx_value']:,.0f}**")
+                            st.write(f"- NVT cible: **{data['target_nvt']}**")
+                            st.caption("NVT < 10 = Sous-évalué | NVT 10-20 = Juste valorisé | NVT > 20 = Surévalué")
+        
         st.markdown("---")
         st.subheader("» QUALITY SCORE (20 MAX)")
         score = 0
@@ -764,7 +861,7 @@ if outil == "ANALYSEUR PRO":
             
         if 10 < payout <= 80: score += 4; positifs.append("» SUSTAINABLE DIVIDEND [+4]")
         elif payout > 95: score -= 4; negatifs.append("!! PAYOUT RISK [-4]")
-        if marge_pourcent > 30: score += 5; positifs.append("» GRAHAM DISCOUNT [+5]")
+        if marge_pourcent > 30: score += 5; positifs.append("» CONSENSUS DISCOUNT [+5]")
         elif marge_pourcent > 15: score += 3; positifs.append("» MODERATE DISCOUNT [+3]")
 
         score_f = min(20, max(0, score))
@@ -778,24 +875,48 @@ if outil == "ANALYSEUR PRO":
             for n in negatifs: 
                 st.markdown(f'<div style="background:#2b0000; color:#ff0000; border-left: 4px solid #ff0000; padding:10px; margin-bottom:5px;">{n}</div>', unsafe_allow_html=True)
         
-        # Info sur la formule Graham
-        with st.expander("ℹ️ À PROPOS DE LA VALEUR GRAHAM"):
+        # Guide d'interprétation des 4 méthodes
+        with st.expander("ℹ️ À PROPOS DES 4 MÉTHODES DE VALORISATION"):
             st.markdown(f"""
-            **Formule de Benjamin Graham :**
+            **CONSENSUS BASÉ SUR 4 MÉTHODES :**
             
-            `Valeur intrinsèque = √(22.5 × EPS × Book Value)`
+            Le prix consensus ({val_consensus:.2f} {devise}) est la **médiane** des 4 méthodes suivantes :
             
-            **Calcul pour {ticker} :**
-            - EPS : {bpa:.2f} {devise}
-            - Book Value : {book_value:.2f} {devise}
-            - Valeur Graham : {val_theorique:.2f} {devise}
+            **1️⃣ GRAHAM (Benjamin Graham Formula)**
+            - Formule : `√(22.5 × EPS × Book Value)`
+            - Meilleure pour : Actions "value" traditionnelles
+            - Fiabilité : Haute pour entreprises établies
             
-            **Interprétation :**
-            - **Prix < Valeur Graham** → Action sous-évaluée
-            - **Prix ≈ Valeur Graham** → Juste valorisation
-            - **Prix > Valeur Graham** → Action surévaluée
+            **2️⃣ DCF (Discounted Cash Flow)**
+            - Principe : Actualisation des flux futurs de trésorerie
+            - Meilleure pour : Sociétés matures avec cash flows stables
+            - Fiabilité : Haute si les hypothèses sont bonnes
             
-            ⚠️ Cette formule fonctionne mieux pour les actions "value" traditionnelles que pour les valeurs de croissance ou technologiques.
+            **3️⃣ P/E RATIO (Price/Earnings)**
+            - Principe : Valorisation relative basée sur les bénéfices
+            - Meilleure pour : Comparaison sectorielle rapide
+            - Fiabilité : Moyenne (dépend du secteur)
+            
+            **4️⃣ PRICE/BOOK**
+            - Principe : Comparaison prix vs valeur comptable
+            - Meilleure pour : Banques, financières, sociétés avec beaucoup d'actifs
+            - Fiabilité : Moyenne (moins pertinent pour tech)
+            
+            **💡 POURQUOI LE CONSENSUS ?**
+            
+            - La **médiane** de 4 méthodes est plus stable qu'une seule
+            - Compense les biais de chaque méthode individuelle
+            - Offre une vision équilibrée entre value et croissance
+            
+            **📊 INTERPRÉTATION DU POTENTIEL :**
+            - **> +20%** : Fortement sous-évalué → ACHAT FORT 🚀
+            - **+10% à +20%** : Sous-évalué → ACHAT 📈
+            - **-10% à +10%** : Juste valorisé → CONSERVER ⚖️
+            - **-20% à -10%** : Surévalué → VENTE 📉
+            - **< -20%** : Fortement surévalué → VENTE FORTE ⚠️
+            
+            ⚠️ **ATTENTION :** Ces valorisations sont des indicateurs, pas des certitudes. 
+            À combiner avec l'analyse technique et les fondamentaux.
             """)
 
         st.markdown("---")
