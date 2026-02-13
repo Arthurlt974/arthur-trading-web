@@ -1,8 +1,12 @@
 streamlit
 yfinance
-plotly
 pandas
 requests
 feedparser
 streamlit-autorefresh
-fpdf
+plotly
+numpy
+fpdf2
+scipy
+ta
+scikit-learn
