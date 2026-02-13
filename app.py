@@ -1590,8 +1590,11 @@ elif outil == "SCREENER CAC 40":
         st.plotly_chart(fig_screener, use_container_width=True)
 
 # ==========================================
-# NOUVEAU MODULE : ANALYSE TECHNIQUE AVANCÉE
+# MODULE : ANALYSE TECHNIQUE AVANCÉE (VERSION CORRIGÉE)
 # ==========================================
+
+# Dans la sidebar, ajoute cette option à ton selectbox :
+# "ANALYSE TECHNIQUE PRO"
 
 elif outil == "ANALYSE TECHNIQUE PRO":
     st.markdown("## 📈 ANALYSE TECHNIQUE AVANCÉE")
@@ -1616,14 +1619,26 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                 if df.empty:
                     st.error("Aucune donnée disponible pour ce ticker")
                 else:
+                    # S'assurer que les colonnes sont au bon format
+                    if isinstance(df.columns, pd.MultiIndex):
+                        df.columns = df.columns.droplevel(1)
+                    
                     # Calcul des indicateurs techniques
                     
                     # 1. RSI (Relative Strength Index)
                     delta = df['Close'].diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    gain = delta.copy()
+                    loss = delta.copy()
+                    gain[gain < 0] = 0
+                    loss[loss > 0] = 0
+                    loss = abs(loss)
+                    
+                    avg_gain = gain.rolling(window=14).mean()
+                    avg_loss = loss.rolling(window=14).mean()
+                    
                     # Éviter division par zéro
-                    rs = gain / loss.replace(0, 0.0001)
+                    avg_loss = avg_loss.replace(0, 0.0001)
+                    rs = avg_gain / avg_loss
                     df['RSI'] = 100 - (100 / (1 + rs))
                     
                     # 2. MACD
@@ -1646,236 +1661,241 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                     # 5. Volume moyen
                     df['Volume_MA'] = df['Volume'].rolling(window=20).mean()
                     
-                    # Dernières valeurs (en prenant la dernière ligne valide)
-                    latest = df.iloc[-1]
+                    # Supprimer les NaN
+                    df = df.dropna()
                     
-                    # Analyse du signal
-                    signals = []
-                    score = 0
-                    
-                    # RSI Signal (vérifier si la valeur existe et n'est pas NaN)
-                    if pd.notna(latest['RSI']):
-                        if latest['RSI'] < 30:
+                    if len(df) == 0:
+                        st.error("Pas assez de données pour calculer les indicateurs")
+                    else:
+                        # Dernières valeurs
+                        last_row = df.iloc[-1]
+                        rsi_val = float(last_row['RSI'])
+                        macd_val = float(last_row['MACD'])
+                        signal_val = float(last_row['Signal'])
+                        close_val = float(last_row['Close'])
+                        bb_upper_val = float(last_row['BB_Upper'])
+                        bb_lower_val = float(last_row['BB_Lower'])
+                        sma50_val = float(last_row['SMA_50'])
+                        volume_val = float(last_row['Volume'])
+                        volume_ma_val = float(last_row['Volume_MA'])
+                        
+                        # Analyse du signal
+                        signals = []
+                        score = 0
+                        
+                        # RSI Signal
+                        if rsi_val < 30:
                             signals.append(("RSI", "🟢 OVERSOLD - Signal ACHAT", "bullish"))
                             score += 2
-                        elif latest['RSI'] > 70:
+                        elif rsi_val > 70:
                             signals.append(("RSI", "🔴 OVERBOUGHT - Signal VENTE", "bearish"))
                             score -= 2
                         else:
                             signals.append(("RSI", "🟡 NEUTRE", "neutral"))
-                    
-                    # MACD Signal
-                    if pd.notna(latest['MACD']) and pd.notna(latest['Signal']):
-                        if latest['MACD'] > latest['Signal']:
+                        
+                        # MACD Signal
+                        if macd_val > signal_val:
                             signals.append(("MACD", "🟢 BULLISH - Signal positif", "bullish"))
                             score += 1
                         else:
                             signals.append(("MACD", "🔴 BEARISH - Signal négatif", "bearish"))
                             score -= 1
-                    
-                    # Bollinger Signal
-                    if pd.notna(latest['BB_Lower']) and pd.notna(latest['BB_Upper']):
-                        if latest['Close'] < latest['BB_Lower']:
+                        
+                        # Bollinger Signal
+                        if close_val < bb_lower_val:
                             signals.append(("Bollinger", "🟢 Prix sous bande basse - ACHAT", "bullish"))
                             score += 2
-                        elif latest['Close'] > latest['BB_Upper']:
+                        elif close_val > bb_upper_val:
                             signals.append(("Bollinger", "🔴 Prix sur bande haute - VENTE", "bearish"))
                             score -= 2
                         else:
                             signals.append(("Bollinger", "🟡 Prix dans la bande", "neutral"))
-                    
-                    # Moving Average Signal
-                    if pd.notna(latest['SMA_50']):
-                        if latest['Close'] > latest['SMA_50']:
+                        
+                        # Moving Average Signal
+                        if close_val > sma50_val:
                             signals.append(("MA50", "🟢 Prix > MA50 - Tendance haussière", "bullish"))
                             score += 1
                         else:
                             signals.append(("MA50", "🔴 Prix < MA50 - Tendance baissière", "bearish"))
                             score -= 1
-                    
-                    # Volume Signal
-                    if pd.notna(latest['Volume_MA']):
-                        if latest['Volume'] > latest['Volume_MA'] * 1.5:
+                        
+                        # Volume Signal
+                        if volume_val > volume_ma_val * 1.5:
                             signals.append(("Volume", "⚠️ Volume anormalement élevé", "important"))
                             score += 1
-                    
-                    # Déterminer le sentiment global
-                    if score >= 3:
-                        sentiment = "FORTEMENT HAUSSIER 🚀"
-                        sentiment_color = "#00ff00"
-                    elif score >= 1:
-                        sentiment = "LÉGÈREMENT HAUSSIER 📈"
-                        sentiment_color = "#7fff00"
-                    elif score <= -3:
-                        sentiment = "FORTEMENT BAISSIER 📉"
-                        sentiment_color = "#ff0000"
-                    elif score <= -1:
-                        sentiment = "LÉGÈREMENT BAISSIER 📉"
-                        sentiment_color = "#ff6347"
-                    else:
-                        sentiment = "NEUTRE ➡️"
-                        sentiment_color = "#ff9800"
-                    
-                    # Affichage du sentiment
-                    st.markdown(f"""
-                        <div style='text-align: center; padding: 20px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px; margin: 20px 0;'>
-                            <h1 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h1>
-                            <p style='color: white; font-size: 20px; margin: 10px 0;'>Score Technique: {score}</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    st.markdown("---")
-                    
-                    # Graphique principal
-                    st.markdown("### 📊 GRAPHIQUE AVEC INDICATEURS")
-                    
-                    from plotly.subplots import make_subplots
-                    
-                    fig = make_subplots(
-                        rows=3, cols=1,
-                        shared_xaxes=True,
-                        vertical_spacing=0.05,
-                        row_heights=[0.6, 0.2, 0.2],
-                        subplot_titles=('PRIX & BOLLINGER BANDS', 'RSI', 'MACD')
-                    )
-                    
-                    # Candlestick
-                    fig.add_trace(go.Candlestick(
-                        x=df.index,
-                        open=df['Open'],
-                        high=df['High'],
-                        low=df['Low'],
-                        close=df['Close'],
-                        name='Prix'
-                    ), row=1, col=1)
-                    
-                    # Bollinger Bands
-                    fig.add_trace(go.Scatter(
-                        x=df.index, 
-                        y=df['BB_Upper'], 
-                        name='BB Upper',
-                        line=dict(color='rgba(255,152,0,0.3)', dash='dash')
-                    ), row=1, col=1)
-                    
-                    fig.add_trace(go.Scatter(
-                        x=df.index, 
-                        y=df['SMA_20'], 
-                        name='SMA 20',
-                        line=dict(color='orange', width=2)
-                    ), row=1, col=1)
-                    
-                    fig.add_trace(go.Scatter(
-                        x=df.index, 
-                        y=df['BB_Lower'], 
-                        name='BB Lower',
-                        line=dict(color='rgba(255,152,0,0.3)', dash='dash'),
-                        fill='tonexty',
-                        fillcolor='rgba(255,152,0,0.1)'
-                    ), row=1, col=1)
-                    
-                    # SMA 50
-                    fig.add_trace(go.Scatter(
-                        x=df.index, 
-                        y=df['SMA_50'], 
-                        name='SMA 50',
-                        line=dict(color='cyan', width=2)
-                    ), row=1, col=1)
-                    
-                    # RSI
-                    fig.add_trace(go.Scatter(
-                        x=df.index, 
-                        y=df['RSI'], 
-                        name='RSI',
-                        line=dict(color='purple', width=2)
-                    ), row=2, col=1)
-                    
-                    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-                    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-                    
-                    # MACD
-                    fig.add_trace(go.Scatter(
-                        x=df.index, 
-                        y=df['MACD'], 
-                        name='MACD',
-                        line=dict(color='blue', width=2)
-                    ), row=3, col=1)
-                    
-                    fig.add_trace(go.Scatter(
-                        x=df.index, 
-                        y=df['Signal'], 
-                        name='Signal',
-                        line=dict(color='red', width=2)
-                    ), row=3, col=1)
-                    
-                    fig.add_trace(go.Bar(
-                        x=df.index, 
-                        y=df['MACD_Hist'], 
-                        name='Histogram',
-                        marker_color='gray'
-                    ), row=3, col=1)
-                    
-                    fig.update_layout(
-                        template="plotly_dark",
-                        paper_bgcolor='black',
-                        plot_bgcolor='black',
-                        height=900,
-                        showlegend=True,
-                        xaxis_rangeslider_visible=False
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    st.markdown("---")
-                    
-                    # Tableau des signaux
-                    st.markdown("### 🎯 SIGNAUX DÉTECTÉS")
-                    
-                    cols_signals = st.columns(3)
-                    for idx, (indicator, message, signal_type) in enumerate(signals):
-                        with cols_signals[idx % 3]:
-                            color_map = {
-                                "bullish": "#00ff00",
-                                "bearish": "#ff0000",
-                                "neutral": "#ff9800",
-                                "important": "#00ffff"
-                            }
-                            
-                            st.markdown(f"""
-                                <div style='padding: 15px; background: {color_map.get(signal_type, '#666')}22; border: 2px solid {color_map.get(signal_type, '#666')}; border-radius: 10px; margin: 10px 0; min-height: 100px;'>
-                                    <h4 style='color: {color_map.get(signal_type, '#fff')}; margin: 0 0 10px 0;'>{indicator}</h4>
-                                    <p style='color: #ccc; font-size: 14px; margin: 0;'>{message}</p>
-                                </div>
-                            """, unsafe_allow_html=True)
-                    
-                    st.markdown("---")
-                    
-                    # Statistiques détaillées
-                    st.markdown("### 📊 VALEURS ACTUELLES")
-                    
-                    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
-                    
-                    with col_stat1:
-                        rsi_val = f"{latest['RSI']:.2f}" if pd.notna(latest['RSI']) else "N/A"
-                        st.metric("RSI", rsi_val)
-                        st.metric("Prix", f"${latest['Close']:.2f}")
-                    
-                    with col_stat2:
-                        macd_val = f"{latest['MACD']:.4f}" if pd.notna(latest['MACD']) else "N/A"
-                        signal_val = f"{latest['Signal']:.4f}" if pd.notna(latest['Signal']) else "N/A"
-                        st.metric("MACD", macd_val)
-                        st.metric("Signal", signal_val)
-                    
-                    with col_stat3:
-                        bb_upper = f"${latest['BB_Upper']:.2f}" if pd.notna(latest['BB_Upper']) else "N/A"
-                        bb_lower = f"${latest['BB_Lower']:.2f}" if pd.notna(latest['BB_Lower']) else "N/A"
-                        st.metric("BB Upper", bb_upper)
-                        st.metric("BB Lower", bb_lower)
-                    
-                    with col_stat4:
-                        sma20 = f"${latest['SMA_20']:.2f}" if pd.notna(latest['SMA_20']) else "N/A"
-                        sma50 = f"${latest['SMA_50']:.2f}" if pd.notna(latest['SMA_50']) else "N/A"
-                        st.metric("SMA 20", sma20)
-                        st.metric("SMA 50", sma50)
+                        
+                        # Déterminer le sentiment global
+                        if score >= 3:
+                            sentiment = "FORTEMENT HAUSSIER 🚀"
+                            sentiment_color = "#00ff00"
+                        elif score >= 1:
+                            sentiment = "LÉGÈREMENT HAUSSIER 📈"
+                            sentiment_color = "#7fff00"
+                        elif score <= -3:
+                            sentiment = "FORTEMENT BAISSIER 📉"
+                            sentiment_color = "#ff0000"
+                        elif score <= -1:
+                            sentiment = "LÉGÈREMENT BAISSIER 📉"
+                            sentiment_color = "#ff6347"
+                        else:
+                            sentiment = "NEUTRE ➡️"
+                            sentiment_color = "#ff9800"
+                        
+                        # Affichage du sentiment
+                        st.markdown(f"""
+                            <div style='text-align: center; padding: 20px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px; margin: 20px 0;'>
+                                <h1 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h1>
+                                <p style='color: white; font-size: 20px; margin: 10px 0;'>Score Technique: {score}</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.markdown("---")
+                        
+                        # Graphique principal
+                        st.markdown("### 📊 GRAPHIQUE AVEC INDICATEURS")
+                        
+                        from plotly.subplots import make_subplots
+                        
+                        fig = make_subplots(
+                            rows=3, cols=1,
+                            shared_xaxes=True,
+                            vertical_spacing=0.05,
+                            row_heights=[0.6, 0.2, 0.2],
+                            subplot_titles=('PRIX & BOLLINGER BANDS', 'RSI', 'MACD')
+                        )
+                        
+                        # Candlestick
+                        fig.add_trace(go.Candlestick(
+                            x=df.index,
+                            open=df['Open'],
+                            high=df['High'],
+                            low=df['Low'],
+                            close=df['Close'],
+                            name='Prix'
+                        ), row=1, col=1)
+                        
+                        # Bollinger Bands
+                        fig.add_trace(go.Scatter(
+                            x=df.index, 
+                            y=df['BB_Upper'], 
+                            name='BB Upper',
+                            line=dict(color='rgba(255,152,0,0.3)', dash='dash')
+                        ), row=1, col=1)
+                        
+                        fig.add_trace(go.Scatter(
+                            x=df.index, 
+                            y=df['SMA_20'], 
+                            name='SMA 20',
+                            line=dict(color='orange', width=2)
+                        ), row=1, col=1)
+                        
+                        fig.add_trace(go.Scatter(
+                            x=df.index, 
+                            y=df['BB_Lower'], 
+                            name='BB Lower',
+                            line=dict(color='rgba(255,152,0,0.3)', dash='dash'),
+                            fill='tonexty',
+                            fillcolor='rgba(255,152,0,0.1)'
+                        ), row=1, col=1)
+                        
+                        # SMA 50
+                        fig.add_trace(go.Scatter(
+                            x=df.index, 
+                            y=df['SMA_50'], 
+                            name='SMA 50',
+                            line=dict(color='cyan', width=2)
+                        ), row=1, col=1)
+                        
+                        # RSI
+                        fig.add_trace(go.Scatter(
+                            x=df.index, 
+                            y=df['RSI'], 
+                            name='RSI',
+                            line=dict(color='purple', width=2)
+                        ), row=2, col=1)
+                        
+                        fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+                        fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+                        
+                        # MACD
+                        fig.add_trace(go.Scatter(
+                            x=df.index, 
+                            y=df['MACD'], 
+                            name='MACD',
+                            line=dict(color='blue', width=2)
+                        ), row=3, col=1)
+                        
+                        fig.add_trace(go.Scatter(
+                            x=df.index, 
+                            y=df['Signal'], 
+                            name='Signal',
+                            line=dict(color='red', width=2)
+                        ), row=3, col=1)
+                        
+                        fig.add_trace(go.Bar(
+                            x=df.index, 
+                            y=df['MACD_Hist'], 
+                            name='Histogram',
+                            marker_color='gray'
+                        ), row=3, col=1)
+                        
+                        fig.update_layout(
+                            template="plotly_dark",
+                            paper_bgcolor='black',
+                            plot_bgcolor='black',
+                            height=900,
+                            showlegend=True,
+                            xaxis_rangeslider_visible=False
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        st.markdown("---")
+                        
+                        # Tableau des signaux
+                        st.markdown("### 🎯 SIGNAUX DÉTECTÉS")
+                        
+                        cols_signals = st.columns(3)
+                        for idx, (indicator, message, signal_type) in enumerate(signals):
+                            with cols_signals[idx % 3]:
+                                color_map = {
+                                    "bullish": "#00ff00",
+                                    "bearish": "#ff0000",
+                                    "neutral": "#ff9800",
+                                    "important": "#00ffff"
+                                }
+                                
+                                st.markdown(f"""
+                                    <div style='padding: 15px; background: {color_map.get(signal_type, '#666')}22; border: 2px solid {color_map.get(signal_type, '#666')}; border-radius: 10px; margin: 10px 0; min-height: 100px;'>
+                                        <h4 style='color: {color_map.get(signal_type, '#fff')}; margin: 0 0 10px 0;'>{indicator}</h4>
+                                        <p style='color: #ccc; font-size: 14px; margin: 0;'>{message}</p>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                        
+                        st.markdown("---")
+                        
+                        # Statistiques détaillées
+                        st.markdown("### 📊 VALEURS ACTUELLES")
+                        
+                        col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                        
+                        with col_stat1:
+                            st.metric("RSI", f"{rsi_val:.2f}")
+                            st.metric("Prix", f"${close_val:.2f}")
+                        
+                        with col_stat2:
+                            st.metric("MACD", f"{macd_val:.4f}")
+                            st.metric("Signal", f"{signal_val:.4f}")
+                        
+                        with col_stat3:
+                            st.metric("BB Upper", f"${bb_upper_val:.2f}")
+                            st.metric("BB Lower", f"${bb_lower_val:.2f}")
+                        
+                        with col_stat4:
+                            st.metric("SMA 20", f"${float(last_row['SMA_20']):.2f}")
+                            st.metric("SMA 50", f"${sma50_val:.2f}")
                     
         except Exception as e:
             st.error(f"Erreur lors de l'analyse: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
