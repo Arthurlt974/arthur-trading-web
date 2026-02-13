@@ -295,7 +295,8 @@ elif categorie == "BOITE À OUTILS":
         "Fear and Gread Index",
         "CORRÉLATION DASH",
         "INTERETS COMPOSES",
-        "ANALYSE TECHNIQUE PRO"
+        "ANALYSE TECHNIQUE PRO",
+        "FIBONACCI CALCULATOR"
         
     ])
 
@@ -1944,5 +1945,270 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                     
         except Exception as e:
             st.error(f"Erreur lors de l'analyse: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+
+# ==========================================
+# MODULE : CALCULATEUR FIBONACCI
+# ==========================================
+
+elif outil == "FIBONACCI CALCULATOR":
+    st.markdown("## 📐 CALCULATEUR FIBONACCI")
+    st.info("Calcul automatique des niveaux de retracement et d'extension de Fibonacci")
+    
+    # Input utilisateur
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        ticker_fib = st.text_input("TICKER", value="AAPL", key="fib_ticker").upper()
+    with col2:
+        period_fib = st.selectbox("PÉRIODE", ["1mo", "3mo", "6mo", "1y", "2y"], index=1, key="fib_period")
+    with col3:
+        fib_type = st.selectbox("TYPE", ["Retracement (Baisse)", "Extension (Hausse)"], key="fib_type")
+    
+    if st.button("🚀 CALCULER FIBONACCI", key="fib_calc"):
+        try:
+            with st.spinner("Calcul des niveaux Fibonacci..."):
+                # Télécharger les données
+                df_fib = yf.download(ticker_fib, period=period_fib, progress=False)
+                
+                if df_fib.empty:
+                    st.error("Aucune donnée disponible")
+                else:
+                    # S'assurer que les colonnes sont au bon format
+                    if isinstance(df_fib.columns, pd.MultiIndex):
+                        df_fib.columns = df_fib.columns.get_level_values(0)
+                    
+                    # Trouver le plus haut et le plus bas
+                    high_price = float(df_fib['High'].max())
+                    low_price = float(df_fib['Low'].min())
+                    current_price = float(df_fib['Close'].iloc[-1])
+                    
+                    # Trouver les dates
+                    high_date = df_fib['High'].idxmax()
+                    low_date = df_fib['Low'].idxmin()
+                    
+                    # Calculer la différence
+                    diff = high_price - low_price
+                    
+                    # Niveaux de Fibonacci
+                    if "Baisse" in fib_type:
+                        # Retracement (depuis le haut)
+                        levels = {
+                            "0.0% (Haut)": high_price,
+                            "23.6%": high_price - (diff * 0.236),
+                            "38.2%": high_price - (diff * 0.382),
+                            "50.0%": high_price - (diff * 0.500),
+                            "61.8%": high_price - (diff * 0.618),
+                            "78.6%": high_price - (diff * 0.786),
+                            "100.0% (Bas)": low_price
+                        }
+                        title_chart = "RETRACEMENT FIBONACCI (BAISSE)"
+                    else:
+                        # Extension (depuis le bas)
+                        levels = {
+                            "0.0% (Bas)": low_price,
+                            "23.6%": low_price + (diff * 0.236),
+                            "38.2%": low_price + (diff * 0.382),
+                            "50.0%": low_price + (diff * 0.500),
+                            "61.8%": low_price + (diff * 0.618),
+                            "78.6%": low_price + (diff * 0.786),
+                            "100.0% (Haut)": high_price,
+                            "127.2%": low_price + (diff * 1.272),
+                            "161.8%": low_price + (diff * 1.618)
+                        }
+                        title_chart = "EXTENSION FIBONACCI (HAUSSE)"
+                    
+                    # Affichage des infos clés
+                    st.markdown("### 📊 NIVEAUX CLÉS")
+                    col_info1, col_info2, col_info3, col_info4 = st.columns(4)
+                    
+                    with col_info1:
+                        st.metric("Prix Actuel", f"${current_price:.2f}")
+                    with col_info2:
+                        st.metric("Plus Haut", f"${high_price:.2f}", f"{high_date.strftime('%Y-%m-%d')}")
+                    with col_info3:
+                        st.metric("Plus Bas", f"${low_price:.2f}", f"{low_date.strftime('%Y-%m-%d')}")
+                    with col_info4:
+                        range_pct = ((high_price - low_price) / low_price) * 100
+                        st.metric("Range", f"{range_pct:.1f}%")
+                    
+                    st.markdown("---")
+                    
+                    # Tableau des niveaux Fibonacci
+                    st.markdown("### 📐 NIVEAUX FIBONACCI")
+                    
+                    fib_data = []
+                    for level_name, level_price in levels.items():
+                        distance_from_current = ((level_price - current_price) / current_price) * 100
+                        
+                        # Déterminer si c'est support ou résistance
+                        if level_price > current_price:
+                            sr_type = "🔴 RÉSISTANCE"
+                            color = "#ff4444"
+                        elif level_price < current_price:
+                            sr_type = "🟢 SUPPORT"
+                            color = "#00ff00"
+                        else:
+                            sr_type = "🎯 PRIX ACTUEL"
+                            color = "#ff9800"
+                        
+                        fib_data.append({
+                            "Niveau": level_name,
+                            "Prix": f"${level_price:.2f}",
+                            "Distance": f"{distance_from_current:+.2f}%",
+                            "Type": sr_type,
+                            "Prix_Num": level_price,
+                            "Color": color
+                        })
+                    
+                    df_fib_levels = pd.DataFrame(fib_data)
+                    
+                    # Afficher le tableau avec style
+                    for idx, row in df_fib_levels.iterrows():
+                        st.markdown(f"""
+                            <div style='padding: 12px; background: {row['Color']}22; border-left: 4px solid {row['Color']}; border-radius: 5px; margin: 8px 0;'>
+                                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                                    <div>
+                                        <b style='color: {row['Color']}; font-size: 16px;'>{row['Niveau']}</b>
+                                        <span style='color: #ccc; margin-left: 20px;'>{row['Type']}</span>
+                                    </div>
+                                    <div style='text-align: right;'>
+                                        <b style='color: white; font-size: 18px;'>{row['Prix']}</b>
+                                        <span style='color: #aaa; margin-left: 15px;'>{row['Distance']}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    
+                    # Graphique avec les niveaux
+                    st.markdown("### 📈 GRAPHIQUE AVEC NIVEAUX FIBONACCI")
+                    
+                    fig_fib = go.Figure()
+                    
+                    # Candlestick
+                    fig_fib.add_trace(go.Candlestick(
+                        x=df_fib.index,
+                        open=df_fib['Open'],
+                        high=df_fib['High'],
+                        low=df_fib['Low'],
+                        close=df_fib['Close'],
+                        name=ticker_fib
+                    ))
+                    
+                    # Ajouter les niveaux Fibonacci
+                    colors_fib = ['#ff0000', '#ff6b6b', '#ffd93d', '#6bcf7f', '#4ecdc4', '#45b7d1', '#96ceb4']
+                    
+                    for idx, (level_name, level_price) in enumerate(levels.items()):
+                        color = colors_fib[idx % len(colors_fib)]
+                        
+                        fig_fib.add_hline(
+                            y=level_price,
+                            line_dash="dash",
+                            line_color=color,
+                            line_width=2,
+                            annotation_text=f"{level_name}: ${level_price:.2f}",
+                            annotation_position="right",
+                            annotation=dict(
+                                font=dict(size=11, color=color),
+                                bgcolor="rgba(0,0,0,0.7)"
+                            )
+                        )
+                    
+                    # Ligne du prix actuel
+                    fig_fib.add_hline(
+                        y=current_price,
+                        line_dash="solid",
+                        line_color="#ff9800",
+                        line_width=3,
+                        annotation_text=f"Prix Actuel: ${current_price:.2f}",
+                        annotation_position="left",
+                        annotation=dict(
+                            font=dict(size=12, color="#ff9800", family="Arial Black"),
+                            bgcolor="rgba(0,0,0,0.9)"
+                        )
+                    )
+                    
+                    fig_fib.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor='black',
+                        plot_bgcolor='black',
+                        title=title_chart,
+                        xaxis_rangeslider_visible=False,
+                        height=700,
+                        xaxis_title="Date",
+                        yaxis_title="Prix ($)"
+                    )
+                    
+                    st.plotly_chart(fig_fib, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # Analyse et recommandations
+                    st.markdown("### 💡 ANALYSE")
+                    
+                    # Trouver le niveau Fibonacci le plus proche
+                    closest_level = min(levels.items(), key=lambda x: abs(x[1] - current_price))
+                    distance_to_closest = abs(closest_level[1] - current_price)
+                    distance_pct = (distance_to_closest / current_price) * 100
+                    
+                    # Trouver les niveaux de support et résistance les plus proches
+                    resistances = [price for price in levels.values() if price > current_price]
+                    supports = [price for price in levels.values() if price < current_price]
+                    
+                    next_resistance = min(resistances) if resistances else None
+                    next_support = max(supports) if supports else None
+                    
+                    col_analysis1, col_analysis2 = st.columns(2)
+                    
+                    with col_analysis1:
+                        st.markdown("#### 🎯 NIVEAU LE PLUS PROCHE")
+                        st.write(f"**{closest_level[0]}** à **${closest_level[1]:.2f}**")
+                        st.write(f"Distance: **{distance_pct:.2f}%**")
+                        
+                        if distance_pct < 1:
+                            st.success("🎯 Prix très proche d'un niveau clé !")
+                        elif distance_pct < 3:
+                            st.info("📍 Prix proche d'un niveau Fibonacci")
+                        else:
+                            st.warning("📊 Prix entre deux niveaux")
+                    
+                    with col_analysis2:
+                        st.markdown("#### 🎚️ SUPPORT / RÉSISTANCE")
+                        
+                        if next_resistance:
+                            resistance_dist = ((next_resistance - current_price) / current_price) * 100
+                            st.write(f"🔴 **Prochaine résistance:** ${next_resistance:.2f}")
+                            st.write(f"   Distance: +{resistance_dist:.2f}%")
+                        
+                        if next_support:
+                            support_dist = ((current_price - next_support) / current_price) * 100
+                            st.write(f"🟢 **Prochain support:** ${next_support:.2f}")
+                            st.write(f"   Distance: -{support_dist:.2f}%")
+                    
+                    # Stratégie suggérée
+                    st.markdown("---")
+                    st.markdown("#### 📋 STRATÉGIE SUGGÉRÉE")
+                    
+                    if next_support and next_resistance:
+                        support_dist_pct = ((current_price - next_support) / current_price) * 100
+                        resistance_dist_pct = ((next_resistance - current_price) / current_price) * 100
+                        
+                        st.markdown(f"""
+                        <div style='padding: 20px; background: #1a1a1a; border-radius: 10px; border: 2px solid #ff9800;'>
+                            <h4 style='color: #ff9800; margin-top: 0;'>📊 Zone de Trading Fibonacci</h4>
+                            <ul style='color: #ccc;'>
+                                <li><b>Achat potentiel:</b> Près du support à ${next_support:.2f} (-{support_dist_pct:.1f}%)</li>
+                                <li><b>Objectif:</b> Résistance à ${next_resistance:.2f} (+{resistance_dist_pct:.1f}%)</li>
+                                <li><b>Stop Loss:</b> En-dessous du prochain niveau Fibonacci inférieur</li>
+                                <li><b>Ratio Risk/Reward:</b> {(resistance_dist_pct/support_dist_pct):.2f}:1</li>
+                            </ul>
+                            <p style='color: #999; font-size: 12px; margin-bottom: 0;'>⚠️ Ceci n'est pas un conseil financier. Faites vos propres recherches.</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+        except Exception as e:
+            st.error(f"Erreur: {str(e)}")
             import traceback
             st.code(traceback.format_exc())
