@@ -965,39 +965,54 @@ if outil == "ANALYSEUR PRO":
         st.error(f"⚠️ IMPOSSIBLE DE CHARGER LES DONNÉES POUR {ticker}")
 
 # ==========================================
-# OUTIL 2 : MODE DUEL (FIXED PERSISTENCE)
+# OUTIL : MODE DUEL - VERSION AMÉLIORÉE ⚔️
 # ==========================================
 elif outil == "MODE DUEL":
-    st.title("⚔️ EQUITY DUEL : PRO COMPARISON")
+    st.markdown("""
+        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
+            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>⚔️ EQUITY DUEL</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Comparaison Professionnelle d'Actions</p>
+        </div>
+    """, unsafe_allow_html=True)
     
-    # Initialisation de la mémoire du duel si elle n'existe pas
+    # Initialisation de la mémoire du duel
     if 'duel_result' not in st.session_state:
         st.session_state.duel_result = None
+    if 'duel_history' not in st.session_state:
+        st.session_state.duel_history = []
 
-    c1, c2 = st.columns(2)
-    with c1:
-        t1 = st.text_input("TICKER 1", value="MC.PA").upper()
-    with c2:
-        t2 = st.text_input("TICKER 2", value="RMS.PA").upper()
+    # Input amélioré
+    col_input1, col_input2, col_input3 = st.columns([2, 2, 1])
+    with col_input1:
+        t1 = st.text_input("🔵 TICKER 1", value="MC.PA", key="duel_t1").upper()
+    with col_input2:
+        t2 = st.text_input("🔴 TICKER 2", value="RMS.PA", key="duel_t2").upper()
+    with col_input3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        run_duel = st.button("⚔️ DUEL !", key="run_duel", use_container_width=True)
 
-    # Si on clique sur le bouton, on calcule et on enregistre dans le session_state
-    if st.button("RUN DEEP ANALYSIS"):
-        def get_full_data(t):
-            ticker_id = trouver_ticker(t)
-            i = get_ticker_info(ticker_id)
-            hist = get_ticker_history(ticker_id, period="1y")
-            p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
-            
-            # Fix prix pour actions européennes
-            if p == 0 or p is None:
-                try:
-                    h = yf.Ticker(ticker_id).history(period="1d")
-                    if not h.empty:
-                        p = float(h['Close'].iloc[-1])
-                except:
+    # Fonction pour récupérer les données complètes
+    def get_full_data(t):
+        """Récupère toutes les données d'un ticker avec fixes"""
+        ticker_id = trouver_ticker(t)
+        ticker_obj = yf.Ticker(ticker_id)
+        i = ticker_obj.info
+        hist = ticker_obj.history(period="1y")
+        
+        # Prix actuel avec fix
+        p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
+        if p == 0 or p is None or p < 0.01:
+            try:
+                h = ticker_obj.history(period="5d")
+                if not h.empty:
+                    p = float(h['Close'].iloc[-1])
+                else:
                     p = 1
-            
-            # Utiliser ValuationCalculator pour consensus 4 méthodes
+            except:
+                p = 1
+        
+        # Valeur consensus via ValuationCalculator
+        try:
             calc = ValuationCalculator(ticker_id)
             valuation_results = calc.get_comprehensive_valuation()
             
@@ -1010,53 +1025,328 @@ elif outil == "MODE DUEL":
                 if eps > 0 and bv > 0:
                     v = (22.5 * eps * bv) ** 0.5
                 else:
-                    v = 0
-            
-            return {
-                "nom": i.get('shortName', t), "prix": p, "valeur": v,
-                "yield": (i.get('dividendYield', 0) or 0) * 100,
-                "per": i.get('trailingPE', 0), "marge": (i.get('profitMargins', 0) or 0) * 100,
-                "hist": hist, "potential": ((v - p) / p) * 100 if p > 0 and v > 0 else 0
-            }
+                    v = p * 1.2
+        except:
+            v = p * 1.2
+        
+        # Dividende avec FIX (problème commun avec yfinance)
+        div_yield_raw = i.get('dividendYield', 0)
+        if div_yield_raw is None:
+            div_yield_raw = 0
+        
+        # Fix: Si le dividende est > 10%, c'est probablement déjà en pourcentage
+        if div_yield_raw > 10:
+            div_yield = div_yield_raw  # Déjà en %
+        elif div_yield_raw > 1:
+            div_yield = div_yield_raw  # Entre 1 et 10, probablement déjà en %
+        else:
+            div_yield = div_yield_raw * 100  # Conversion décimal → %
+        
+        # Sécurité : plafonner à 20% (au-delà c'est suspect)
+        if div_yield > 20:
+            div_yield = div_yield / 100  # Probablement une erreur de format
+        
+        # Autres métriques
+        per = i.get('trailingPE') or i.get('forwardPE', 0)
+        marge = (i.get('profitMargins', 0) or 0) * 100
+        roe = (i.get('returnOnEquity', 0) or 0) * 100
+        debt_equity = i.get('debtToEquity', 0) or 0
+        pb_ratio = i.get('priceToBook', 0) or 0
+        market_cap = i.get('marketCap', 0) or 0
+        beta = i.get('beta', 0) or 0
+        revenue_growth = (i.get('revenueGrowth', 0) or 0) * 100
+        
+        # Calculs
+        potential = ((v - p) / p) * 100 if p > 0 and v > 0 else 0
+        
+        # Performance historique
+        if not hist.empty:
+            perf_1m = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-21]) - 1) * 100 if len(hist) >= 21 else 0
+            perf_3m = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-63]) - 1) * 100 if len(hist) >= 63 else 0
+            perf_1y = ((hist['Close'].iloc[-1] / hist['Close'].iloc[0]) - 1) * 100
+            volatility = hist['Close'].pct_change().std() * 100 * (252 ** 0.5)  # Annualisée
+        else:
+            perf_1m = perf_3m = perf_1y = volatility = 0
+        
+        return {
+            "ticker": ticker_id,
+            "nom": i.get('shortName', t),
+            "nom_complet": i.get('longName', i.get('shortName', t)),
+            "secteur": i.get('sector', 'N/A'),
+            "industrie": i.get('industry', 'N/A'),
+            "prix": p,
+            "valeur": v,
+            "potential": potential,
+            "yield": div_yield,
+            "per": per,
+            "marge": marge,
+            "roe": roe,
+            "debt_equity": debt_equity,
+            "pb_ratio": pb_ratio,
+            "market_cap": market_cap,
+            "beta": beta,
+            "revenue_growth": revenue_growth,
+            "perf_1m": perf_1m,
+            "perf_3m": perf_3m,
+            "perf_1y": perf_1y,
+            "volatility": volatility,
+            "hist": hist
+        }
 
+    # Lancement du duel
+    if run_duel:
         try:
-            with st.spinner('Extracting Market Data...'):
+            with st.spinner('⏳ Analyse des deux actifs en cours...'):
                 res_d1 = get_full_data(t1)
                 res_d2 = get_full_data(t2)
-                # On stocke tout dans la mémoire
                 st.session_state.duel_result = (res_d1, res_d2)
+                
+                # Ajouter à l'historique
+                st.session_state.duel_history.append({
+                    'date': datetime.now(),
+                    'ticker1': t1,
+                    'ticker2': t2
+                })
+                
+                st.success("✅ Analyse terminée !")
         except Exception as e:
-            st.error(f"ENGINE ERROR : {str(e)}")
+            st.error(f"❌ Erreur lors de l'analyse: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
 
-    # AFFICHAGE (indépendant du bouton, basé sur la mémoire)
+    # AFFICHAGE DES RÉSULTATS
     if st.session_state.duel_result:
         d1, d2 = st.session_state.duel_result
         
-        col_a, col_vs, col_b = st.columns([2, 1, 2])
-        with col_a:
-            st.markdown(f"### {d1['nom']}")
-            st.markdown(f"<h1 style='color:#00ff00; margin:0;'>{d1['prix']:.2f}</h1>", unsafe_allow_html=True)
-        with col_vs:
-            st.markdown("<h1 style='text-align:center; color:#ff9800; padding-top:20px;'>VS</h1>", unsafe_allow_html=True)
-        with col_b:
-            st.markdown(f"### {d2['nom']}")
-            st.markdown(f"<h1 style='color:#00ff00; margin:0; text-align:right;'>{d2['prix']:.2f}</h1>", unsafe_allow_html=True)
-
-        st.table(pd.DataFrame({
-            "INDICATOR": ["GRAHAM VALUE", "UPSIDE POTENTIAL", "P/E RATIO", "DIV. YIELD", "PROFIT MARGIN"],
-            d1['nom']: [f"{d1['valeur']:.2f}", f"{d1['potential']:+.2f}%", f"{d1['per']:.2f}", f"{d1['yield']:.2f}%", f"{d1['marge']:.2f}%"],
-            d2['nom']: [f"{d2['valeur']:.2f}", f"{d2['potential']:+.2f}%", f"{d2['per']:.2f}", f"{d2['yield']:.2f}%", f"{d2['marge']:.2f}%"]
-        }))
-
-        # Graphique
-        fig = go.Figure()
-        for d in [d1, d2]:
-            if not d['hist'].empty:
-                norm_price = (d['hist']['Close'] / d['hist']['Close'].iloc[0]) * 100
-                fig.add_trace(go.Scatter(x=d['hist'].index, y=norm_price, name=d['nom']))
+        st.markdown("---")
         
-        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#ff9800"), height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        # Header du duel
+        col_a, col_vs, col_b = st.columns([2, 1, 2])
+        
+        with col_a:
+            st.markdown(f"""
+                <div style='text-align: center; padding: 20px; background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%); border-radius: 10px; border: 3px solid #2196f3;'>
+                    <h2 style='color: #fff; margin: 0;'>🔵 {d1['nom']}</h2>
+                    <p style='color: #ccc; font-size: 12px; margin: 5px 0;'>{d1['secteur']}</p>
+                    <h1 style='color: #00ff00; margin: 10px 0; font-size: 42px;'>${d1['prix']:.2f}</h1>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col_vs:
+            st.markdown("""
+                <div style='text-align: center; padding-top: 30px;'>
+                    <h1 style='color: #ff9800; font-size: 48px; margin: 0;'>⚔️</h1>
+                    <p style='color: #ff9800; font-size: 16px;'>VS</p>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col_b:
+            st.markdown(f"""
+                <div style='text-align: center; padding: 20px; background: linear-gradient(135deg, #c62828 0%, #f44336 100%); border-radius: 10px; border: 3px solid #ef5350;'>
+                    <h2 style='color: #fff; margin: 0;'>🔴 {d2['nom']}</h2>
+                    <p style='color: #ccc; font-size: 12px; margin: 5px 0;'>{d2['secteur']}</p>
+                    <h1 style='color: #00ff00; margin: 10px 0; font-size: 42px;'>${d2['prix']:.2f}</h1>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Tableau comparatif amélioré
+        st.markdown("### 📊 COMPARAISON DÉTAILLÉE")
+        
+        comparison_data = {
+            "INDICATEUR": [
+                "💰 Market Cap",
+                "📈 Valeur Intrinsèque",
+                "🎯 Potentiel (%)",
+                "📊 P/E Ratio",
+                "💎 P/B Ratio",
+                "💵 Dividende (%)",
+                "📈 Marge Profit (%)",
+                "💪 ROE (%)",
+                "🏦 Dette/Equity",
+                "⚡ Beta",
+                "📈 Croissance CA (%)",
+                "📊 Perf 1M (%)",
+                "📊 Perf 3M (%)",
+                "📊 Perf 1Y (%)",
+                "📉 Volatilité (%)"
+            ],
+            f"🔵 {d1['nom']}": [
+                f"${d1['market_cap']/1e9:.2f}B" if d1['market_cap'] > 0 else "N/A",
+                f"${d1['valeur']:.2f}",
+                f"{d1['potential']:+.2f}%",
+                f"{d1['per']:.2f}" if d1['per'] else "N/A",
+                f"{d1['pb_ratio']:.2f}" if d1['pb_ratio'] else "N/A",
+                f"{d1['yield']:.2f}%",
+                f"{d1['marge']:.2f}%",
+                f"{d1['roe']:.2f}%",
+                f"{d1['debt_equity']:.0f}" if d1['debt_equity'] else "N/A",
+                f"{d1['beta']:.2f}" if d1['beta'] else "N/A",
+                f"{d1['revenue_growth']:.2f}%",
+                f"{d1['perf_1m']:+.2f}%",
+                f"{d1['perf_3m']:+.2f}%",
+                f"{d1['perf_1y']:+.2f}%",
+                f"{d1['volatility']:.2f}%"
+            ],
+            f"🔴 {d2['nom']}": [
+                f"${d2['market_cap']/1e9:.2f}B" if d2['market_cap'] > 0 else "N/A",
+                f"${d2['valeur']:.2f}",
+                f"{d2['potential']:+.2f}%",
+                f"{d2['per']:.2f}" if d2['per'] else "N/A",
+                f"{d2['pb_ratio']:.2f}" if d2['pb_ratio'] else "N/A",
+                f"{d2['yield']:.2f}%",
+                f"{d2['marge']:.2f}%",
+                f"{d2['roe']:.2f}%",
+                f"{d2['debt_equity']:.0f}" if d2['debt_equity'] else "N/A",
+                f"{d2['beta']:.2f}" if d2['beta'] else "N/A",
+                f"{d2['revenue_growth']:.2f}%",
+                f"{d2['perf_1m']:+.2f}%",
+                f"{d2['perf_3m']:+.2f}%",
+                f"{d2['perf_1y']:+.2f}%",
+                f"{d2['volatility']:.2f}%"
+            ]
+        }
+        
+        df_comparison = pd.DataFrame(comparison_data)
+        st.dataframe(df_comparison, use_container_width=True, hide_index=True)
+        
+        st.markdown("---")
+        
+        # Graphique de performance relative
+        st.markdown("### 📈 PERFORMANCE RELATIVE (1 AN)")
+        
+        if not d1['hist'].empty and not d2['hist'].empty:
+            fig = go.Figure()
+            
+            # Normaliser à 100 pour comparaison
+            norm_d1 = (d1['hist']['Close'] / d1['hist']['Close'].iloc[0]) * 100
+            norm_d2 = (d2['hist']['Close'] / d2['hist']['Close'].iloc[0]) * 100
+            
+            fig.add_trace(go.Scatter(
+                x=d1['hist'].index,
+                y=norm_d1,
+                name=f"🔵 {d1['nom']}",
+                line=dict(color='#2196f3', width=3),
+                fill='tozeroy',
+                fillcolor='rgba(33, 150, 243, 0.1)'
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=d2['hist'].index,
+                y=norm_d2,
+                name=f"🔴 {d2['nom']}",
+                line=dict(color='#f44336', width=3),
+                fill='tozeroy',
+                fillcolor='rgba(244, 67, 54, 0.1)'
+            ))
+            
+            # Ligne de base à 100
+            fig.add_hline(
+                y=100,
+                line_dash="dash",
+                line_color="#ff9800",
+                annotation_text="Base 100",
+                annotation_position="right"
+            )
+            
+            fig.update_layout(
+                paper_bgcolor='#0d0d0d',
+                plot_bgcolor='#0d0d0d',
+                font=dict(color='#ff9800'),
+                height=500,
+                hovermode='x unified',
+                xaxis=dict(
+                    title="Date",
+                    gridcolor='#333',
+                    showgrid=True
+                ),
+                yaxis=dict(
+                    title="Performance (%)",
+                    gridcolor='#333',
+                    showgrid=True
+                ),
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.01,
+                    bgcolor='rgba(0,0,0,0.5)'
+                )
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Verdict automatique
+        st.markdown("### 🏆 VERDICT")
+        
+        # Calcul du score pour chaque action
+        def calculate_score(d):
+            score = 0
+            # Potentiel
+            if d['potential'] > 30: score += 3
+            elif d['potential'] > 15: score += 2
+            elif d['potential'] > 0: score += 1
+            
+            # P/E
+            if d['per'] and d['per'] < 15: score += 2
+            elif d['per'] and d['per'] < 25: score += 1
+            
+            # Dividende
+            if d['yield'] > 3: score += 2
+            elif d['yield'] > 1: score += 1
+            
+            # ROE
+            if d['roe'] > 20: score += 2
+            elif d['roe'] > 15: score += 1
+            
+            # Dette
+            if d['debt_equity'] < 50: score += 2
+            elif d['debt_equity'] < 100: score += 1
+            
+            # Performance
+            if d['perf_1y'] > 20: score += 2
+            elif d['perf_1y'] > 0: score += 1
+            
+            return score
+        
+        score1 = calculate_score(d1)
+        score2 = calculate_score(d2)
+        
+        col_verdict1, col_verdict2 = st.columns(2)
+        
+        with col_verdict1:
+            color1 = "#00ff00" if score1 > score2 else "#ff9800" if score1 == score2 else "#ff4444"
+            st.markdown(f"""
+                <div style='text-align: center; padding: 20px; background: {color1}22; border: 3px solid {color1}; border-radius: 10px;'>
+                    <h3 style='color: {color1};'>🔵 {d1['nom']}</h3>
+                    <h1 style='color: {color1}; font-size: 48px; margin: 10px 0;'>{score1}/14</h1>
+                    <p style='color: white;'>{"🏆 GAGNANT" if score1 > score2 else "🤝 ÉGALITÉ" if score1 == score2 else "👎 PERDANT"}</p>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col_verdict2:
+            color2 = "#00ff00" if score2 > score1 else "#ff9800" if score2 == score1 else "#ff4444"
+            st.markdown(f"""
+                <div style='text-align: center; padding: 20px; background: {color2}22; border: 3px solid {color2}; border-radius: 10px;'>
+                    <h3 style='color: {color2};'>🔴 {d2['nom']}</h3>
+                    <h1 style='color: {color2}; font-size: 48px; margin: 10px 0;'>{score2}/14</h1>
+                    <p style='color: white;'>{"🏆 GAGNANT" if score2 > score1 else "🤝 ÉGALITÉ" if score2 == score1 else "👎 PERDANT"}</p>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        # Recommandation finale
+        st.markdown("---")
+        if score1 > score2:
+            st.success(f"✅ **RECOMMANDATION:** {d1['nom']} présente de meilleurs fondamentaux")
+        elif score2 > score1:
+            st.success(f"✅ **RECOMMANDATION:** {d2['nom']} présente de meilleurs fondamentaux")
+        else:
+            st.info(f"⚖️ **RECOMMANDATION:** Les deux actions sont équivalentes selon nos critères")
+        
+        st.caption("⚠️ Cette analyse est automatique et ne constitue pas un conseil d'investissement. DYOR.")
            
 # ==========================================
 # OUTIL 3 : MARKET MONITOR
