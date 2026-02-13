@@ -642,7 +642,7 @@ components.html(marquee_html, height=60)
 # st.markdown("---") # Tu peux garder ou enlever cette ligne selon tes préférences visuelles
 
 # ==========================================
-# OUTIL 1 : ANALYSEUR PRO
+# OUTIL 1 : ANALYSEUR PRO (CORRIGÉ)
 # ==========================================
 if outil == "ANALYSEUR PRO":
     nom_entree = st.sidebar.text_input("TICKER SEARCH", value="NVIDIA")
@@ -652,6 +652,16 @@ if outil == "ANALYSEUR PRO":
     if info and ('currentPrice' in info or 'regularMarketPrice' in info):
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+        
+        # Fix pour les actions européennes
+        if prix == 0 or prix is None:
+            try:
+                hist = yf.Ticker(ticker).history(period="1d")
+                if not hist.empty:
+                    prix = float(hist['Close'].iloc[-1])
+            except:
+                prix = 1
+        
         devise = info.get('currency', 'EUR')
         secteur = info.get('sector', 'N/A')
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
@@ -660,15 +670,22 @@ if outil == "ANALYSEUR PRO":
         div_rate = info.get('dividendRate') or info.get('trailingAnnualDividendRate') or 0
         payout = (info.get('payoutRatio') or 0) * 100
         cash_action = info.get('totalCashPerShare') or 0
-        val_theorique = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
-        marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 else 0
+        
+        # FORMULE DE GRAHAM CORRIGÉE
+        book_value = info.get('bookValue', 0)
+        if bpa > 0 and book_value > 0:
+            val_theorique = (22.5 * bpa * book_value) ** 0.5
+        else:
+            val_theorique = 0
+        
+        marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 and val_theorique > 0 else 0
 
         st.title(f"» {nom} // {ticker}")
 
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("LAST PRICE", f"{prix:.2f} {devise}")
-        c2.metric("GRAHAM VAL", f"{val_theorique:.2f} {devise}")
-        c3.metric("POTENTIAL", f"{marge_pourcent:+.2f}%")
+        c2.metric("GRAHAM VAL", f"{val_theorique:.2f} {devise}" if val_theorique > 0 else "N/A")
+        c3.metric("POTENTIAL", f"{marge_pourcent:+.2f}%" if val_theorique > 0 else "N/A")
         c4.metric("SECTOR", secteur)
 
         st.markdown("---")
@@ -681,6 +698,7 @@ if outil == "ANALYSEUR PRO":
         with f1:
             st.write(f"**EPS (BPA) :** {bpa:.2f} {devise}")
             st.write(f"**P/E RATIO :** {per:.2f}")
+            st.write(f"**BOOK VALUE :** {book_value:.2f} {devise}")
         with f2:
             st.write(f"**DEBT/EQUITY :** {dette_equity if dette_equity is not None else 'N/A'} %")
             st.write(f"**DIV. YIELD :** {(div_rate/prix*100 if prix>0 else 0):.2f} %")
@@ -706,6 +724,7 @@ if outil == "ANALYSEUR PRO":
         if 10 < payout <= 80: score += 4; positifs.append("» SUSTAINABLE DIVIDEND [+4]")
         elif payout > 95: score -= 4; negatifs.append("!! PAYOUT RISK [-4]")
         if marge_pourcent > 30: score += 5; positifs.append("» GRAHAM DISCOUNT [+5]")
+        elif marge_pourcent > 15: score += 3; positifs.append("» MODERATE DISCOUNT [+3]")
 
         score_f = min(20, max(0, score))
         cs, cd = st.columns([1, 2])
@@ -717,6 +736,26 @@ if outil == "ANALYSEUR PRO":
                 st.markdown(f'<div style="background:#002b00; color:#00ff00; border-left: 4px solid #00ff00; padding:10px; margin-bottom:5px;">{p}</div>', unsafe_allow_html=True)
             for n in negatifs: 
                 st.markdown(f'<div style="background:#2b0000; color:#ff0000; border-left: 4px solid #ff0000; padding:10px; margin-bottom:5px;">{n}</div>', unsafe_allow_html=True)
+        
+        # Info sur la formule Graham
+        with st.expander("ℹ️ À PROPOS DE LA VALEUR GRAHAM"):
+            st.markdown(f"""
+            **Formule de Benjamin Graham :**
+            
+            `Valeur intrinsèque = √(22.5 × EPS × Book Value)`
+            
+            **Calcul pour {ticker} :**
+            - EPS : {bpa:.2f} {devise}
+            - Book Value : {book_value:.2f} {devise}
+            - Valeur Graham : {val_theorique:.2f} {devise}
+            
+            **Interprétation :**
+            - **Prix < Valeur Graham** → Action sous-évaluée
+            - **Prix ≈ Valeur Graham** → Juste valorisation
+            - **Prix > Valeur Graham** → Action surévaluée
+            
+            ⚠️ Cette formule fonctionne mieux pour les actions "value" traditionnelles que pour les valeurs de croissance ou technologiques.
+            """)
 
         st.markdown("---")
         st.subheader(f"» NEWS FEED : {nom}")
@@ -759,6 +798,8 @@ if outil == "ANALYSEUR PRO":
                         st.link_button("VIEW ARCHIVE", entry.link)
         except Exception:
             st.error("ERROR FETCHING NEWS FEED.")
+    else:
+        st.error(f"⚠️ IMPOSSIBLE DE CHARGER LES DONNÉES POUR {ticker}")
 
 # ==========================================
 # OUTIL 2 : MODE DUEL (FIXED PERSISTENCE)
