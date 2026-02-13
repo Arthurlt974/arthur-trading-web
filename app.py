@@ -296,7 +296,8 @@ elif categorie == "BOITE À OUTILS":
         "CORRÉLATION DASH",
         "INTERETS COMPOSES",
         "ANALYSE TECHNIQUE PRO",
-        "FIBONACCI CALCULATOR"
+        "FIBONACCI CALCULATOR",
+        "BACKTESTING ENGINE"
         
     ])
 
@@ -2210,5 +2211,553 @@ elif outil == "FIBONACCI CALCULATOR":
                     
         except Exception as e:
             st.error(f"Erreur: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+
+# ==========================================
+# MODULE : BACKTESTING ENGINE
+# ==========================================
+
+elif outil == "BACKTESTING ENGINE":
+    st.markdown("## ⚡ BACKTESTING ENGINE")
+    st.info("Testez vos stratégies de trading sur données historiques")
+    
+    # Configuration
+    col_config1, col_config2, col_config3 = st.columns(3)
+    
+    with col_config1:
+        ticker_bt = st.text_input("TICKER", value="AAPL", key="bt_ticker").upper()
+    with col_config2:
+        period_bt = st.selectbox("PÉRIODE", ["6mo", "1y", "2y", "5y", "max"], index=1, key="bt_period")
+    with col_config3:
+        capital_bt = st.number_input("CAPITAL ($)", min_value=1000, value=10000, step=1000, key="bt_capital")
+    
+    st.markdown("---")
+    
+    # Choix de la stratégie
+    st.markdown("### 🎯 STRATÉGIE DE TRADING")
+    
+    col_strat1, col_strat2 = st.columns(2)
+    
+    with col_strat1:
+        strategy = st.selectbox(
+            "STRATÉGIE",
+            [
+                "RSI Oversold/Overbought",
+                "MACD Crossover",
+                "Moving Average Cross (Golden Cross)",
+                "Bollinger Bounce",
+                "Combinée (RSI + MACD)"
+            ],
+            key="bt_strategy"
+        )
+    
+    with col_strat2:
+        # Paramètres selon la stratégie
+        if "RSI" in strategy:
+            col_p1, col_p2 = st.columns(2)
+            with col_p1:
+                rsi_buy = st.slider("RSI Achat (<)", 20, 40, 30, key="bt_rsi_buy")
+            with col_p2:
+                rsi_sell = st.slider("RSI Vente (>)", 60, 80, 70, key="bt_rsi_sell")
+        elif "Bollinger" in strategy:
+            bb_period = st.slider("Période Bollinger", 10, 30, 20, key="bt_bb")
+        elif "Moving Average" in strategy:
+            col_p1, col_p2 = st.columns(2)
+            with col_p1:
+                ma_fast = st.slider("MA Rapide", 10, 50, 20, key="bt_ma_fast")
+            with col_p2:
+                ma_slow = st.slider("MA Lente", 50, 200, 50, key="bt_ma_slow")
+    
+    # Paramètres avancés
+    with st.expander("⚙️ PARAMÈTRES AVANCÉS"):
+        col_adv1, col_adv2, col_adv3 = st.columns(3)
+        with col_adv1:
+            stop_loss_pct = st.slider("Stop Loss (%)", 0, 20, 5, key="bt_sl")
+        with col_adv2:
+            take_profit_pct = st.slider("Take Profit (%)", 0, 50, 0, key="bt_tp", help="0 = désactivé")
+        with col_adv3:
+            commission_pct = st.slider("Commission (%)", 0.0, 1.0, 0.1, step=0.1, key="bt_comm")
+    
+    if st.button("🚀 LANCER LE BACKTEST", key="bt_launch"):
+        try:
+            with st.spinner("Backtesting en cours... Cela peut prendre quelques secondes."):
+                # Télécharger les données
+                df_bt = yf.download(ticker_bt, period=period_bt, progress=False)
+                
+                if df_bt.empty:
+                    st.error("Aucune donnée disponible")
+                else:
+                    # S'assurer que les colonnes sont au bon format
+                    if isinstance(df_bt.columns, pd.MultiIndex):
+                        df_bt.columns = df_bt.columns.get_level_values(0)
+                    
+                    # Calculer les indicateurs
+                    
+                    # RSI
+                    delta = df_bt['Close'].diff()
+                    gain = delta.copy()
+                    loss = delta.copy()
+                    gain[gain < 0] = 0
+                    loss[loss > 0] = 0
+                    loss = abs(loss)
+                    avg_gain = gain.rolling(window=14).mean()
+                    avg_loss = loss.rolling(window=14).mean()
+                    avg_loss = avg_loss.replace(0, 0.0001)
+                    rs = avg_gain / avg_loss
+                    df_bt['RSI'] = 100 - (100 / (1 + rs))
+                    
+                    # MACD
+                    exp1 = df_bt['Close'].ewm(span=12, adjust=False).mean()
+                    exp2 = df_bt['Close'].ewm(span=26, adjust=False).mean()
+                    df_bt['MACD'] = exp1 - exp2
+                    df_bt['Signal'] = df_bt['MACD'].ewm(span=9, adjust=False).mean()
+                    
+                    # Bollinger Bands
+                    if "Bollinger" in strategy:
+                        bb_p = bb_period
+                    else:
+                        bb_p = 20
+                    df_bt['BB_SMA'] = df_bt['Close'].rolling(window=bb_p).mean()
+                    df_bt['BB_std'] = df_bt['Close'].rolling(window=bb_p).std()
+                    df_bt['BB_Upper'] = df_bt['BB_SMA'] + (df_bt['BB_std'] * 2)
+                    df_bt['BB_Lower'] = df_bt['BB_SMA'] - (df_bt['BB_std'] * 2)
+                    
+                    # Moving Averages
+                    if "Moving Average" in strategy:
+                        df_bt['MA_Fast'] = df_bt['Close'].rolling(window=ma_fast).mean()
+                        df_bt['MA_Slow'] = df_bt['Close'].rolling(window=ma_slow).mean()
+                    else:
+                        df_bt['MA_Fast'] = df_bt['Close'].rolling(window=20).mean()
+                        df_bt['MA_Slow'] = df_bt['Close'].rolling(window=50).mean()
+                    
+                    # Supprimer les NaN
+                    df_bt = df_bt.dropna()
+                    
+                    # Variables de simulation
+                    capital = float(capital_bt)
+                    position = 0
+                    shares = 0
+                    entry_price = 0
+                    trades = []
+                    equity_curve = []
+                    
+                    # Boucle de backtesting
+                    for i in range(1, len(df_bt)):
+                        row = df_bt.iloc[i]
+                        prev_row = df_bt.iloc[i-1]
+                        
+                        current_price = float(row['Close'])
+                        current_equity = capital if position == 0 else (shares * current_price)
+                        equity_curve.append({'Date': row.name, 'Equity': current_equity})
+                        
+                        # Vérifier Stop Loss et Take Profit si en position
+                        if position == 1 and entry_price > 0:
+                            # Stop Loss
+                            if stop_loss_pct > 0:
+                                if current_price <= entry_price * (1 - stop_loss_pct/100):
+                                    # Vendre (Stop Loss)
+                                    capital = shares * current_price * (1 - commission_pct/100)
+                                    profit = capital - (shares * entry_price)
+                                    trades.append({
+                                        'Date': row.name,
+                                        'Type': 'STOP LOSS',
+                                        'Prix': current_price,
+                                        'Shares': shares,
+                                        'P/L': profit,
+                                        'P/L %': (profit / (shares * entry_price)) * 100,
+                                        'Capital': capital
+                                    })
+                                    position = 0
+                                    shares = 0
+                                    entry_price = 0
+                                    continue
+                            
+                            # Take Profit
+                            if take_profit_pct > 0:
+                                if current_price >= entry_price * (1 + take_profit_pct/100):
+                                    # Vendre (Take Profit)
+                                    capital = shares * current_price * (1 - commission_pct/100)
+                                    profit = capital - (shares * entry_price)
+                                    trades.append({
+                                        'Date': row.name,
+                                        'Type': 'TAKE PROFIT',
+                                        'Prix': current_price,
+                                        'Shares': shares,
+                                        'P/L': profit,
+                                        'P/L %': (profit / (shares * entry_price)) * 100,
+                                        'Capital': capital
+                                    })
+                                    position = 0
+                                    shares = 0
+                                    entry_price = 0
+                                    continue
+                        
+                        # Signaux de trading selon la stratégie
+                        buy_signal = False
+                        sell_signal = False
+                        
+                        if strategy == "RSI Oversold/Overbought":
+                            if float(row['RSI']) < rsi_buy and position == 0:
+                                buy_signal = True
+                            elif float(row['RSI']) > rsi_sell and position == 1:
+                                sell_signal = True
+                        
+                        elif strategy == "MACD Crossover":
+                            if float(row['MACD']) > float(row['Signal']) and float(prev_row['MACD']) <= float(prev_row['Signal']) and position == 0:
+                                buy_signal = True
+                            elif float(row['MACD']) < float(row['Signal']) and float(prev_row['MACD']) >= float(prev_row['Signal']) and position == 1:
+                                sell_signal = True
+                        
+                        elif strategy == "Moving Average Cross (Golden Cross)":
+                            if float(row['MA_Fast']) > float(row['MA_Slow']) and float(prev_row['MA_Fast']) <= float(prev_row['MA_Slow']) and position == 0:
+                                buy_signal = True
+                            elif float(row['MA_Fast']) < float(row['MA_Slow']) and float(prev_row['MA_Fast']) >= float(prev_row['MA_Slow']) and position == 1:
+                                sell_signal = True
+                        
+                        elif strategy == "Bollinger Bounce":
+                            if current_price <= float(row['BB_Lower']) and position == 0:
+                                buy_signal = True
+                            elif current_price >= float(row['BB_Upper']) and position == 1:
+                                sell_signal = True
+                        
+                        elif strategy == "Combinée (RSI + MACD)":
+                            # Achat si RSI < 35 ET MACD > Signal
+                            if float(row['RSI']) < 35 and float(row['MACD']) > float(row['Signal']) and position == 0:
+                                buy_signal = True
+                            # Vente si RSI > 65 OU MACD < Signal
+                            elif (float(row['RSI']) > 65 or float(row['MACD']) < float(row['Signal'])) and position == 1:
+                                sell_signal = True
+                        
+                        # Exécuter les trades
+                        if buy_signal and position == 0:
+                            # Acheter
+                            shares = (capital * (1 - commission_pct/100)) / current_price
+                            entry_price = current_price
+                            trades.append({
+                                'Date': row.name,
+                                'Type': 'BUY',
+                                'Prix': current_price,
+                                'Shares': shares,
+                                'P/L': 0,
+                                'P/L %': 0,
+                                'Capital': 0
+                            })
+                            capital = 0
+                            position = 1
+                        
+                        elif sell_signal and position == 1:
+                            # Vendre
+                            capital = shares * current_price * (1 - commission_pct/100)
+                            profit = capital - (shares * entry_price)
+                            trades.append({
+                                'Date': row.name,
+                                'Type': 'SELL',
+                                'Prix': current_price,
+                                'Shares': shares,
+                                'P/L': profit,
+                                'P/L %': (profit / (shares * entry_price)) * 100,
+                                'Capital': capital
+                            })
+                            position = 0
+                            shares = 0
+                            entry_price = 0
+                    
+                    # Valeur finale
+                    final_price = float(df_bt['Close'].iloc[-1])
+                    if position == 1:
+                        final_value = shares * final_price
+                    else:
+                        final_value = capital
+                    
+                    total_return = final_value - capital_bt
+                    total_return_pct = (total_return / capital_bt) * 100
+                    
+                    # Buy & Hold comparison
+                    buy_hold_shares = capital_bt / float(df_bt['Close'].iloc[0])
+                    buy_hold_value = buy_hold_shares * final_price
+                    buy_hold_return = buy_hold_value - capital_bt
+                    buy_hold_return_pct = (buy_hold_return / capital_bt) * 100
+                    
+                    # Calcul des métriques
+                    df_trades = pd.DataFrame(trades)
+                    
+                    if len(df_trades) > 0:
+                        completed_trades = df_trades[df_trades['Type'].isin(['SELL', 'STOP LOSS', 'TAKE PROFIT'])]
+                        
+                        if len(completed_trades) > 0:
+                            winning_trades = completed_trades[completed_trades['P/L'] > 0]
+                            losing_trades = completed_trades[completed_trades['P/L'] <= 0]
+                            
+                            num_trades = len(completed_trades)
+                            num_wins = len(winning_trades)
+                            num_losses = len(losing_trades)
+                            win_rate = (num_wins / num_trades * 100) if num_trades > 0 else 0
+                            
+                            avg_win = winning_trades['P/L'].mean() if len(winning_trades) > 0 else 0
+                            avg_loss = losing_trades['P/L'].mean() if len(losing_trades) > 0 else 0
+                            
+                            # Max Drawdown
+                            equity_series = pd.Series([e['Equity'] for e in equity_curve])
+                            running_max = equity_series.cummax()
+                            drawdown = ((equity_series - running_max) / running_max) * 100
+                            max_drawdown = drawdown.min()
+                            
+                            # Sharpe Ratio (simplifié)
+                            returns = equity_series.pct_change().dropna()
+                            if len(returns) > 0 and returns.std() > 0:
+                                sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
+                            else:
+                                sharpe = 0
+                        else:
+                            num_trades = 0
+                            win_rate = 0
+                            avg_win = 0
+                            avg_loss = 0
+                            max_drawdown = 0
+                            sharpe = 0
+                    else:
+                        num_trades = 0
+                        win_rate = 0
+                        avg_win = 0
+                        avg_loss = 0
+                        max_drawdown = 0
+                        sharpe = 0
+                    
+                    # Affichage des résultats
+                    st.markdown("---")
+                    st.markdown("## 📊 RÉSULTATS DU BACKTEST")
+                    
+                    # Performance globale
+                    col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+                    
+                    with col_res1:
+                        st.metric("Capital Initial", f"${capital_bt:,.0f}")
+                    with col_res2:
+                        st.metric("Capital Final", f"${final_value:,.0f}", f"{total_return_pct:+.2f}%")
+                    with col_res3:
+                        st.metric("Profit/Loss", f"${total_return:+,.0f}")
+                    with col_res4:
+                        st.metric("Nombre de Trades", num_trades)
+                    
+                    st.markdown("---")
+                    
+                    # Comparaison stratégie vs Buy & Hold
+                    st.markdown("### 📈 COMPARAISON : STRATÉGIE VS BUY & HOLD")
+                    
+                    col_comp1, col_comp2 = st.columns(2)
+                    
+                    with col_comp1:
+                        st.markdown(f"""
+                            <div style='padding: 20px; background: {'#00ff0022' if total_return_pct >= 0 else '#ff000022'}; border: 2px solid {'#00ff00' if total_return_pct >= 0 else '#ff0000'}; border-radius: 10px;'>
+                                <h3 style='color: {'#00ff00' if total_return_pct >= 0 else '#ff0000'}; margin: 0 0 10px 0;'>🤖 STRATÉGIE: {strategy}</h3>
+                                <p style='color: white; font-size: 28px; margin: 10px 0;'>{total_return_pct:+.2f}%</p>
+                                <p style='color: #ccc; font-size: 16px; margin: 0;'>${final_value:,.0f}</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_comp2:
+                        st.markdown(f"""
+                            <div style='padding: 20px; background: {'#00ff0022' if buy_hold_return_pct >= 0 else '#ff000022'}; border: 2px solid {'#00ff00' if buy_hold_return_pct >= 0 else '#ff0000'}; border-radius: 10px;'>
+                                <h3 style='color: {'#00ff00' if buy_hold_return_pct >= 0 else '#ff0000'}; margin: 0 0 10px 0;'>💎 BUY & HOLD</h3>
+                                <p style='color: white; font-size: 28px; margin: 10px 0;'>{buy_hold_return_pct:+.2f}%</p>
+                                <p style='color: #ccc; font-size: 16px; margin: 0;'>${buy_hold_value:,.0f}</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Performance
+                    performance_diff = total_return_pct - buy_hold_return_pct
+                    if performance_diff > 0:
+                        st.success(f"🎉 La stratégie a surperformé le Buy & Hold de **{performance_diff:.2f}%** !")
+                    elif performance_diff < 0:
+                        st.warning(f"⚠️ La stratégie a sous-performé le Buy & Hold de **{abs(performance_diff):.2f}%**")
+                    else:
+                        st.info("➡️ Performance égale au Buy & Hold")
+                    
+                    st.markdown("---")
+                    
+                    # Métriques de trading
+                    st.markdown("### 📉 MÉTRIQUES DE PERFORMANCE")
+                    
+                    col_metrics = st.columns(5)
+                    with col_metrics[0]:
+                        st.metric("Win Rate", f"{win_rate:.1f}%")
+                    with col_metrics[1]:
+                        st.metric("Trades Gagnants", num_wins)
+                    with col_metrics[2]:
+                        st.metric("Trades Perdants", num_losses)
+                    with col_metrics[3]:
+                        st.metric("Max Drawdown", f"{max_drawdown:.2f}%")
+                    with col_metrics[4]:
+                        st.metric("Sharpe Ratio", f"{sharpe:.2f}")
+                    
+                    st.markdown("---")
+                    
+                    col_avg = st.columns(3)
+                    with col_avg[0]:
+                        st.metric("Gain Moyen", f"${avg_win:+,.0f}")
+                    with col_avg[1]:
+                        st.metric("Perte Moyenne", f"${avg_loss:+,.0f}")
+                    with col_avg[2]:
+                        profit_factor = abs(avg_win / avg_loss) if avg_loss != 0 else 0
+                        st.metric("Profit Factor", f"{profit_factor:.2f}")
+                    
+                    st.markdown("---")
+                    
+                    # Equity Curve
+                    st.markdown("### 📈 EQUITY CURVE")
+                    
+                    df_equity = pd.DataFrame(equity_curve)
+                    
+                    fig_equity = go.Figure()
+                    
+                    # Equity curve
+                    fig_equity.add_trace(go.Scatter(
+                        x=df_equity['Date'],
+                        y=df_equity['Equity'],
+                        fill='tozeroy',
+                        name='Portfolio Value',
+                        line=dict(color='cyan', width=3),
+                        fillcolor='rgba(0, 255, 255, 0.1)'
+                    ))
+                    
+                    # Capital initial
+                    fig_equity.add_hline(
+                        y=capital_bt,
+                        line_dash="dash",
+                        line_color="orange",
+                        annotation_text="Capital Initial",
+                        annotation=dict(font=dict(size=10))
+                    )
+                    
+                    # Buy & Hold
+                    buy_hold_equity = []
+                    for date in df_equity['Date']:
+                        price_at_date = float(df_bt.loc[date, 'Close'])
+                        value = buy_hold_shares * price_at_date
+                        buy_hold_equity.append(value)
+                    
+                    fig_equity.add_trace(go.Scatter(
+                        x=df_equity['Date'],
+                        y=buy_hold_equity,
+                        name='Buy & Hold',
+                        line=dict(color='yellow', width=2, dash='dash')
+                    ))
+                    
+                    fig_equity.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor='black',
+                        plot_bgcolor='black',
+                        title="Évolution du Capital vs Buy & Hold",
+                        xaxis_title="Date",
+                        yaxis_title="Valeur ($)",
+                        height=500,
+                        hovermode='x unified'
+                    )
+                    
+                    st.plotly_chart(fig_equity, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # Graphique des trades sur le prix
+                    if len(trades) > 0:
+                        st.markdown("### 📍 POINTS D'ENTRÉE ET SORTIE")
+                        
+                        fig_trades = go.Figure()
+                        
+                        # Prix
+                        fig_trades.add_trace(go.Scatter(
+                            x=df_bt.index,
+                            y=df_bt['Close'],
+                            name='Prix',
+                            line=dict(color='white', width=2)
+                        ))
+                        
+                        # Ajouter indicateurs selon stratégie
+                        if "RSI" in strategy or "Combinée" in strategy:
+                            # On ne peut pas afficher RSI sur le même graphique, on skip
+                            pass
+                        if "Moving Average" in strategy:
+                            fig_trades.add_trace(go.Scatter(
+                                x=df_bt.index,
+                                y=df_bt['MA_Fast'],
+                                name=f'MA{ma_fast}',
+                                line=dict(color='cyan', width=1.5)
+                            ))
+                            fig_trades.add_trace(go.Scatter(
+                                x=df_bt.index,
+                                y=df_bt['MA_Slow'],
+                                name=f'MA{ma_slow}',
+                                line=dict(color='magenta', width=1.5)
+                            ))
+                        if "Bollinger" in strategy:
+                            fig_trades.add_trace(go.Scatter(
+                                x=df_bt.index,
+                                y=df_bt['BB_Upper'],
+                                name='BB Upper',
+                                line=dict(color='orange', width=1, dash='dash')
+                            ))
+                            fig_trades.add_trace(go.Scatter(
+                                x=df_bt.index,
+                                y=df_bt['BB_Lower'],
+                                name='BB Lower',
+                                line=dict(color='orange', width=1, dash='dash')
+                            ))
+                        
+                        # Points d'achat
+                        buys = df_trades[df_trades['Type'] == 'BUY']
+                        if len(buys) > 0:
+                            fig_trades.add_trace(go.Scatter(
+                                x=buys['Date'],
+                                y=buys['Prix'],
+                                mode='markers',
+                                name='ACHAT',
+                                marker=dict(color='green', size=12, symbol='triangle-up')
+                            ))
+                        
+                        # Points de vente
+                        sells = df_trades[df_trades['Type'].isin(['SELL', 'STOP LOSS', 'TAKE PROFIT'])]
+                        if len(sells) > 0:
+                            fig_trades.add_trace(go.Scatter(
+                                x=sells['Date'],
+                                y=sells['Prix'],
+                                mode='markers',
+                                name='VENTE',
+                                marker=dict(color='red', size=12, symbol='triangle-down')
+                            ))
+                        
+                        fig_trades.update_layout(
+                            template="plotly_dark",
+                            paper_bgcolor='black',
+                            plot_bgcolor='black',
+                            title=f"Stratégie: {strategy}",
+                            xaxis_title="Date",
+                            yaxis_title="Prix ($)",
+                            height=600,
+                            hovermode='x unified'
+                        )
+                        
+                        st.plotly_chart(fig_trades, use_container_width=True)
+                        
+                        st.markdown("---")
+                        
+                        # Tableau des trades
+                        st.markdown("### 📋 HISTORIQUE DES TRADES")
+                        
+                        # Formater le DataFrame pour l'affichage
+                        df_display = df_trades.copy()
+                        df_display['Date'] = df_display['Date'].dt.strftime('%Y-%m-%d')
+                        df_display['Prix'] = df_display['Prix'].apply(lambda x: f"${x:.2f}")
+                        df_display['Shares'] = df_display['Shares'].apply(lambda x: f"{x:.4f}")
+                        df_display['P/L'] = df_display['P/L'].apply(lambda x: f"${x:+,.2f}" if x != 0 else "-")
+                        df_display['P/L %'] = df_display['P/L %'].apply(lambda x: f"{x:+.2f}%" if x != 0 else "-")
+                        
+                        st.dataframe(df_display[['Date', 'Type', 'Prix', 'Shares', 'P/L', 'P/L %']], use_container_width=True, hide_index=True)
+                    
+                    else:
+                        st.warning("⚠️ Aucun trade n'a été exécuté avec cette stratégie sur la période sélectionnée.")
+                    
+        except Exception as e:
+            st.error(f"Erreur lors du backtesting: {str(e)}")
             import traceback
             st.code(traceback.format_exc())
