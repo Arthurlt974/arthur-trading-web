@@ -2253,7 +2253,10 @@ elif outil == "THE GRAND COUNCIL️":
                     st.markdown("<br>", unsafe_allow_html=True)
                     
                     # Bouton PDF amélioré
-                    def generate_pdf(ticker_name, score, verdict, df):
+                    def generate_pdf(ticker_name, score, verdict_text, df):
+                        # Nettoyer le verdict des emojis pour le PDF
+                        verdict_clean = verdict_text.replace("🚀", "").replace("📈", "").replace("📊", "").replace("⚠️", "").replace("❌", "").strip()
+                        
                         pdf = FPDF()
                         pdf.add_page()
                         pdf.set_text_color(255, 152, 0)
@@ -2265,7 +2268,7 @@ elif outil == "THE GRAND COUNCIL️":
                         pdf.set_font("Arial", 'B', 28)
                         pdf.cell(190, 15, f"SCORE : {score}/20", ln=True, align='C')
                         pdf.set_font("Arial", 'B', 14)
-                        pdf.cell(190, 10, f"VERDICT : {verdict}", ln=True, align='C')
+                        pdf.cell(190, 10, f"VERDICT : {verdict_clean}", ln=True, align='C')
                         pdf.ln(10)
                         pdf.set_text_color(0, 0, 0)
                         pdf.set_font("Arial", '', 10)
@@ -2274,9 +2277,14 @@ elif outil == "THE GRAND COUNCIL️":
                         
                         for _, row in df.iterrows():
                             pdf.set_font("Arial", 'B', 11)
-                            pdf.cell(190, 7, f"{row['Emoji']} {row['Expert']} ({row['Style']}) - {row['Note']}/5", ln=True)
+                            # Retirer les emojis du nom de l'expert
+                            expert_name = row['Expert']
+                            style_name = row['Style']
+                            pdf.cell(190, 7, f"{expert_name} ({style_name}) - {row['Note']}/5", ln=True)
                             pdf.set_font("Arial", '', 9)
-                            pdf.multi_cell(190, 5, f"Avis : {row['Avis']}")
+                            # S'assurer que l'avis est encodable en latin-1
+                            avis_clean = row['Avis'].encode('latin-1', 'replace').decode('latin-1')
+                            pdf.multi_cell(190, 5, f"Avis : {avis_clean}")
                             pdf.ln(3)
                         
                         pdf.ln(5)
