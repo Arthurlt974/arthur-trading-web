@@ -1843,167 +1843,513 @@ elif outil == "EXPERT SYSTEM":
                 st.error("❌ TICKER NON TROUVÉ OU DONNÉES INCOMPLÈTES.")
 
 # ==========================================
-# OUTIL : THE GRAND COUNCIL (15 EXPERTS) 🏛️
+# OUTIL : THE GRAND COUNCIL (15 EXPERTS) 🏛️ - VERSION AMÉLIORÉE
 # ==========================================
 elif outil == "THE GRAND COUNCIL️":
-    st.markdown("<h1 style='text-align: center; color: #ff9800;'>🏛️ THE GRAND COUNCIL OF WALL STREET</h1>", unsafe_allow_html=True)
+    st.markdown("""
+        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
+            <h1 style='color: #ff9800; margin: 0; font-size: 42px; text-shadow: 0 0 20px #ff9800;'>🏛️ THE GRAND COUNCIL OF WALL STREET</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 16px;'>15 Légendes de l'Investissement Analysent Votre Actif</p>
+        </div>
+    """, unsafe_allow_html=True)
     
-    nom_entree = st.text_input("📝 ANALYSE GLOBALE DE L'ACTIF :", value="AAPL")
+    # Input amélioré
+    col_input1, col_input2 = st.columns([3, 1])
+    with col_input1:
+        nom_entree = st.text_input("📝 TICKER OU NOM DE L'ACTIF", value="AAPL", key="council_ticker")
+    with col_input2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        analyze_btn = st.button("🚀 CONVOQUER LE CONSEIL", key="council_btn", use_container_width=True)
     
-    if nom_entree:
-        with st.spinner("Le Conseil délibère..."):
-            ticker = trouver_ticker(nom_entree)
-            action = yf.Ticker(ticker)
-            info = action.info
-            
-            if info and ('currentPrice' in info or 'regularMarketPrice' in info):
-                # --- EXTRACTION DES DONNÉES ---
-                p = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+    if analyze_btn and nom_entree:
+        with st.spinner("⏳ Le Conseil délibère... Veuillez patienter."):
+            try:
+                ticker = trouver_ticker(nom_entree)
+                action = yf.Ticker(ticker)
+                info = action.info
                 
-                # Fix prix pour actions européennes
-                if p == 0 or p is None:
-                    try:
-                        hist = yf.Ticker(ticker).history(period="1d")
-                        if not hist.empty:
-                            p = float(hist['Close'].iloc[-1])
-                    except:
-                        p = 1
-                
-                # Utiliser consensus pour valeur Graham
-                calc = ValuationCalculator(ticker)
-                valuation = calc.get_comprehensive_valuation()
-                
-                if "consensus" in valuation:
-                    graham_fair_value = valuation["consensus"]["fair_value"]
-                else:
-                    # Fallback Graham
-                    eps_temp = info.get('trailingEps') or info.get('forwardEps', 0)
-                    bv_temp = info.get('bookValue', 0)
-                    if eps_temp > 0 and bv_temp > 0:
-                        graham_fair_value = (22.5 * eps_temp * bv_temp) ** 0.5
+                if info and ('currentPrice' in info or 'regularMarketPrice' in info):
+                    # --- EXTRACTION DES DONNÉES (AMÉLIORÉE) ---
+                    p = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                    
+                    # Fix prix pour actions européennes et cas spéciaux
+                    if p == 0 or p is None or p < 0.01:
+                        try:
+                            hist = yf.Ticker(ticker).history(period="5d")
+                            if not hist.empty:
+                                p = float(hist['Close'].iloc[-1])
+                        except:
+                            p = 1
+                    
+                    # Infos de base
+                    nom_complet = info.get('longName', info.get('shortName', ticker))
+                    secteur = info.get('sector', 'N/A')
+                    industrie = info.get('industry', 'N/A')
+                    
+                    # Utiliser consensus pour valeur Graham
+                    calc = ValuationCalculator(ticker)
+                    valuation = calc.get_comprehensive_valuation()
+                    
+                    if "consensus" in valuation:
+                        graham_fair_value = valuation["consensus"]["fair_value"]
                     else:
-                        graham_fair_value = p
-                
-                eps = info.get('trailingEps') or 1
-                per = info.get('trailingPE') or 20
-                roe = info.get('returnOnEquity', 0) * 100
-                marge = info.get('operatingMargins', 0) * 100
-                yield_div = info.get('dividendYield', 0) * 100
-                croissance = info.get('earningsGrowth', 0.05) * 100
-                dette_equity = info.get('debtToEquity', 100)
-                pb_ratio = info.get('priceToBook', 2)
-                fcf = info.get('freeCashflow', 0)
+                        # Fallback Graham amélioré
+                        eps_temp = info.get('trailingEps') or info.get('forwardEps', 0)
+                        bv_temp = info.get('bookValue', 0)
+                        if eps_temp > 0 and bv_temp > 0:
+                            graham_fair_value = (22.5 * eps_temp * bv_temp) ** 0.5
+                        else:
+                            graham_fair_value = p * 1.2  # Estimation conservative
+                    
+                    # Ratios financiers (avec valeurs par défaut sécurisées)
+                    eps = info.get('trailingEps', info.get('forwardEps', 1))
+                    per = info.get('trailingPE', info.get('forwardPE', 20))
+                    roe = (info.get('returnOnEquity', 0) or 0) * 100
+                    marge = (info.get('operatingMargins', 0) or 0) * 100
+                    yield_div = (info.get('dividendYield', 0) or 0) * 100
+                    croissance = (info.get('earningsGrowth', 0.05) or 0.05) * 100
+                    dette_equity = info.get('debtToEquity', 100) or 100
+                    pb_ratio = info.get('priceToBook', 2) or 2
+                    fcf = info.get('freeCashflow', 0) or 0
+                    revenue_growth = (info.get('revenueGrowth', 0) or 0) * 100
+                    current_ratio = info.get('currentRatio', 1) or 1
+                    quick_ratio = info.get('quickRatio', 1) or 1
+                    ps_ratio = info.get('priceToSalesTrailing12Months', 5) or 5
+                    total_cash = info.get('totalCash', 0) or 0
+                    total_debt = info.get('totalDebt', 0) or 0
+                    
+                    # Moyennes mobiles pour analyse technique
+                    ma50 = info.get('fiftyDayAverage', p)
+                    ma200 = info.get('twoHundredDayAverage', p)
+                    
+                    # Affichage des infos clés
+                    st.markdown("### 📊 INFORMATIONS DE L'ACTIF")
+                    col_info1, col_info2, col_info3, col_info4 = st.columns(4)
+                    
+                    with col_info1:
+                        st.metric("Société", nom_complet[:20] + "..." if len(nom_complet) > 20 else nom_complet)
+                        st.metric("Secteur", secteur)
+                    
+                    with col_info2:
+                        st.metric("Prix Actuel", f"${p:.2f}")
+                        marge_securite = ((graham_fair_value - p) / p) * 100
+                        st.metric("Marge Sécurité", f"{marge_securite:+.1f}%")
+                    
+                    with col_info3:
+                        st.metric("P/E Ratio", f"{per:.1f}" if per else "N/A")
+                        st.metric("ROE", f"{roe:.1f}%" if roe else "N/A")
+                    
+                    with col_info4:
+                        st.metric("Dette/Equity", f"{dette_equity:.0f}" if dette_equity else "N/A")
+                        st.metric("FCF", f"${fcf/1e9:.2f}B" if fcf > 0 else "N/A")
+                    
+                    st.markdown("---")
 
-                # --- FONCTION SCORE & AVIS ---
-                def get_expert_details(pts_list):
-                    score = min(5, 1 + sum(pts_list))
-                    avis_dict = {
-                        5: "Exceptionnel. L'actif coche toutes mes cases stratégiques.",
-                        4: "Très solide. Quelques détails manquent pour la perfection.",
-                        3: "Acceptable, mais je reste prudent sur certains ratios.",
-                        2: "Médiocre. Le profil risque/rendement ne m'enchante pas.",
-                        1: "À éviter absolument. Cela va à l'encontre de ma méthode."
-                    }
-                    return score, avis_dict[score]
+                    # --- FONCTION SCORE & AVIS (AMÉLIORÉE) ---
+                    def get_expert_details(pts_list):
+                        """Calcule le score et génère un avis personnalisé"""
+                        # Compter les points (True = 1, False = 0)
+                        score_base = sum([1 for pt in pts_list if pt])
+                        score = min(5, max(1, score_base + 1))  # Entre 1 et 5
+                        
+                        avis_dict = {
+                            5: "Exceptionnel. L'actif coche toutes mes cases stratégiques. Je recommande fortement.",
+                            4: "Très solide. Quelques détails manquent pour la perfection, mais c'est prometteur.",
+                            3: "Acceptable. Je reste prudent sur certains ratios, analyse approfondie nécessaire.",
+                            2: "Médiocre. Le profil risque/rendement ne m'enchante pas du tout.",
+                            1: "À éviter absolument. Cela va à l'encontre de ma philosophie d'investissement."
+                        }
+                        return score, avis_dict[score]
 
-                # --- CONFIGURATION DES 15 EXPERTS ---
-                experts_config = [
-                    {"nom": "Benjamin Graham", "style": "Value Pure", "pts": [
-                        p < graham_fair_value,
-                        p < (graham_fair_value * 0.8),
-                        pb_ratio < 1.5,
-                        dette_equity < 50
-                    ]},
-                    {"nom": "Warren Buffett", "style": "Moat/Qualité", "pts": [roe > 15, roe > 25, marge > 10, marge > 20]},
-                    {"nom": "Peter Lynch", "style": "PEG/Croissance", "pts": [per < 30, (per/croissance < 1.5 if croissance > 0 else False), croissance > 10, croissance > 20]},
-                    {"nom": "Joel Greenblatt", "style": "Magic Formula", "pts": [roe > 20, per < 20, roe > 30, per < 12]},
-                    {"nom": "John Templeton", "style": "Contrarien", "pts": [per < 15, per < 10, p < info.get('fiftyDayAverage', p), p < info.get('twoHundredDayAverage', p)]},
-                    {"nom": "Philip Fisher", "style": "Croissance Max", "pts": [croissance > 15, croissance > 30, marge > 15, info.get('revenueGrowth', 0) > 0.1]},
-                    {"nom": "Charles Munger", "style": "Lollapalooza", "pts": [roe > 18, dette_equity < 40, marge > 15, fcf > 0]},
-                    {"nom": "David Dreman", "style": "Contrarien Value", "pts": [per < 15, yield_div > 2, yield_div > 4, p < info.get('twoHundredDayAverage', p)]},
-                    {"nom": "William O'Neil", "style": "CANSLIM", "pts": [croissance > 20, p > info.get('fiftyDayAverage', 0), p > info.get('twoHundredDayAverage', 0), croissance > 40]},
-                    {"nom": "Bill Ackman", "style": "Activiste", "pts": [fcf > 0, marge > 20, yield_div > 0, roe > 15]},
-                    {"nom": "Ray Dalio", "style": "Macro", "pts": [dette_equity < 70, dette_equity < 30, yield_div > 1, fcf > 0]},
-                    {"nom": "Cathie Wood", "style": "Innovation", "pts": [croissance > 20, croissance > 50, info.get('revenueGrowth', 0) > 0.3, True]},
-                    {"nom": "J. O'Shaughnessy", "style": "Quant", "pts": [pb_ratio < 2, info.get('priceToSalesTrailing12Months', 5) < 1.5, yield_div > 1, per < 25]},
-                    {"nom": "Nassim Taleb", "style": "Anti-Fragile", "pts": [info.get('totalCash', 0) > info.get('totalDebt', 0), info.get('currentRatio', 0) > 2, info.get('currentRatio', 0) > 4, True]},
-                    {"nom": "Gerald Loeb", "style": "Spéculation", "pts": [p > info.get('fiftyDayAverage', 0), p > info.get('twoHundredDayAverage', 0), per > 20, True]}
-                ]
+                    # --- CONFIGURATION DES 15 EXPERTS (AMÉLIORÉE) ---
+                    experts_config = [
+                        {
+                            "nom": "Benjamin Graham",
+                            "style": "Value Investing",
+                            "emoji": "📚",
+                            "pts": [
+                                p < graham_fair_value,
+                                p < (graham_fair_value * 0.67),  # Marge 33%
+                                pb_ratio < 1.5,
+                                dette_equity < 50
+                            ]
+                        },
+                        {
+                            "nom": "Warren Buffett",
+                            "style": "Moat/Qualité",
+                            "emoji": "🎩",
+                            "pts": [
+                                roe > 15,
+                                roe > 25,
+                                marge > 10,
+                                marge > 20
+                            ]
+                        },
+                        {
+                            "nom": "Peter Lynch",
+                            "style": "PEG Growth",
+                            "emoji": "📈",
+                            "pts": [
+                                per < 30,
+                                (per / croissance < 1.5 if croissance > 0 else False),
+                                croissance > 10,
+                                croissance > 20
+                            ]
+                        },
+                        {
+                            "nom": "Joel Greenblatt",
+                            "style": "Magic Formula",
+                            "emoji": "✨",
+                            "pts": [
+                                roe > 20,
+                                per < 20,
+                                roe > 30,
+                                per < 12
+                            ]
+                        },
+                        {
+                            "nom": "John Templeton",
+                            "style": "Contrarian",
+                            "emoji": "🌍",
+                            "pts": [
+                                per < 15,
+                                per < 10,
+                                p < ma50,
+                                p < ma200
+                            ]
+                        },
+                        {
+                            "nom": "Philip Fisher",
+                            "style": "Growth Maximum",
+                            "emoji": "🚀",
+                            "pts": [
+                                croissance > 15,
+                                croissance > 30,
+                                marge > 15,
+                                revenue_growth > 10
+                            ]
+                        },
+                        {
+                            "nom": "Charles Munger",
+                            "style": "Lollapalooza",
+                            "emoji": "🧠",
+                            "pts": [
+                                roe > 18,
+                                dette_equity < 40,
+                                marge > 15,
+                                fcf > 0
+                            ]
+                        },
+                        {
+                            "nom": "David Dreman",
+                            "style": "Contrarian Value",
+                            "emoji": "⚖️",
+                            "pts": [
+                                per < 15,
+                                yield_div > 2,
+                                yield_div > 4,
+                                p < ma200
+                            ]
+                        },
+                        {
+                            "nom": "William O'Neil",
+                            "style": "CANSLIM",
+                            "emoji": "📊",
+                            "pts": [
+                                croissance > 20,
+                                p > ma50,
+                                p > ma200,
+                                croissance > 40
+                            ]
+                        },
+                        {
+                            "nom": "Bill Ackman",
+                            "style": "Activist",
+                            "emoji": "💼",
+                            "pts": [
+                                fcf > 0,
+                                marge > 20,
+                                yield_div > 0,
+                                roe > 15
+                            ]
+                        },
+                        {
+                            "nom": "Ray Dalio",
+                            "style": "Macro/Balance",
+                            "emoji": "🌐",
+                            "pts": [
+                                dette_equity < 70,
+                                dette_equity < 30,
+                                yield_div > 1,
+                                current_ratio > 1.5
+                            ]
+                        },
+                        {
+                            "nom": "Cathie Wood",
+                            "style": "Innovation",
+                            "emoji": "🔮",
+                            "pts": [
+                                croissance > 20,
+                                croissance > 50,
+                                revenue_growth > 30,
+                                marge < 0  # Accepte pertes si croissance
+                            ]
+                        },
+                        {
+                            "nom": "James O'Shaughnessy",
+                            "style": "Quantitative",
+                            "emoji": "🔢",
+                            "pts": [
+                                pb_ratio < 2,
+                                ps_ratio < 1.5,
+                                yield_div > 1,
+                                per < 25
+                            ]
+                        },
+                        {
+                            "nom": "Nassim Taleb",
+                            "style": "Anti-Fragile",
+                            "emoji": "🛡️",
+                            "pts": [
+                                total_cash > total_debt,
+                                current_ratio > 2,
+                                quick_ratio > 1.5,
+                                dette_equity < 50
+                            ]
+                        },
+                        {
+                            "nom": "Gerald Loeb",
+                            "style": "Momentum",
+                            "emoji": "⚡",
+                            "pts": [
+                                p > ma50,
+                                p > ma200,
+                                croissance > 15,
+                                revenue_growth > 10
+                            ]
+                        }
+                    ]
 
-                # --- TRAITEMENT DES RÉSULTATS ---
-                final_results = []
-                total_pts = 0
-                for exp in experts_config:
-                    sc, av = get_expert_details(exp["pts"])
-                    final_results.append({"Expert": exp["nom"], "Style": exp["style"], "Note": sc, "Avis": av})
-                    total_pts += sc
+                    # --- TRAITEMENT DES RÉSULTATS ---
+                    final_results = []
+                    total_pts = 0
+                    consensus_bullish = 0
+                    consensus_bearish = 0
+                    
+                    for exp in experts_config:
+                        sc, av = get_expert_details(exp["pts"])
+                        final_results.append({
+                            "Expert": exp["nom"],
+                            "Style": exp["style"],
+                            "Emoji": exp["emoji"],
+                            "Note": sc,
+                            "Avis": av
+                        })
+                        total_pts += sc
+                        
+                        if sc >= 4:
+                            consensus_bullish += 1
+                        elif sc <= 2:
+                            consensus_bearish += 1
 
-                final_score_20 = round((total_pts / 75) * 20, 1)
-                df_scores = pd.DataFrame(final_results)
+                    final_score_20 = round((total_pts / 75) * 20, 1)
+                    df_scores = pd.DataFrame(final_results)
+                    
+                    # Calcul consensus
+                    consensus_pct = (consensus_bullish / len(experts_config)) * 100
+                    
+                    # --- GRAPHIQUE AMÉLIORÉ ---
+                    st.markdown("### 📊 NOTATION DES 15 EXPERTS")
+                    
+                    fig = go.Figure(data=[go.Bar(
+                        x=df_scores['Expert'],
+                        y=df_scores['Note'],
+                        text=df_scores['Note'],
+                        textposition='auto',
+                        marker=dict(
+                            color=df_scores['Note'],
+                            colorscale=[
+                                [0, '#ff0000'],
+                                [0.3, '#ff6b6b'],
+                                [0.5, '#ff9800'],
+                                [0.7, '#7fff00'],
+                                [1, '#00ff00']
+                            ],
+                            line=dict(color='black', width=2)
+                        ),
+                        hovertemplate='<b>%{x}</b><br>Note: %{y}/5<br><extra></extra>'
+                    )])
+                    
+                    fig.update_layout(
+                        paper_bgcolor='black',
+                        plot_bgcolor='black',
+                        font=dict(color="white", size=11),
+                        height=400,
+                        margin=dict(t=30, b=120, l=40, r=40),
+                        yaxis=dict(
+                            range=[0, 5],
+                            dtick=1,
+                            gridcolor='#333',
+                            title="Note /5"
+                        ),
+                        xaxis=dict(
+                            tickangle=-45,
+                            title=""
+                        ),
+                        showlegend=False
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
 
-                # --- AFFICHAGE GRAPHIQUE NOIR ---
-                fig = go.Figure(data=[go.Bar(
-                    x=df_scores['Expert'], y=df_scores['Note'],
-                    marker=dict(color=df_scores['Note'], colorscale=[[0, '#ff0000'], [0.5, '#ff9800'], [1, '#00ff00']])
-                )])
-                fig.update_layout(paper_bgcolor='black', plot_bgcolor='black', font=dict(color="white"), height=350, margin=dict(t=20, b=100, l=20, r=20))
-                st.plotly_chart(fig, use_container_width=True)
-
-                # --- SCORE FINAL & BOUTON PDF ---
-                color_f = "#00ff00" if final_score_20 >= 14 else "#ff9800" if final_score_20 >= 10 else "#ff0000"
-                
-                col_res1, col_res2 = st.columns([2, 1])
-                with col_res1:
-                    st.markdown(f"""
-                        <div style='text-align:center; padding:15px; border:2px solid {color_f}; border-radius:10px; background:black;'>
-                            <h1 style='color:{color_f}; margin:0;'>{final_score_20} / 20</h1>
-                            <small style='color:white;'>CONSENSUS DU GRAND CONSEIL</small>
-                        </div>
-                    """, unsafe_allow_html=True)
-                
-                with col_res2:
-                    # Fonction Génération PDF
-                    def generate_pdf(ticker_name, score, df):
+                    # --- SCORE FINAL AMÉLIORÉ ---
+                    st.markdown("---")
+                    
+                    color_f = "#00ff00" if final_score_20 >= 14 else "#ff9800" if final_score_20 >= 10 else "#ff0000"
+                    
+                    # Déterminer le verdict
+                    if final_score_20 >= 16:
+                        verdict = "ACHAT FORT 🚀"
+                        verdict_desc = "Consensus exceptionnel du conseil"
+                    elif final_score_20 >= 14:
+                        verdict = "ACHAT 📈"
+                        verdict_desc = "Opportunité solide validée"
+                    elif final_score_20 >= 12:
+                        verdict = "CONSERVER 📊"
+                        verdict_desc = "Position neutre à surveiller"
+                    elif final_score_20 >= 10:
+                        verdict = "PRUDENCE ⚠️"
+                        verdict_desc = "Risques identifiés"
+                    else:
+                        verdict = "ÉVITER ❌"
+                        verdict_desc = "Consensus négatif"
+                    
+                    col_res1, col_res2, col_res3 = st.columns([2, 1, 1])
+                    
+                    with col_res1:
+                        st.markdown(f"""
+                            <div style='text-align:center; padding:25px; border:3px solid {color_f}; border-radius:15px; background: linear-gradient(135deg, #0a0a0a 0%, #000000 100%); box-shadow: 0 0 30px {color_f}44;'>
+                                <h1 style='color:{color_f}; margin:0; font-size: 48px; text-shadow: 0 0 10px {color_f};'>{final_score_20} / 20</h1>
+                                <h3 style='color:white; margin: 10px 0;'>{verdict}</h3>
+                                <small style='color:#999;'>{verdict_desc}</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_res2:
+                        st.markdown(f"""
+                            <div style='text-align:center; padding:20px; border:2px solid #00ff00; border-radius:10px; background:#0a0a0a;'>
+                                <h2 style='color:#00ff00; margin:0; font-size: 32px;'>{consensus_bullish}</h2>
+                                <small style='color:#ccc;'>EXPERTS POSITIFS</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_res3:
+                        st.markdown(f"""
+                            <div style='text-align:center; padding:20px; border:2px solid #ff0000; border-radius:10px; background:#0a0a0a;'>
+                                <h2 style='color:#ff0000; margin:0; font-size: 32px;'>{consensus_bearish}</h2>
+                                <small style='color:#ccc;'>EXPERTS NÉGATIFS</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    # Bouton PDF amélioré
+                    def generate_pdf(ticker_name, score, verdict, df):
                         pdf = FPDF()
                         pdf.add_page()
-                        pdf.set_fill_color(0, 0, 0)
-                        pdf.rect(0, 0, 210, 297, 'F') # Fond noir optionnel (attention cartouches) - ici on reste standard
                         pdf.set_text_color(255, 152, 0)
+                        pdf.set_font("Arial", 'B', 20)
+                        pdf.cell(190, 15, "THE GRAND COUNCIL OF WALL STREET", ln=True, align='C')
                         pdf.set_font("Arial", 'B', 16)
-                        pdf.cell(190, 10, f"RAPPORT D'EXPERTISE : {ticker_name}", ln=True, align='C')
-                        pdf.set_font("Arial", 'B', 24)
-                        pdf.cell(190, 20, f"SCORE : {score}/20", ln=True, align='C')
+                        pdf.cell(190, 10, f"ANALYSE : {ticker_name}", ln=True, align='C')
+                        pdf.ln(5)
+                        pdf.set_font("Arial", 'B', 28)
+                        pdf.cell(190, 15, f"SCORE : {score}/20", ln=True, align='C')
+                        pdf.set_font("Arial", 'B', 14)
+                        pdf.cell(190, 10, f"VERDICT : {verdict}", ln=True, align='C')
                         pdf.ln(10)
-                        pdf.set_text_color(200, 200, 200)
+                        pdf.set_text_color(0, 0, 0)
+                        pdf.set_font("Arial", '', 10)
+                        pdf.cell(190, 7, f"Date du rapport : {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
+                        pdf.ln(5)
+                        
                         for _, row in df.iterrows():
                             pdf.set_font("Arial", 'B', 11)
-                            pdf.cell(190, 7, f"{row['Expert']} ({row['Style']}) - {row['Note']}/5", ln=True)
-                            pdf.set_font("Arial", 'I', 9)
+                            pdf.cell(190, 7, f"{row['Emoji']} {row['Expert']} ({row['Style']}) - {row['Note']}/5", ln=True)
+                            pdf.set_font("Arial", '', 9)
                             pdf.multi_cell(190, 5, f"Avis : {row['Avis']}")
-                            pdf.ln(2)
+                            pdf.ln(3)
+                        
+                        pdf.ln(5)
+                        pdf.set_font("Arial", 'I', 8)
+                        pdf.multi_cell(190, 4, "AVERTISSEMENT : Ce rapport est genere automatiquement a des fins educatives. Il ne constitue pas un conseil financier. Effectuez vos propres recherches avant tout investissement.")
+                        
                         return pdf.output(dest='S').encode('latin-1')
 
-                    pdf_bytes = generate_pdf(info.get('longName', ticker), final_score_20, df_scores)
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.download_button(label="📥 TÉLÉCHARGER LE RAPPORT", data=pdf_bytes, file_name=f"Expert_Report_{ticker}.pdf", mime="application/pdf")
+                    pdf_bytes = generate_pdf(nom_complet, final_score_20, verdict, df_scores)
+                    
+                    st.download_button(
+                        label="📥 TÉLÉCHARGER LE RAPPORT COMPLET (PDF)",
+                        data=pdf_bytes,
+                        file_name=f"Grand_Council_Report_{ticker}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
 
-                # --- GRILLE DES AVIS ---
-                st.markdown("---")
-                cols = st.columns(3)
-                for i, row in df_scores.iterrows():
-                    with cols[i % 3]:
-                        stars = "★" * row['Note'] + "☆" * (5 - row['Note'])
-                        color = "#00ff00" if row['Note'] >= 4 else "#ff9800" if row['Note'] >= 2 else "#ff0000"
-                        st.markdown(f"""
-                        <div style="background:#0a0a0a; padding:15px; border-radius:8px; margin-bottom:12px; border:1px solid #222; min-height:170px;">
-                            <b style="color:{color};">{row['Expert']}</b><br>
-                            <small style="color:#666;">{row['Style']}</small><br>
-                            <span style="color:{color}; font-size:18px;">{stars}</span><br>
-                            <p style="color:#bbb; font-size:12px; margin-top:8px;"><i>"{row['Avis']}"</i></p>
-                        </div>
-                        """, unsafe_allow_html=True)
-            else:
-                st.error("❌ Données boursières introuvables.")
+                    # --- GRILLE DES AVIS (AMÉLIORÉE) ---
+                    st.markdown("---")
+                    st.markdown("### 🏛️ AVIS DÉTAILLÉS DES EXPERTS")
+                    
+                    cols = st.columns(3)
+                    for i, row in df_scores.iterrows():
+                        with cols[i % 3]:
+                            stars = "★" * row['Note'] + "☆" * (5 - row['Note'])
+                            color = "#00ff00" if row['Note'] >= 4 else "#ff9800" if row['Note'] >= 2 else "#ff0000"
+                            
+                            st.markdown(f"""
+                            <div style="background: linear-gradient(135deg, #0a0a0a 0%, #000000 100%); padding:18px; border-radius:12px; margin-bottom:15px; border:2px solid {color}; min-height:190px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="font-size: 28px;">{row['Emoji']}</span>
+                                    <span style="color:{color}; font-size:20px;">{stars}</span>
+                                </div>
+                                <b style="color:{color}; font-size: 16px;">{row['Expert']}</b><br>
+                                <small style="color:#888; font-size: 11px;">{row['Style']}</small><br>
+                                <div style="margin-top: 12px; padding: 10px; background: #050505; border-radius: 6px; border-left: 3px solid {color};">
+                                    <p style="color:#bbb; font-size:12px; margin:0; line-height: 1.4;"><i>"{row['Avis']}"</i></p>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    # Statistiques additionnelles
+                    st.markdown("---")
+                    st.markdown("### 📊 ANALYSE STATISTIQUE")
+                    
+                    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                    
+                    with col_stat1:
+                        avg_score = df_scores['Note'].mean()
+                        st.metric("Note Moyenne", f"{avg_score:.2f}/5")
+                    
+                    with col_stat2:
+                        max_score = df_scores['Note'].max()
+                        best_expert = df_scores[df_scores['Note'] == max_score]['Expert'].iloc[0]
+                        st.metric("Plus Optimiste", best_expert, f"{max_score}/5")
+                    
+                    with col_stat3:
+                        min_score = df_scores['Note'].min()
+                        worst_expert = df_scores[df_scores['Note'] == min_score]['Expert'].iloc[0]
+                        st.metric("Plus Pessimiste", worst_expert, f"{min_score}/5")
+                    
+                    with col_stat4:
+                        std_dev = df_scores['Note'].std()
+                        st.metric("Écart-type", f"{std_dev:.2f}", "Consensus" if std_dev < 1 else "Divergent")
+                    
+                else:
+                    st.error("❌ Données boursières introuvables pour ce ticker.")
+                    
+            except Exception as e:
+                st.error(f"❌ Erreur lors de l'analyse: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
 
 # ==========================================
 # OUTIL : SCREENER CAC 40 🇫🇷 (LOGIQUE PRO)
