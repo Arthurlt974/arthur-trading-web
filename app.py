@@ -37,10 +37,18 @@ class ValuationCalculator:
         self.info = self._get_safe_info()
         
     def _get_safe_info(self):
-        try:
-            return self.ticker.info
-        except:
-            return {}
+    """Récupère les infos de manière sécurisée"""
+    try:
+        info = self.ticker.info
+        # Fix pour le prix actuel si incorrect
+        if info.get('currentPrice', 0) == 0 or info.get('currentPrice') is None:
+            # Fallback sur le dernier prix de l'historique
+            hist = self.ticker.history(period="1d")
+            if not hist.empty:
+                info['currentPrice'] = float(hist['Close'].iloc[-1])
+        return info
+    except:
+        return {}
     
     def dcf_valuation(self, growth_rate=0.05, discount_rate=0.10, years=5):
         """Calcule la valeur intrinsèque via DCF"""
@@ -133,6 +141,14 @@ class ValuationCalculator:
         """Valorisation basée sur le Price/Book ratio"""
         try:
             current_price = self.info.get('currentPrice', 0)
+            # Vérification/correction du prix actuel
+if current_price == 0 or current_price is None:
+    try:
+        hist = self.ticker.history(period="1d")
+        if not hist.empty:
+            current_price = float(hist['Close'].iloc[-1])
+    except:
+        pass
             book_value = self.info.get('bookValue', 0)
             pb_ratio = self.info.get('priceToBook', 0)
             
