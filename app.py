@@ -1593,7 +1593,6 @@ elif outil == "SCREENER CAC 40":
 # NOUVEAU MODULE : ANALYSE TECHNIQUE AVANCÉE
 # ==========================================
 
-
 elif outil == "ANALYSE TECHNIQUE PRO":
     st.markdown("## 📈 ANALYSE TECHNIQUE AVANCÉE")
     st.info("Analyse complète avec RSI, MACD, Bollinger Bands et plus")
@@ -1623,7 +1622,8 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain / loss
+                    # Éviter division par zéro
+                    rs = gain / loss.replace(0, 0.0001)
                     df['RSI'] = 100 - (100 / (1 + rs))
                     
                     # 2. MACD
@@ -1646,53 +1646,58 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                     # 5. Volume moyen
                     df['Volume_MA'] = df['Volume'].rolling(window=20).mean()
                     
-                    # Dernières valeurs
+                    # Dernières valeurs (en prenant la dernière ligne valide)
                     latest = df.iloc[-1]
                     
                     # Analyse du signal
                     signals = []
                     score = 0
                     
-                    # RSI Signal
-                    if latest['RSI'] < 30:
-                        signals.append(("RSI", "🟢 OVERSOLD - Signal ACHAT", "bullish"))
-                        score += 2
-                    elif latest['RSI'] > 70:
-                        signals.append(("RSI", "🔴 OVERBOUGHT - Signal VENTE", "bearish"))
-                        score -= 2
-                    else:
-                        signals.append(("RSI", "🟡 NEUTRE", "neutral"))
+                    # RSI Signal (vérifier si la valeur existe et n'est pas NaN)
+                    if pd.notna(latest['RSI']):
+                        if latest['RSI'] < 30:
+                            signals.append(("RSI", "🟢 OVERSOLD - Signal ACHAT", "bullish"))
+                            score += 2
+                        elif latest['RSI'] > 70:
+                            signals.append(("RSI", "🔴 OVERBOUGHT - Signal VENTE", "bearish"))
+                            score -= 2
+                        else:
+                            signals.append(("RSI", "🟡 NEUTRE", "neutral"))
                     
                     # MACD Signal
-                    if latest['MACD'] > latest['Signal']:
-                        signals.append(("MACD", "🟢 BULLISH - Signal positif", "bullish"))
-                        score += 1
-                    else:
-                        signals.append(("MACD", "🔴 BEARISH - Signal négatif", "bearish"))
-                        score -= 1
+                    if pd.notna(latest['MACD']) and pd.notna(latest['Signal']):
+                        if latest['MACD'] > latest['Signal']:
+                            signals.append(("MACD", "🟢 BULLISH - Signal positif", "bullish"))
+                            score += 1
+                        else:
+                            signals.append(("MACD", "🔴 BEARISH - Signal négatif", "bearish"))
+                            score -= 1
                     
                     # Bollinger Signal
-                    if latest['Close'] < latest['BB_Lower']:
-                        signals.append(("Bollinger", "🟢 Prix sous bande basse - ACHAT", "bullish"))
-                        score += 2
-                    elif latest['Close'] > latest['BB_Upper']:
-                        signals.append(("Bollinger", "🔴 Prix sur bande haute - VENTE", "bearish"))
-                        score -= 2
-                    else:
-                        signals.append(("Bollinger", "🟡 Prix dans la bande", "neutral"))
+                    if pd.notna(latest['BB_Lower']) and pd.notna(latest['BB_Upper']):
+                        if latest['Close'] < latest['BB_Lower']:
+                            signals.append(("Bollinger", "🟢 Prix sous bande basse - ACHAT", "bullish"))
+                            score += 2
+                        elif latest['Close'] > latest['BB_Upper']:
+                            signals.append(("Bollinger", "🔴 Prix sur bande haute - VENTE", "bearish"))
+                            score -= 2
+                        else:
+                            signals.append(("Bollinger", "🟡 Prix dans la bande", "neutral"))
                     
                     # Moving Average Signal
-                    if latest['Close'] > latest['SMA_50']:
-                        signals.append(("MA50", "🟢 Prix > MA50 - Tendance haussière", "bullish"))
-                        score += 1
-                    else:
-                        signals.append(("MA50", "🔴 Prix < MA50 - Tendance baissière", "bearish"))
-                        score -= 1
+                    if pd.notna(latest['SMA_50']):
+                        if latest['Close'] > latest['SMA_50']:
+                            signals.append(("MA50", "🟢 Prix > MA50 - Tendance haussière", "bullish"))
+                            score += 1
+                        else:
+                            signals.append(("MA50", "🔴 Prix < MA50 - Tendance baissière", "bearish"))
+                            score -= 1
                     
                     # Volume Signal
-                    if latest['Volume'] > latest['Volume_MA'] * 1.5:
-                        signals.append(("Volume", "⚠️ Volume anormalement élevé", "important"))
-                        score += 1
+                    if pd.notna(latest['Volume_MA']):
+                        if latest['Volume'] > latest['Volume_MA'] * 1.5:
+                            signals.append(("Volume", "⚠️ Volume anormalement élevé", "important"))
+                            score += 1
                     
                     # Déterminer le sentiment global
                     if score >= 3:
@@ -1850,20 +1855,27 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                     col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                     
                     with col_stat1:
-                        st.metric("RSI", f"{latest['RSI']:.2f}")
+                        rsi_val = f"{latest['RSI']:.2f}" if pd.notna(latest['RSI']) else "N/A"
+                        st.metric("RSI", rsi_val)
                         st.metric("Prix", f"${latest['Close']:.2f}")
                     
                     with col_stat2:
-                        st.metric("MACD", f"{latest['MACD']:.4f}")
-                        st.metric("Signal", f"{latest['Signal']:.4f}")
+                        macd_val = f"{latest['MACD']:.4f}" if pd.notna(latest['MACD']) else "N/A"
+                        signal_val = f"{latest['Signal']:.4f}" if pd.notna(latest['Signal']) else "N/A"
+                        st.metric("MACD", macd_val)
+                        st.metric("Signal", signal_val)
                     
                     with col_stat3:
-                        st.metric("BB Upper", f"${latest['BB_Upper']:.2f}")
-                        st.metric("BB Lower", f"${latest['BB_Lower']:.2f}")
+                        bb_upper = f"${latest['BB_Upper']:.2f}" if pd.notna(latest['BB_Upper']) else "N/A"
+                        bb_lower = f"${latest['BB_Lower']:.2f}" if pd.notna(latest['BB_Lower']) else "N/A"
+                        st.metric("BB Upper", bb_upper)
+                        st.metric("BB Lower", bb_lower)
                     
                     with col_stat4:
-                        st.metric("SMA 20", f"${latest['SMA_20']:.2f}")
-                        st.metric("SMA 50", f"${latest['SMA_50']:.2f}")
+                        sma20 = f"${latest['SMA_20']:.2f}" if pd.notna(latest['SMA_20']) else "N/A"
+                        sma50 = f"${latest['SMA_50']:.2f}" if pd.notna(latest['SMA_50']) else "N/A"
+                        st.metric("SMA 20", sma20)
+                        st.metric("SMA 50", sma50)
                     
         except Exception as e:
             st.error(f"Erreur lors de l'analyse: {str(e)}")
