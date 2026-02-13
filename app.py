@@ -588,6 +588,7 @@ if categorie == "MARCHÉ CRYPTO":
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
         "ON-CHAIN ANALYSIS",
+        "NFT TRACKER",
         "WHALE WATCHER"
     ])
 
@@ -4902,3 +4903,290 @@ elif outil == "ON-CHAIN ANALYSIS":
             st.error(f"Erreur: {str(e)}")
             import traceback
             st.code(traceback.format_exc())
+
+# ==========================================
+# MODULE : NFT TRACKER 🎨
+# ==========================================
+
+elif outil == "NFT TRACKER":
+    st.markdown("""
+        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
+            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>🎨 NFT TRACKER</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Floor Prices & Market Analysis</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Note: Les vraies données NFT nécessiteraient des APIs comme OpenSea, Reservoir, Blur, etc.
+    # Ici on simule avec des données réalistes
+    
+    # Sélection de la blockchain
+    blockchain = st.selectbox(
+        "🌐 BLOCKCHAIN",
+        ["Ethereum", "Polygon", "Solana", "Arbitrum", "Optimism"],
+        key="nft_blockchain"
+    )
+    
+    # Collections NFT populaires (données simulées mais réalistes)
+    nft_collections = {
+        "Ethereum": [
+            {"name": "Bored Ape Yacht Club", "symbol": "BAYC", "floor": 28.5, "volume_24h": 450.2, "change_24h": -2.3, "owners": 6400, "supply": 10000, "sales_24h": 12},
+            {"name": "CryptoPunks", "symbol": "PUNK", "floor": 45.8, "volume_24h": 320.5, "change_24h": +1.5, "owners": 3711, "supply": 10000, "sales_24h": 8},
+            {"name": "Azuki", "symbol": "AZUKI", "floor": 12.3, "volume_24h": 180.4, "change_24h": +5.2, "owners": 5200, "supply": 10000, "sales_24h": 15},
+            {"name": "Mutant Ape Yacht Club", "symbol": "MAYC", "floor": 6.8, "volume_24h": 210.3, "change_24h": -1.8, "owners": 12000, "supply": 19423, "sales_24h": 25},
+            {"name": "Doodles", "symbol": "DOODLE", "floor": 4.2, "volume_24h": 95.6, "change_24h": +3.1, "owners": 5800, "supply": 10000, "sales_24h": 18},
+            {"name": "CloneX", "symbol": "CLONEX", "floor": 3.5, "volume_24h": 120.8, "change_24h": +2.7, "owners": 9100, "supply": 20000, "sales_24h": 22},
+            {"name": "Pudgy Penguins", "symbol": "PPG", "floor": 5.1, "volume_24h": 140.2, "change_24h": +4.5, "owners": 4500, "supply": 8888, "sales_24h": 20},
+            {"name": "Otherdeed for Otherside", "symbol": "OTHERDEED", "floor": 0.8, "volume_24h": 85.3, "change_24h": -0.5, "owners": 34000, "supply": 100000, "sales_24h": 95},
+        ],
+        "Polygon": [
+            {"name": "Trump Digital Trading Cards", "symbol": "TRUMP", "floor": 0.15, "volume_24h": 12.5, "change_24h": +8.2, "owners": 18000, "supply": 45000, "sales_24h": 120},
+            {"name": "y00ts", "symbol": "Y00TS", "floor": 0.42, "volume_24h": 8.3, "change_24h": +2.1, "owners": 8500, "supply": 15000, "sales_24h": 25},
+        ],
+        "Solana": [
+            {"name": "DeGods", "symbol": "DEGODS", "floor": 145.0, "volume_24h": 2500.0, "change_24h": +3.2, "owners": 7200, "supply": 10000, "sales_24h": 18},
+            {"name": "Mad Lads", "symbol": "MADLADS", "floor": 85.5, "volume_24h": 1200.0, "change_24h": +5.8, "owners": 8900, "supply": 10000, "sales_24h": 22},
+            {"name": "Okay Bears", "symbol": "OKAYBEARS", "floor": 28.2, "volume_24h": 450.0, "change_24h": -1.5, "owners": 9100, "supply": 10000, "sales_24h": 15},
+        ],
+        "Arbitrum": [
+            {"name": "Smolverse", "symbol": "SMOL", "floor": 0.35, "volume_24h": 15.2, "change_24h": +1.8, "owners": 5200, "supply": 10000, "sales_24h": 42},
+        ],
+        "Optimism": [
+            {"name": "Optimism Quests NFT", "symbol": "OPQUEST", "floor": 0.08, "volume_24h": 5.5, "change_24h": +0.5, "owners": 12000, "supply": 50000, "sales_24h": 85},
+        ]
+    }
+    
+    collections = nft_collections.get(blockchain, [])
+    
+    if collections:
+        # Statistiques globales
+        st.markdown("### 📊 STATISTIQUES DU MARCHÉ NFT")
+        
+        total_volume = sum([c['volume_24h'] for c in collections])
+        total_sales = sum([c['sales_24h'] for c in collections])
+        avg_floor = sum([c['floor'] for c in collections]) / len(collections)
+        
+        col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
+        
+        with col_stats1:
+            currency = "ETH" if blockchain in ["Ethereum", "Polygon", "Arbitrum", "Optimism"] else "SOL"
+            st.metric("Volume 24h", f"{total_volume:,.1f} {currency}")
+        
+        with col_stats2:
+            st.metric("Ventes 24h", f"{total_sales}")
+        
+        with col_stats3:
+            st.metric("Floor Moyen", f"{avg_floor:,.2f} {currency}")
+        
+        with col_stats4:
+            st.metric("Collections", len(collections))
+        
+        st.markdown("---")
+        
+        # Tableau des collections
+        st.markdown("### 🏆 TOP COLLECTIONS")
+        
+        # Trier par volume
+        collections_sorted = sorted(collections, key=lambda x: x['volume_24h'], reverse=True)
+        
+        for idx, collection in enumerate(collections_sorted):
+            col_nft1, col_nft2 = st.columns([3, 1])
+            
+            with col_nft1:
+                # Déterminer la couleur selon le changement
+                change_color = "#00ff00" if collection['change_24h'] >= 0 else "#ff0000"
+                rank_emoji = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else "📊"
+                
+                st.markdown(f"""
+                    <div style='padding: 20px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border-radius: 12px; margin: 10px 0; border: 2px solid #333;'>
+                        <div style='display: flex; justify-content: space-between; align-items: center;'>
+                            <div>
+                                <h3 style='color: #ff9800; margin: 0 0 5px 0;'>{rank_emoji} {collection['name']}</h3>
+                                <p style='color: #666; font-size: 12px; margin: 0;'>{collection['symbol']} • {collection['supply']:,} items • {collection['owners']:,} owners</p>
+                            </div>
+                        </div>
+                        
+                        <div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 15px;'>
+                            <div>
+                                <p style='color: #999; font-size: 11px; margin: 0;'>FLOOR PRICE</p>
+                                <h4 style='color: white; margin: 5px 0 0 0;'>{collection['floor']:.2f} {currency}</h4>
+                            </div>
+                            <div>
+                                <p style='color: #999; font-size: 11px; margin: 0;'>VOLUME 24H</p>
+                                <h4 style='color: white; margin: 5px 0 0 0;'>{collection['volume_24h']:.1f} {currency}</h4>
+                            </div>
+                            <div>
+                                <p style='color: #999; font-size: 11px; margin: 0;'>CHANGE 24H</p>
+                                <h4 style='color: {change_color}; margin: 5px 0 0 0;'>{collection['change_24h']:+.1f}%</h4>
+                            </div>
+                            <div>
+                                <p style='color: #999; font-size: 11px; margin: 0;'>SALES 24H</p>
+                                <h4 style='color: white; margin: 5px 0 0 0;'>{collection['sales_24h']}</h4>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with col_nft2:
+                # Calculer quelques métriques
+                market_cap = collection['floor'] * collection['supply']
+                owner_ratio = (collection['owners'] / collection['supply']) * 100
+                
+                st.markdown(f"""
+                    <div style='padding: 20px; background: #0a0a0a; border-radius: 12px; margin: 10px 0; border: 2px solid #222; height: 150px; display: flex; flex-direction: column; justify-content: center;'>
+                        <div style='text-align: center; margin-bottom: 10px;'>
+                            <p style='color: #666; font-size: 10px; margin: 0;'>MARKET CAP</p>
+                            <h4 style='color: #7fff00; margin: 5px 0;'>{market_cap:,.0f} {currency}</h4>
+                        </div>
+                        <div style='text-align: center;'>
+                            <p style='color: #666; font-size: 10px; margin: 0;'>UNIQUE OWNERS</p>
+                            <h4 style='color: #00bfff; margin: 5px 0;'>{owner_ratio:.0f}%</h4>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Graphique de comparaison
+        st.markdown("### 📊 COMPARAISON DES FLOOR PRICES")
+        
+        fig_nft = go.Figure()
+        
+        # Bar chart des floor prices
+        fig_nft.add_trace(go.Bar(
+            x=[c['name'][:20] for c in collections_sorted],
+            y=[c['floor'] for c in collections_sorted],
+            marker_color=['#00ff00' if c['change_24h'] >= 0 else '#ff0000' for c in collections_sorted],
+            text=[f"{c['floor']:.2f}" for c in collections_sorted],
+            textposition='auto',
+            hovertemplate='<b>%{x}</b><br>Floor: %{y:.2f} ' + currency + '<br><extra></extra>'
+        ))
+        
+        fig_nft.update_layout(
+            template="plotly_dark",
+            paper_bgcolor='black',
+            plot_bgcolor='black',
+            title="Floor Price par Collection",
+            xaxis_title="Collection",
+            yaxis_title=f"Floor Price ({currency})",
+            height=400,
+            xaxis=dict(tickangle=-45)
+        )
+        
+        st.plotly_chart(fig_nft, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Top movers
+        st.markdown("### 🚀 TOP MOVERS (24H)")
+        
+        col_gain, col_loss = st.columns(2)
+        
+        # Top gainers
+        gainers = sorted([c for c in collections if c['change_24h'] > 0], key=lambda x: x['change_24h'], reverse=True)[:3]
+        
+        with col_gain:
+            st.markdown("#### 🟢 TOP GAINERS")
+            for collection in gainers:
+                st.markdown(f"""
+                    <div style='padding: 12px; background: #00ff0022; border-left: 4px solid #00ff00; border-radius: 5px; margin: 8px 0;'>
+                        <div style='display: flex; justify-content: space-between;'>
+                            <b style='color: #00ff00; font-size: 14px;'>{collection['name'][:25]}</b>
+                            <b style='color: white; font-size: 14px;'>{collection['change_24h']:+.1f}%</b>
+                        </div>
+                        <small style='color: #ccc;'>Floor: {collection['floor']:.2f} {currency} • Vol: {collection['volume_24h']:.1f} {currency}</small>
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        # Top losers
+        losers = sorted([c for c in collections if c['change_24h'] < 0], key=lambda x: x['change_24h'])[:3]
+        
+        with col_loss:
+            st.markdown("#### 🔴 TOP LOSERS")
+            for collection in losers:
+                st.markdown(f"""
+                    <div style='padding: 12px; background: #ff000022; border-left: 4px solid #ff0000; border-radius: 5px; margin: 8px 0;'>
+                        <div style='display: flex; justify-content: space-between;'>
+                            <b style='color: #ff0000; font-size: 14px;'>{collection['name'][:25]}</b>
+                            <b style='color: white; font-size: 14px;'>{collection['change_24h']:+.1f}%</b>
+                        </div>
+                        <small style='color: #ccc;'>Floor: {collection['floor']:.2f} {currency} • Vol: {collection['volume_24h']:.1f} {currency}</small>
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Distribution du volume
+        st.markdown("### 📊 DISTRIBUTION DU VOLUME")
+        
+        fig_volume = go.Figure(data=[go.Pie(
+            labels=[c['name'][:20] for c in collections_sorted],
+            values=[c['volume_24h'] for c in collections_sorted],
+            hole=0.4,
+            marker=dict(
+                colors=['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#74b9ff', '#a29bfe']
+            ),
+            textinfo='label+percent',
+            textposition='auto',
+            hovertemplate='<b>%{label}</b><br>Volume: %{value:.1f} ' + currency + '<br>%{percent}<br><extra></extra>'
+        )])
+        
+        fig_volume.update_layout(
+            template="plotly_dark",
+            paper_bgcolor='black',
+            height=500,
+            title="Répartition du Volume 24h"
+        )
+        
+        st.plotly_chart(fig_volume, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Analyse du marché
+        st.markdown("### 💡 ANALYSE DU MARCHÉ NFT")
+        
+        # Calculer des indicateurs
+        positive_count = len([c for c in collections if c['change_24h'] > 0])
+        negative_count = len([c for c in collections if c['change_24h'] < 0])
+        positive_pct = (positive_count / len(collections)) * 100
+        
+        # Sentiment
+        if positive_pct >= 70:
+            sentiment = "TRÈS HAUSSIER 🚀"
+            sentiment_color = "#00ff00"
+        elif positive_pct >= 50:
+            sentiment = "HAUSSIER 📈"
+            sentiment_color = "#7fff00"
+        elif positive_pct >= 30:
+            sentiment = "NEUTRE ➡️"
+            sentiment_color = "#ff9800"
+        else:
+            sentiment = "BAISSIER 📉"
+            sentiment_color = "#ff0000"
+        
+        col_analysis1, col_analysis2 = st.columns(2)
+        
+        with col_analysis1:
+            st.markdown(f"""
+                <div style='text-align: center; padding: 25px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px;'>
+                    <h2 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h2>
+                    <p style='color: white; font-size: 18px; margin: 10px 0;'>{positive_count}/{len(collections)} collections en hausse</p>
+                    <p style='color: #ccc; font-size: 14px; margin: 0;'>{positive_pct:.0f}% du marché positif</p>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col_analysis2:
+            # Collection la plus active
+            most_active = max(collections, key=lambda x: x['sales_24h'])
+            
+            st.markdown(f"""
+                <div style='text-align: center; padding: 25px; background: #00bfff22; border: 3px solid #00bfff; border-radius: 15px;'>
+                    <h4 style='color: #00bfff; margin: 0 0 10px 0;'>🔥 PLUS ACTIVE</h4>
+                    <h3 style='color: white; margin: 0;'>{most_active['name'][:25]}</h3>
+                    <p style='color: #ccc; font-size: 14px; margin: 10px 0 0 0;'>{most_active['sales_24h']} ventes aujourd'hui</p>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        st.caption("⚠️ Les données NFT sont simulées à des fins de démonstration. Pour des données en temps réel, utilisez les APIs OpenSea, Blur ou Reservoir.")
+    
+    else:
+        st.info(f"Aucune collection disponible pour {blockchain}")
