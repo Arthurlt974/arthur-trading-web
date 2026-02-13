@@ -592,7 +592,11 @@ if categorie == "MARCHÉ CRYPTO":
 
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
-        "ANALYSEUR PRO", 
+        "ANALYSEUR PRO",
+        "ANALYSE TECHNIQUE PRO",
+        "FIBONACCI CALCULATOR",
+        "BACKTESTING ENGINE",
+        "VALORISATION FONDAMENTALE",
         "MULTI-CHARTS",
         "EXPERT SYSTEM",
         "THE GRAND COUNCIL️",
@@ -607,11 +611,7 @@ elif categorie == "BOITE À OUTILS":
         "CALENDRIER ÉCO",
         "Fear and Gread Index",
         "CORRÉLATION DASH",
-        "INTERETS COMPOSES",
-        "ANALYSE TECHNIQUE PRO",
-        "FIBONACCI CALCULATOR",
-        "BACKTESTING ENGINE",
-        "VALORISATION FONDAMENTALE"
+        "INTERETS COMPOSES"
     ])
 
 st.sidebar.markdown("---")
