@@ -704,8 +704,9 @@ if outil == "ANALYSEUR PRO":
             except:
                 prix = None
     
-        if prix: # Si on a enfin un prix, on continue
-            # ... reste de votre code ...
+    if prix: 
+        # Si on a enfin un prix, on continue
+        # ... reste de votre code ...
         else:
             st.error(f"⚠️ DONNÉES DE PRIX INDISPONIBLES POUR {ticker}")
 
