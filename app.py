@@ -3608,6 +3608,9 @@ elif outil == "VALORISATION FONDAMENTALE":
 # MODULE : HEATMAP DE MARCHÉ
 # ==========================================
 
+# Dans la sidebar, ajoute cette option à ton selectbox :
+# "HEATMAP MARCHÉ"
+
 elif outil == "HEATMAP MARCHÉ":
     st.markdown("## 🌊 HEATMAP DE MARCHÉ")
     st.info("Visualisation TreeMap interactive des performances du marché")
@@ -3856,96 +3859,6 @@ elif outil == "HEATMAP MARCHÉ":
                     with col_stat4:
                         top_loser = df_heatmap.loc[df_heatmap['Change'].idxmin()]
                         st.metric("Top Loser 📉", top_loser['Ticker'], f"{top_loser['Change']:+.2f}%")
-                    
-                    st.markdown("---")
-                    
-                    # HEATMAP TREEMAP
-                    st.markdown("### 🌊 HEATMAP INTERACTIVE")
-                    
-                    # Créer le TreeMap
-                    if 'Sector' in df_heatmap.columns and market_choice != "Crypto Top 15":
-                        # TreeMap avec secteurs
-                        fig_heatmap = go.Figure(go.Treemap(
-                            labels=df_heatmap['Ticker'],
-                            parents=df_heatmap['Sector'],
-                            values=abs(df_heatmap['Change']) + 0.1,  # Éviter les valeurs nulles
-                            marker=dict(
-                                colors=df_heatmap['Change'],
-                                colorscale=[
-                                    [0, '#ff0000'],      # Rouge fort (baisse)
-                                    [0.3, '#ff6666'],    # Rouge moyen
-                                    [0.45, '#ffcccc'],   # Rouge clair
-                                    [0.5, '#ffffff'],    # Blanc (neutre)
-                                    [0.55, '#ccffcc'],   # Vert clair
-                                    [0.7, '#66ff66'],    # Vert moyen
-                                    [1, '#00ff00']       # Vert fort (hausse)
-                                ],
-                                cmid=0,
-                                colorbar=dict(
-                                    title="Change %",
-                                    ticksuffix="%",
-                                    thickness=20,
-                                    len=0.7,
-                                    bgcolor='rgba(0,0,0,0.5)',
-                                    bordercolor='#ff9800',
-                                    borderwidth=2
-                                ),
-                                line=dict(color='#333333', width=3)
-                            ),
-                            text=df_heatmap.apply(lambda x: f"<b>{x['Ticker']}</b><br>{x['Change']:+.1f}%<br>${x['Price']:.2f}", axis=1),
-                            textposition='middle center',
-                            textfont=dict(size=13, color='black', family='Arial Black'),
-                            hovertemplate='<b>%{label}</b><br>Variation: %{color:.2f}%<br>Secteur: %{parent}<br><extra></extra>'
-                        ))
-                    else:
-                        # TreeMap simple (crypto)
-                        fig_heatmap = go.Figure(go.Treemap(
-                            labels=df_heatmap['Ticker'],
-                            values=abs(df_heatmap['Change']) + 0.1,  # Éviter les valeurs nulles
-                            marker=dict(
-                                colors=df_heatmap['Change'],
-                                colorscale=[
-                                    [0, '#ff0000'],      # Rouge fort (baisse)
-                                    [0.3, '#ff6666'],    # Rouge moyen
-                                    [0.45, '#ffcccc'],   # Rouge clair
-                                    [0.5, '#ffffff'],    # Blanc (neutre)
-                                    [0.55, '#ccffcc'],   # Vert clair
-                                    [0.7, '#66ff66'],    # Vert moyen
-                                    [1, '#00ff00']       # Vert fort (hausse)
-                                ],
-                                cmid=0,
-                                colorbar=dict(
-                                    title="Change %",
-                                    ticksuffix="%",
-                                    thickness=20,
-                                    len=0.7,
-                                    bgcolor='rgba(0,0,0,0.5)',
-                                    bordercolor='#ff9800',
-                                    borderwidth=2
-                                ),
-                                line=dict(color='#333333', width=3)
-                            ),
-                            text=df_heatmap.apply(lambda x: f"<b>{x['Ticker']}</b><br>{x['Change']:+.1f}%<br>${x['Price']:.2f}", axis=1),
-                            textposition='middle center',
-                            textfont=dict(size=14, color='black', family='Arial Black'),
-                            hovertemplate='<b>%{label}</b><br>Variation: %{color:.2f}%<br><extra></extra>'
-                        ))
-                    
-                    fig_heatmap.update_layout(
-                        paper_bgcolor='#0d0d0d',
-                        plot_bgcolor='#0d0d0d',
-                        height=700,
-                        title=dict(
-                            text=f"<b>Heatmap: {market_choice} - {time_period}</b>",
-                            font=dict(size=20, color='#ff9800', family='Arial Black'),
-                            x=0.5,
-                            xanchor='center'
-                        ),
-                        font=dict(size=12, color='white'),
-                        margin=dict(l=10, r=10, t=80, b=10)
-                    )
-                    
-                    st.plotly_chart(fig_heatmap, use_container_width=True)
                     
                     st.markdown("---")
                     
