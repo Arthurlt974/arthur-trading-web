@@ -3135,7 +3135,7 @@ elif outil == "VALORISATION FONDAMENTALE":
                 st.markdown("---")
                 st.markdown("### 📈 DÉTAILS PAR MÉTHODE DE VALORISATION")
                 
-                methods_available = [method for method in results.keys() if method != "consensus"]
+                methods_available = [method for method in results.keys() if method not in ["consensus", "dcf"]]
                 
                 if methods_available:
                     tabs = st.tabs([method.upper() for method in methods_available])
