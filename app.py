@@ -4681,12 +4681,12 @@ elif outil == "ON-CHAIN ANALYSIS":
                     change_30d = ((current_price - price_30d_ago) / price_30d_ago) * 100
                     
                     # Volume
-                    avg_volume_7d = df_crypto['Volume'].tail(7).mean()
+                    avg_volume_7d = float(df_crypto['Volume'].tail(7).mean())
                     current_volume = float(df_crypto['Volume'].iloc[-1])
                     volume_ratio = (current_volume / avg_volume_7d) if avg_volume_7d > 0 else 1
                     
                     # Volatilité
-                    volatility_30d = df_crypto['Close'].pct_change().std() * 100
+                    volatility_30d = float(df_crypto['Close'].pct_change().std() * 100)
                     
                     # High/Low 30j
                     high_30d = float(df_crypto['High'].max())
