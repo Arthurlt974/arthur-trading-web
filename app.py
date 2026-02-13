@@ -246,6 +246,41 @@ class ValuationCalculator:
         except Exception as e:
             return {"error": f"Erreur NVT: {str(e)}"}
     
+    def graham_valuation(self):
+        """Valorisation selon la formule de Benjamin Graham"""
+        try:
+            current_price = self.info.get('currentPrice', 0)
+            
+            # Vérification/correction du prix actuel
+            if current_price == 0 or current_price is None:
+                try:
+                    hist = self.ticker.history(period="1d")
+                    if not hist.empty:
+                        current_price = float(hist['Close'].iloc[-1])
+                except:
+                    pass
+            
+            eps = self.info.get('trailingEps') or self.info.get('forwardEps', 0)
+            book_value = self.info.get('bookValue', 0)
+            
+            if eps <= 0 or book_value <= 0:
+                return {"error": "EPS ou Book Value non disponible"}
+            
+            # Formule de Graham: √(22.5 × EPS × Book Value)
+            fair_value = (22.5 * eps * book_value) ** 0.5
+            upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
+            
+            return {
+                "method": "Graham",
+                "fair_value": round(fair_value, 2),
+                "current_price": round(current_price, 2),
+                "upside_pct": round(upside, 2),
+                "eps": round(eps, 2),
+                "book_value": round(book_value, 2)
+            }
+        except Exception as e:
+            return {"error": f"Erreur Graham: {str(e)}"}
+    
     def get_comprehensive_valuation(self):
         """Calcule toutes les valorisations possibles et retourne un consensus"""
         results = {}
@@ -258,6 +293,12 @@ class ValuationCalculator:
                 results["nvt"] = nvt
                 fair_values.append(nvt["fair_value"])
         else:
+            # GRAHAM EN PREMIER (priorité car plus fiable)
+            graham = self.graham_valuation()
+            if "error" not in graham:
+                results["graham"] = graham
+                fair_values.append(graham["fair_value"])
+            
             dcf = self.dcf_valuation()
             if "error" not in dcf:
                 results["dcf"] = dcf
@@ -824,13 +865,36 @@ elif outil == "MODE DUEL":
             i = get_ticker_info(ticker_id)
             hist = get_ticker_history(ticker_id, period="1y")
             p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
-            b = i.get('trailingEps') or 0
-            v = (max(0, b) * (8.5 + 2 * 7) * 4.4) / 3.5
+            
+            # Fix prix pour actions européennes
+            if p == 0 or p is None:
+                try:
+                    h = yf.Ticker(ticker_id).history(period="1d")
+                    if not h.empty:
+                        p = float(h['Close'].iloc[-1])
+                except:
+                    p = 1
+            
+            # Utiliser ValuationCalculator pour consensus 4 méthodes
+            calc = ValuationCalculator(ticker_id)
+            valuation_results = calc.get_comprehensive_valuation()
+            
+            if "consensus" in valuation_results:
+                v = valuation_results["consensus"]["fair_value"]
+            else:
+                # Fallback sur Graham
+                eps = i.get('trailingEps') or i.get('forwardEps', 0)
+                bv = i.get('bookValue', 0)
+                if eps > 0 and bv > 0:
+                    v = (22.5 * eps * bv) ** 0.5
+                else:
+                    v = 0
+            
             return {
                 "nom": i.get('shortName', t), "prix": p, "valeur": v,
                 "yield": (i.get('dividendYield', 0) or 0) * 100,
                 "per": i.get('trailingPE', 0), "marge": (i.get('profitMargins', 0) or 0) * 100,
-                "hist": hist, "potential": ((v - p) / p) * 100 if p > 0 else 0
+                "hist": hist, "potential": ((v - p) / p) * 100 if p > 0 and v > 0 else 0
             }
 
         try:
@@ -1559,6 +1623,16 @@ elif outil == "EXPERT SYSTEM":
                 # --- EXTRACTION DES DONNÉES ---
                 nom = info.get('longName', ticker)
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                
+                # Fix prix pour actions européennes
+                if prix == 0 or prix is None:
+                    try:
+                        hist = yf.Ticker(ticker).history(period="1d")
+                        if not hist.empty:
+                            prix = float(hist['Close'].iloc[-1])
+                    except:
+                        prix = 1
+                
                 bpa = info.get('trailingEps') or info.get('forwardEps') or 0
                 per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 50)
                 roe = (info.get('returnOnEquity', 0)) * 100
@@ -1567,9 +1641,21 @@ elif outil == "EXPERT SYSTEM":
                 devise = info.get('currency', '€')
 
                 # --- CALCULS DES SCORES (LOGIQUE ORIGINALE AMÉLIORÉE) ---
-                # 1. Graham (Value)
-                val_graham = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
-                score_graham = int(min(5, max(0, (val_graham / prix) * 2.5)))
+                # 1. Graham (Value) - Utiliser consensus 4 méthodes
+                calc = ValuationCalculator(ticker)
+                valuation = calc.get_comprehensive_valuation()
+                
+                if "consensus" in valuation:
+                    val_graham = valuation["consensus"]["fair_value"]
+                else:
+                    # Fallback vraie formule Graham
+                    book_value = info.get('bookValue', 0)
+                    if bpa > 0 and book_value > 0:
+                        val_graham = (22.5 * bpa * book_value) ** 0.5
+                    else:
+                        val_graham = 0
+                
+                score_graham = int(min(5, max(0, (val_graham / prix) * 2.5))) if prix > 0 and val_graham > 0 else 0
 
                 # 2. Buffett (Moat/ROE)
                 score_buffett = int(min(5, (roe / 4))) 
@@ -1651,6 +1737,31 @@ elif outil == "THE GRAND COUNCIL️":
             if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                 # --- EXTRACTION DES DONNÉES ---
                 p = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                
+                # Fix prix pour actions européennes
+                if p == 0 or p is None:
+                    try:
+                        hist = yf.Ticker(ticker).history(period="1d")
+                        if not hist.empty:
+                            p = float(hist['Close'].iloc[-1])
+                    except:
+                        p = 1
+                
+                # Utiliser consensus pour valeur Graham
+                calc = ValuationCalculator(ticker)
+                valuation = calc.get_comprehensive_valuation()
+                
+                if "consensus" in valuation:
+                    graham_fair_value = valuation["consensus"]["fair_value"]
+                else:
+                    # Fallback Graham
+                    eps_temp = info.get('trailingEps') or info.get('forwardEps', 0)
+                    bv_temp = info.get('bookValue', 0)
+                    if eps_temp > 0 and bv_temp > 0:
+                        graham_fair_value = (22.5 * eps_temp * bv_temp) ** 0.5
+                    else:
+                        graham_fair_value = p
+                
                 eps = info.get('trailingEps') or 1
                 per = info.get('trailingPE') or 20
                 roe = info.get('returnOnEquity', 0) * 100
@@ -1675,7 +1786,12 @@ elif outil == "THE GRAND COUNCIL️":
 
                 # --- CONFIGURATION DES 15 EXPERTS ---
                 experts_config = [
-                    {"nom": "Benjamin Graham", "style": "Value Pure", "pts": [p < (eps*15), p < (eps*10), pb_ratio < 1.5, dette_equity < 50]},
+                    {"nom": "Benjamin Graham", "style": "Value Pure", "pts": [
+                        p < graham_fair_value,
+                        p < (graham_fair_value * 0.8),
+                        pb_ratio < 1.5,
+                        dette_equity < 50
+                    ]},
                     {"nom": "Warren Buffett", "style": "Moat/Qualité", "pts": [roe > 15, roe > 25, marge > 10, marge > 20]},
                     {"nom": "Peter Lynch", "style": "PEG/Croissance", "pts": [per < 30, (per/croissance < 1.5 if croissance > 0 else False), croissance > 10, croissance > 20]},
                     {"nom": "Joel Greenblatt", "style": "Magic Formula", "pts": [roe > 20, per < 20, roe > 30, per < 12]},
@@ -1800,14 +1916,48 @@ elif outil == "SCREENER CAC 40":
                 # --- EXTRACTION DATA (LOGIQUE ANALYSEUR PRO) ---
                 nom = info.get('shortName') or t
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                
+                # Fix prix pour actions européennes
+                if prix == 0 or prix is None:
+                    try:
+                        hist = yf.Ticker(t).history(period="1d")
+                        if not hist.empty:
+                            prix = float(hist['Close'].iloc[-1])
+                    except:
+                        prix = 1
+                
                 bpa = info.get('trailingEps') or info.get('forwardEps') or 0
                 per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
                 dette_equity = info.get('debtToEquity')
                 payout = (info.get('payoutRatio') or 0) * 100
                 
-                # Formule de Graham
-                val_theorique = (max(0, bpa) * (8.5 + 2 * 7) * 4.4) / 3.5
-                marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 else 0
+                # Utiliser consensus 4 méthodes
+                try:
+                    calc = ValuationCalculator(t)
+                    valuation_results = calc.get_comprehensive_valuation()
+                    
+                    if "consensus" in valuation_results:
+                        val_theorique = valuation_results["consensus"]["fair_value"]
+                        marge_pourcent = valuation_results["consensus"]["upside_pct"]
+                        methods_count = valuation_results["consensus"]["methods_used"]
+                    else:
+                        # Fallback Graham
+                        book_value = info.get('bookValue', 0)
+                        if bpa > 0 and book_value > 0:
+                            val_theorique = (22.5 * bpa * book_value) ** 0.5
+                        else:
+                            val_theorique = 0
+                        marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 and val_theorique > 0 else 0
+                        methods_count = 1
+                except:
+                    # En cas d'erreur, utiliser Graham simple
+                    book_value = info.get('bookValue', 0)
+                    if bpa > 0 and book_value > 0:
+                        val_theorique = (22.5 * bpa * book_value) ** 0.5
+                    else:
+                        val_theorique = 0
+                    marge_pourcent = ((val_theorique - prix) / prix) * 100 if prix > 0 and val_theorique > 0 else 0
+                    methods_count = 1
 
                 # --- CALCUL DU QUALITY SCORE (TA NOTATION) ---
                 score = 0
@@ -1834,6 +1984,7 @@ elif outil == "SCREENER CAC 40":
                     "Nom": nom,
                     "Score": score_f,
                     "Potentiel %": round(marge_pourcent, 1),
+                    "Méthodes": methods_count,
                     "P/E": round(per, 1),
                     "Dette/Eq %": round(dette_equity, 1) if dette_equity else "N/A",
                     "Prix": f"{prix:.2f} €"
@@ -3236,6 +3387,16 @@ elif outil == "VALORISATION FONDAMENTALE":
                                     with col_param[2]:
                                         st.info(f"**P/B Cible:** {data['target_pb']:.2f}")
                                 
+                                elif method == "graham":
+                                    col_param = st.columns(3)
+                                    with col_param[0]:
+                                        st.info(f"**EPS:** ${data['eps']:.2f}")
+                                    with col_param[1]:
+                                        st.info(f"**Book Value:** ${data['book_value']:.2f}")
+                                    with col_param[2]:
+                                        st.info(f"**Formule:** √(22.5 × EPS × BV)")
+                                    st.caption("📚 Formule de Benjamin Graham - Investissement Value")
+                                
                                 elif method == "nvt":
                                     col_param = st.columns(3)
                                     with col_param[0]:
@@ -3288,6 +3449,11 @@ elif outil == "VALORISATION FONDAMENTALE":
                     - **< -20%** : Fortement surévalué → VENTE FORTE ⚠️
                     
                     **MÉTHODES DE VALORISATION:**
+                    
+                    **Graham (Benjamin Graham Formula):**
+                    - Meilleure pour: Actions "value" traditionnelles
+                    - Principe: √(22.5 × EPS × Book Value per Share)
+                    - Fiabilité: Haute pour entreprises établies, moins pour tech/croissance
                     
                     **DCF (Discounted Cash Flow):**
                     - Meilleure pour: Sociétés matures avec cash flows stables
