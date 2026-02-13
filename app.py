@@ -4776,51 +4776,6 @@ elif outil == "ON-CHAIN ANALYSIS":
                     
                     st.markdown("---")
                     
-                    # Graphique de prix avec volume
-                    st.markdown("### 📈 GRAPHIQUE PRIX & VOLUME (30 JOURS)")
-                    
-                    from plotly.subplots import make_subplots
-                    
-                    fig_onchain = make_subplots(
-                        rows=2, cols=1,
-                        shared_xaxes=True,
-                        vertical_spacing=0.05,
-                        row_heights=[0.7, 0.3],
-                        subplot_titles=('Prix', 'Volume')
-                    )
-                    
-                    # Prix
-                    fig_onchain.add_trace(go.Candlestick(
-                        x=df_crypto.index,
-                        open=df_crypto['Open'],
-                        high=df_crypto['High'],
-                        low=df_crypto['Low'],
-                        close=df_crypto['Close'],
-                        name='Prix'
-                    ), row=1, col=1)
-                    
-                    # Volume
-                    colors_vol = ['red' if float(df_crypto['Close'].iloc[i]) < float(df_crypto['Open'].iloc[i]) else 'green' for i in range(len(df_crypto))]
-                    fig_onchain.add_trace(go.Bar(
-                        x=df_crypto.index,
-                        y=df_crypto['Volume'],
-                        name='Volume',
-                        marker_color=colors_vol
-                    ), row=2, col=1)
-                    
-                    fig_onchain.update_layout(
-                        template="plotly_dark",
-                        paper_bgcolor='black',
-                        plot_bgcolor='black',
-                        height=600,
-                        xaxis_rangeslider_visible=False,
-                        showlegend=False
-                    )
-                    
-                    st.plotly_chart(fig_onchain, use_container_width=True)
-                    
-                    st.markdown("---")
-                    
                     # Indicateurs On-Chain avancés
                     st.markdown("### 🔍 INDICATEURS ON-CHAIN")
                     
