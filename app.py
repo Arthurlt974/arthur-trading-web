@@ -587,6 +587,7 @@ if categorie == "MARCHÉ CRYPTO":
         "BITCOIN DOMINANCE",
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
+        "ON-CHAIN ANALYSIS",
         "WHALE WATCHER"
     ])
 
@@ -4627,5 +4628,322 @@ elif outil == "HEATMAP MARCHÉ":
                     
         except Exception as e:
             st.error(f"Erreur lors de la génération: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+
+# ==========================================
+# MODULE : ON-CHAIN ANALYSIS 📊
+# ==========================================
+
+elif outil == "ON-CHAIN ANALYSIS":
+    st.markdown("""
+        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
+            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>📊 ON-CHAIN ANALYSIS</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Métriques Blockchain en Temps Réel</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Sélection de la crypto
+    col_select1, col_select2 = st.columns([2, 1])
+    
+    with col_select1:
+        crypto_selected = st.selectbox(
+            "CRYPTO",
+            ["BTC", "ETH", "BNB", "SOL", "ADA", "DOT", "MATIC", "AVAX", "LINK", "UNI"],
+            key="onchain_crypto"
+        )
+    
+    with col_select2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        analyze_btn = st.button("🔍 ANALYSER", key="onchain_analyze", use_container_width=True)
+    
+    if analyze_btn:
+        try:
+            with st.spinner(f"Récupération des données on-chain pour {crypto_selected}..."):
+                
+                # Récupérer les données de prix via yfinance
+                ticker = f"{crypto_selected}-USD"
+                df_crypto = yf.download(ticker, period="30d", progress=False)
+                
+                if df_crypto.empty:
+                    st.error("Données non disponibles")
+                else:
+                    # Prix actuel
+                    current_price = float(df_crypto['Close'].iloc[-1])
+                    
+                    # Calculs de métriques
+                    price_1d_ago = float(df_crypto['Close'].iloc[-2])
+                    price_7d_ago = float(df_crypto['Close'].iloc[-7]) if len(df_crypto) >= 7 else price_1d_ago
+                    price_30d_ago = float(df_crypto['Close'].iloc[0])
+                    
+                    change_1d = ((current_price - price_1d_ago) / price_1d_ago) * 100
+                    change_7d = ((current_price - price_7d_ago) / price_7d_ago) * 100
+                    change_30d = ((current_price - price_30d_ago) / price_30d_ago) * 100
+                    
+                    # Volume
+                    avg_volume_7d = df_crypto['Volume'].tail(7).mean()
+                    current_volume = float(df_crypto['Volume'].iloc[-1])
+                    volume_ratio = (current_volume / avg_volume_7d) if avg_volume_7d > 0 else 1
+                    
+                    # Volatilité
+                    volatility_30d = df_crypto['Close'].pct_change().std() * 100
+                    
+                    # High/Low 30j
+                    high_30d = float(df_crypto['High'].max())
+                    low_30d = float(df_crypto['Low'].min())
+                    position_in_range = ((current_price - low_30d) / (high_30d - low_30d)) * 100 if high_30d > low_30d else 50
+                    
+                    # Simulations de métriques on-chain (à adapter selon la crypto)
+                    # Note: Pour de vraies données on-chain, il faudrait utiliser des APIs comme Glassnode, CoinMetrics, etc.
+                    
+                    if crypto_selected == "BTC":
+                        # Simulations réalistes pour Bitcoin
+                        hash_rate = 450  # EH/s
+                        difficulty = 72.0  # T
+                        active_addresses = 950000
+                        transactions_24h = 280000
+                        avg_tx_value = 25000
+                        mempool_size = 150  # MB
+                        fear_greed = 65  # Index
+                        
+                    elif crypto_selected == "ETH":
+                        hash_rate = 950  # TH/s
+                        difficulty = 0  # PoS
+                        active_addresses = 550000
+                        transactions_24h = 1100000
+                        avg_tx_value = 2500
+                        mempool_size = 0  # PoS
+                        fear_greed = 62
+                        
+                    else:
+                        # Valeurs génériques
+                        hash_rate = 100
+                        difficulty = 10
+                        active_addresses = 100000
+                        transactions_24h = 50000
+                        avg_tx_value = 1000
+                        mempool_size = 50
+                        fear_greed = 60
+                    
+                    # Affichage des métriques principales
+                    st.markdown("### 💰 PRIX & PERFORMANCE")
+                    
+                    col_price1, col_price2, col_price3, col_price4 = st.columns(4)
+                    
+                    with col_price1:
+                        st.metric("Prix Actuel", f"${current_price:,.2f}")
+                    with col_price2:
+                        st.metric("Change 24h", f"{change_1d:+.2f}%", delta=f"{change_1d:+.2f}%")
+                    with col_price3:
+                        st.metric("Change 7j", f"{change_7d:+.2f}%", delta=f"{change_7d:+.2f}%")
+                    with col_price4:
+                        st.metric("Change 30j", f"{change_30d:+.2f}%", delta=f"{change_30d:+.2f}%")
+                    
+                    st.markdown("---")
+                    
+                    # Métriques réseau
+                    st.markdown("### 🌐 MÉTRIQUES RÉSEAU")
+                    
+                    col_network1, col_network2, col_network3, col_network4 = st.columns(4)
+                    
+                    with col_network1:
+                        st.metric("Adresses Actives", f"{active_addresses:,}")
+                    with col_network2:
+                        st.metric("TX 24h", f"{transactions_24h:,}")
+                    with col_network3:
+                        st.metric("Valeur TX Moy", f"${avg_tx_value:,.0f}")
+                    with col_network4:
+                        if crypto_selected in ["BTC", "ETH"]:
+                            st.metric("Hash Rate", f"{hash_rate:.0f} {'EH/s' if crypto_selected == 'BTC' else 'TH/s'}")
+                        else:
+                            st.metric("Network Score", f"{hash_rate:.0f}")
+                    
+                    st.markdown("---")
+                    
+                    # Volume et Volatilité
+                    st.markdown("### 📊 VOLUME & VOLATILITÉ")
+                    
+                    col_vol1, col_vol2, col_vol3, col_vol4 = st.columns(4)
+                    
+                    with col_vol1:
+                        st.metric("Volume 24h", f"${current_volume/1e9:.2f}B")
+                    with col_vol2:
+                        st.metric("Ratio Volume", f"{volume_ratio:.2f}x")
+                    with col_vol3:
+                        st.metric("Volatilité 30j", f"{volatility_30d:.2f}%")
+                    with col_vol4:
+                        st.metric("Position Range", f"{position_in_range:.0f}%")
+                    
+                    st.markdown("---")
+                    
+                    # Graphique de prix avec volume
+                    st.markdown("### 📈 GRAPHIQUE PRIX & VOLUME (30 JOURS)")
+                    
+                    from plotly.subplots import make_subplots
+                    
+                    fig_onchain = make_subplots(
+                        rows=2, cols=1,
+                        shared_xaxes=True,
+                        vertical_spacing=0.05,
+                        row_heights=[0.7, 0.3],
+                        subplot_titles=('Prix', 'Volume')
+                    )
+                    
+                    # Prix
+                    fig_onchain.add_trace(go.Candlestick(
+                        x=df_crypto.index,
+                        open=df_crypto['Open'],
+                        high=df_crypto['High'],
+                        low=df_crypto['Low'],
+                        close=df_crypto['Close'],
+                        name='Prix'
+                    ), row=1, col=1)
+                    
+                    # Volume
+                    colors_vol = ['red' if df_crypto['Close'].iloc[i] < df_crypto['Open'].iloc[i] else 'green' for i in range(len(df_crypto))]
+                    fig_onchain.add_trace(go.Bar(
+                        x=df_crypto.index,
+                        y=df_crypto['Volume'],
+                        name='Volume',
+                        marker_color=colors_vol
+                    ), row=2, col=1)
+                    
+                    fig_onchain.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor='black',
+                        plot_bgcolor='black',
+                        height=600,
+                        xaxis_rangeslider_visible=False,
+                        showlegend=False
+                    )
+                    
+                    st.plotly_chart(fig_onchain, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # Indicateurs On-Chain avancés
+                    st.markdown("### 🔍 INDICATEURS ON-CHAIN")
+                    
+                    col_ind1, col_ind2, col_ind3 = st.columns(3)
+                    
+                    with col_ind1:
+                        # MVRV Ratio simulé
+                        mvrv_ratio = (current_price / price_30d_ago) * 1.2  # Simulé
+                        mvrv_color = "#00ff00" if mvrv_ratio < 1.5 else "#ff9800" if mvrv_ratio < 2.5 else "#ff0000"
+                        st.markdown(f"""
+                            <div style='padding: 20px; background: {mvrv_color}22; border: 2px solid {mvrv_color}; border-radius: 10px;'>
+                                <h4 style='color: {mvrv_color}; margin: 0 0 10px 0;'>MVRV Ratio</h4>
+                                <h2 style='color: white; margin: 0;'>{mvrv_ratio:.2f}</h2>
+                                <small style='color: #ccc;'>{"Sous-évalué" if mvrv_ratio < 1.5 else "Neutre" if mvrv_ratio < 2.5 else "Sur-évalué"}</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_ind2:
+                        # Fear & Greed
+                        fg_color = "#ff0000" if fear_greed < 30 else "#ff9800" if fear_greed < 50 else "#00ff00" if fear_greed < 70 else "#7fff00"
+                        st.markdown(f"""
+                            <div style='padding: 20px; background: {fg_color}22; border: 2px solid {fg_color}; border-radius: 10px;'>
+                                <h4 style='color: {fg_color}; margin: 0 0 10px 0;'>Fear & Greed</h4>
+                                <h2 style='color: white; margin: 0;'>{fear_greed}/100</h2>
+                                <small style='color: #ccc;'>{"Peur Extrême" if fear_greed < 30 else "Peur" if fear_greed < 50 else "Neutre" if fear_greed < 70 else "Avidité"}</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_ind3:
+                        # NVT Ratio simulé
+                        nvt_ratio = (current_volume / transactions_24h) * 100 if transactions_24h > 0 else 0
+                        nvt_color = "#00ff00" if nvt_ratio < 50 else "#ff9800" if nvt_ratio < 100 else "#ff0000"
+                        st.markdown(f"""
+                            <div style='padding: 20px; background: {nvt_color}22; border: 2px solid {nvt_color}; border-radius: 10px;'>
+                                <h4 style='color: {nvt_color}; margin: 0 0 10px 0;'>NVT Ratio</h4>
+                                <h2 style='color: white; margin: 0;'>{nvt_ratio:.0f}</h2>
+                                <small style='color: #ccc;'>{"Sous-évalué" if nvt_ratio < 50 else "Neutre" if nvt_ratio < 100 else "Sur-évalué"}</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    
+                    # Analyse et recommandation
+                    st.markdown("### 💡 ANALYSE & RECOMMANDATION")
+                    
+                    # Score global
+                    score = 0
+                    signals = []
+                    
+                    # Évaluation des métriques
+                    if change_7d > 10:
+                        score += 2
+                        signals.append(("📈 Momentum Positif", f"Hausse de {change_7d:.1f}% sur 7j", "bullish"))
+                    elif change_7d < -10:
+                        score -= 2
+                        signals.append(("📉 Momentum Négatif", f"Baisse de {change_7d:.1f}% sur 7j", "bearish"))
+                    
+                    if volume_ratio > 1.5:
+                        score += 1
+                        signals.append(("📊 Volume Élevé", f"Volume {volume_ratio:.1f}x supérieur", "bullish"))
+                    
+                    if position_in_range > 70:
+                        score -= 1
+                        signals.append(("⚠️ Proche du Haut", f"À {position_in_range:.0f}% du range", "bearish"))
+                    elif position_in_range < 30:
+                        score += 1
+                        signals.append(("✅ Proche du Bas", f"À {position_in_range:.0f}% du range", "bullish"))
+                    
+                    if mvrv_ratio < 1.5:
+                        score += 2
+                        signals.append(("💎 MVRV Favorable", "Potentiellement sous-évalué", "bullish"))
+                    elif mvrv_ratio > 2.5:
+                        score -= 2
+                        signals.append(("🔴 MVRV Élevé", "Potentiellement sur-évalué", "bearish"))
+                    
+                    if fear_greed < 30:
+                        score += 1
+                        signals.append(("😨 Peur Extrême", "Opportunité potentielle", "bullish"))
+                    elif fear_greed > 70:
+                        score -= 1
+                        signals.append(("😎 Avidité", "Prudence recommandée", "bearish"))
+                    
+                    # Verdict
+                    if score >= 4:
+                        verdict = "FORTEMENT HAUSSIER 🚀"
+                        verdict_color = "#00ff00"
+                    elif score >= 2:
+                        verdict = "HAUSSIER 📈"
+                        verdict_color = "#7fff00"
+                    elif score <= -4:
+                        verdict = "FORTEMENT BAISSIER 📉"
+                        verdict_color = "#ff0000"
+                    elif score <= -2:
+                        verdict = "BAISSIER 📉"
+                        verdict_color = "#ff6347"
+                    else:
+                        verdict = "NEUTRE ➡️"
+                        verdict_color = "#ff9800"
+                    
+                    st.markdown(f"""
+                        <div style='text-align: center; padding: 25px; background: {verdict_color}22; border: 3px solid {verdict_color}; border-radius: 15px; margin: 20px 0;'>
+                            <h1 style='color: {verdict_color}; margin: 0;'>{verdict}</h1>
+                            <p style='color: white; font-size: 20px; margin: 10px 0;'>Score On-Chain: {score:+d}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Signaux
+                    st.markdown("#### 🎯 SIGNAUX DÉTECTÉS")
+                    
+                    for indicator, message, signal_type in signals:
+                        color_map = {"bullish": "#00ff00", "bearish": "#ff0000", "neutral": "#ff9800"}
+                        emoji_map = {"bullish": "🟢", "bearish": "🔴", "neutral": "🟡"}
+                        
+                        st.markdown(f"""
+                            <div style='padding: 12px; background: {color_map[signal_type]}22; border-left: 4px solid {color_map[signal_type]}; border-radius: 5px; margin: 8px 0;'>
+                                <b style='color: {color_map[signal_type]};'>{emoji_map[signal_type]} {indicator}</b><br>
+                                <small style='color: #ccc;'>{message}</small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    st.caption("⚠️ Les données on-chain sont simulées. Pour des données réelles, utilisez Glassnode, CoinMetrics ou IntoTheBlock.")
+                    
+        except Exception as e:
+            st.error(f"Erreur: {str(e)}")
             import traceback
             st.code(traceback.format_exc())
