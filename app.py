@@ -611,7 +611,8 @@ elif categorie == "BOITE À OUTILS":
         "CALENDRIER ÉCO",
         "Fear and Gread Index",
         "CORRÉLATION DASH",
-        "INTERETS COMPOSES"
+        "INTERETS COMPOSES",
+        "HEATMAP MARCHÉ"
     ])
 
 st.sidebar.markdown("---")
@@ -3602,3 +3603,441 @@ elif outil == "VALORISATION FONDAMENTALE":
                     - À combiner avec l'analyse technique pour de meilleures décisions
                     - Ne constitue pas un conseil en investissement
                     """)
+
+# ==========================================
+# MODULE : HEATMAP DE MARCHÉ
+# ==========================================
+
+elif outil == "HEATMAP MARCHÉ":
+    st.markdown("## 🌊 HEATMAP DE MARCHÉ")
+    st.info("Visualisation TreeMap interactive des performances du marché")
+    
+    # Sélection du marché
+    col_market1, col_market2 = st.columns(2)
+    
+    with col_market1:
+        market_choice = st.selectbox(
+            "MARCHÉ",
+            [
+                "S&P 500 Top 30",
+                "CAC 40",
+                "NASDAQ Top 20",
+                "Crypto Top 15",
+                "Secteurs S&P 500"
+            ],
+            key="heatmap_market"
+        )
+    
+    with col_market2:
+        time_period = st.selectbox(
+            "PÉRIODE",
+            ["1 Jour", "5 Jours", "1 Mois", "3 Mois", "1 An"],
+            key="heatmap_period"
+        )
+    
+    if st.button("🎨 GÉNÉRER LA HEATMAP", key="gen_heatmap"):
+        try:
+            with st.spinner(f"Génération de la heatmap {market_choice}..."):
+                
+                # Conversion période
+                period_map = {
+                    "1 Jour": "1d",
+                    "5 Jours": "5d",
+                    "1 Mois": "1mo",
+                    "3 Mois": "3mo",
+                    "1 An": "1y"
+                }
+                period = period_map[time_period]
+                
+                heatmap_data = []
+                
+                # ====================================
+                # S&P 500 TOP 30
+                # ====================================
+                if market_choice == "S&P 500 Top 30":
+                    sp500_top = [
+                        ("AAPL", "Tech"), ("MSFT", "Tech"), ("GOOGL", "Tech"), ("AMZN", "Consumer"),
+                        ("NVDA", "Tech"), ("META", "Tech"), ("TSLA", "Auto"), ("BRK-B", "Finance"),
+                        ("UNH", "Healthcare"), ("JNJ", "Healthcare"), ("V", "Finance"), ("XOM", "Energy"),
+                        ("WMT", "Consumer"), ("JPM", "Finance"), ("PG", "Consumer"), ("MA", "Finance"),
+                        ("CVX", "Energy"), ("HD", "Consumer"), ("ABBV", "Healthcare"), ("MRK", "Healthcare"),
+                        ("KO", "Consumer"), ("PEP", "Consumer"), ("COST", "Consumer"), ("AVGO", "Tech"),
+                        ("MCD", "Consumer"), ("CSCO", "Tech"), ("TMO", "Healthcare"), ("ACN", "Tech"),
+                        ("ADBE", "Tech"), ("NKE", "Consumer")
+                    ]
+                    
+                    for ticker, sector in sp500_top:
+                        try:
+                            df = yf.download(ticker, period=period, progress=False)
+                            if not df.empty:
+                                if isinstance(df.columns, pd.MultiIndex):
+                                    df.columns = df.columns.get_level_values(0)
+                                
+                                start_price = float(df['Close'].iloc[0])
+                                end_price = float(df['Close'].iloc[-1])
+                                change_pct = ((end_price - start_price) / start_price) * 100
+                                
+                                heatmap_data.append({
+                                    'Ticker': ticker,
+                                    'Sector': sector,
+                                    'Change': change_pct,
+                                    'Price': end_price
+                                })
+                        except:
+                            continue
+                
+                # ====================================
+                # CAC 40
+                # ====================================
+                elif market_choice == "CAC 40":
+                    cac40_tickers = [
+                        ("AIR.PA", "Industrie"), ("AIRP.PA", "Industrie"), ("ALO.PA", "Luxe"),
+                        ("BNP.PA", "Finance"), ("EN.PA", "Energie"), ("CAP.PA", "Tech"),
+                        ("CA.PA", "Finance"), ("ACA.PA", "Finance"), ("DSY.PA", "Tech"),
+                        ("ENGI.PA", "Energie"), ("RMS.PA", "Luxe"), ("MC.PA", "Luxe"),
+                        ("OR.PA", "Luxe"), ("SAN.PA", "Pharma"), ("AI.PA", "Industrie"),
+                        ("CS.PA", "Finance"), ("BN.PA", "Alimentaire"), ("KER.PA", "Luxe"),
+                        ("LR.PA", "Cosmétique"), ("ML.PA", "Acier"), ("ORP.PA", "Cosmétique"),
+                        ("RI.PA", "Luxe"), ("PUB.PA", "Média"), ("RNO.PA", "Auto"),
+                        ("SAF.PA", "Luxe"), ("SGO.PA", "Luxe"), ("SU.PA", "Energie"),
+                        ("GLE.PA", "Finance"), ("SW.PA", "Eau"), ("STMPA.PA", "Tech"),
+                        ("TEP.PA", "Telecom"), ("HO.PA", "Industrie"), ("TTE.PA", "Energie"),
+                        ("URW.PA", "Immobilier"), ("VIE.PA", "Médias"), ("DG.PA", "Luxe"),
+                        ("VIV.PA", "Telecom"), ("WLN.PA", "Services")
+                    ]
+                    
+                    for ticker, sector in cac40_tickers:
+                        try:
+                            df = yf.download(ticker, period=period, progress=False)
+                            if not df.empty:
+                                if isinstance(df.columns, pd.MultiIndex):
+                                    df.columns = df.columns.get_level_values(0)
+                                
+                                start_price = float(df['Close'].iloc[0])
+                                end_price = float(df['Close'].iloc[-1])
+                                change_pct = ((end_price - start_price) / start_price) * 100
+                                
+                                heatmap_data.append({
+                                    'Ticker': ticker.replace('.PA', ''),
+                                    'Sector': sector,
+                                    'Change': change_pct,
+                                    'Price': end_price
+                                })
+                        except:
+                            continue
+                
+                # ====================================
+                # NASDAQ TOP 20
+                # ====================================
+                elif market_choice == "NASDAQ Top 20":
+                    nasdaq_top = [
+                        ("AAPL", "Tech"), ("MSFT", "Tech"), ("GOOGL", "Tech"), ("AMZN", "E-commerce"),
+                        ("NVDA", "Tech"), ("META", "Social"), ("TSLA", "Auto"), ("AVGO", "Semi"),
+                        ("ASML", "Semi"), ("COST", "Retail"), ("ADBE", "Software"), ("CSCO", "Network"),
+                        ("PEP", "Beverage"), ("NFLX", "Streaming"), ("CMCSA", "Media"), ("INTC", "Semi"),
+                        ("AMD", "Semi"), ("QCOM", "Semi"), ("TXN", "Semi"), ("AMAT", "Semi")
+                    ]
+                    
+                    for ticker, sector in nasdaq_top:
+                        try:
+                            df = yf.download(ticker, period=period, progress=False)
+                            if not df.empty:
+                                if isinstance(df.columns, pd.MultiIndex):
+                                    df.columns = df.columns.get_level_values(0)
+                                
+                                start_price = float(df['Close'].iloc[0])
+                                end_price = float(df['Close'].iloc[-1])
+                                change_pct = ((end_price - start_price) / start_price) * 100
+                                
+                                heatmap_data.append({
+                                    'Ticker': ticker,
+                                    'Sector': sector,
+                                    'Change': change_pct,
+                                    'Price': end_price
+                                })
+                        except:
+                            continue
+                
+                # ====================================
+                # CRYPTO TOP 15
+                # ====================================
+                elif market_choice == "Crypto Top 15":
+                    crypto_list = [
+                        "BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "DOGE", 
+                        "MATIC", "DOT", "AVAX", "LINK", "UNI", "ATOM", "LTC", "BCH"
+                    ]
+                    
+                    for crypto in crypto_list:
+                        try:
+                            ticker_crypto = f"{crypto}-USD"
+                            df = yf.download(ticker_crypto, period=period, progress=False)
+                            if not df.empty:
+                                if isinstance(df.columns, pd.MultiIndex):
+                                    df.columns = df.columns.get_level_values(0)
+                                
+                                start_price = float(df['Close'].iloc[0])
+                                end_price = float(df['Close'].iloc[-1])
+                                change_pct = ((end_price - start_price) / start_price) * 100
+                                
+                                heatmap_data.append({
+                                    'Ticker': crypto,
+                                    'Sector': 'Crypto',
+                                    'Change': change_pct,
+                                    'Price': end_price
+                                })
+                        except:
+                            continue
+                
+                # ====================================
+                # SECTEURS S&P 500
+                # ====================================
+                elif market_choice == "Secteurs S&P 500":
+                    sectors_etf = [
+                        ("XLK", "Technology"),
+                        ("XLF", "Finance"),
+                        ("XLV", "Healthcare"),
+                        ("XLE", "Energy"),
+                        ("XLY", "Consumer Discretionary"),
+                        ("XLP", "Consumer Staples"),
+                        ("XLI", "Industrials"),
+                        ("XLU", "Utilities"),
+                        ("XLRE", "Real Estate"),
+                        ("XLC", "Communication"),
+                        ("XLB", "Materials")
+                    ]
+                    
+                    for ticker, sector in sectors_etf:
+                        try:
+                            df = yf.download(ticker, period=period, progress=False)
+                            if not df.empty:
+                                if isinstance(df.columns, pd.MultiIndex):
+                                    df.columns = df.columns.get_level_values(0)
+                                
+                                start_price = float(df['Close'].iloc[0])
+                                end_price = float(df['Close'].iloc[-1])
+                                change_pct = ((end_price - start_price) / start_price) * 100
+                                
+                                heatmap_data.append({
+                                    'Ticker': sector,
+                                    'Sector': 'Sector ETF',
+                                    'Change': change_pct,
+                                    'Price': end_price
+                                })
+                        except:
+                            continue
+                
+                # ====================================
+                # AFFICHAGE DES RÉSULTATS
+                # ====================================
+                
+                if heatmap_data:
+                    df_heatmap = pd.DataFrame(heatmap_data)
+                    
+                    st.success(f"✅ {len(df_heatmap)} actifs chargés")
+                    
+                    # Statistiques globales
+                    st.markdown("### 📊 STATISTIQUES DU MARCHÉ")
+                    
+                    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                    
+                    with col_stat1:
+                        avg_change = df_heatmap['Change'].mean()
+                        st.metric("Variation Moyenne", f"{avg_change:+.2f}%")
+                    
+                    with col_stat2:
+                        positive_count = len(df_heatmap[df_heatmap['Change'] > 0])
+                        positive_pct = (positive_count / len(df_heatmap)) * 100
+                        st.metric("Actions en hausse", f"{positive_count}/{len(df_heatmap)}", f"{positive_pct:.0f}%")
+                    
+                    with col_stat3:
+                        top_gainer = df_heatmap.loc[df_heatmap['Change'].idxmax()]
+                        st.metric("Top Gainer 🚀", top_gainer['Ticker'], f"{top_gainer['Change']:+.2f}%")
+                    
+                    with col_stat4:
+                        top_loser = df_heatmap.loc[df_heatmap['Change'].idxmin()]
+                        st.metric("Top Loser 📉", top_loser['Ticker'], f"{top_loser['Change']:+.2f}%")
+                    
+                    st.markdown("---")
+                    
+                    # HEATMAP TREEMAP
+                    st.markdown("### 🌊 HEATMAP INTERACTIVE")
+                    
+                    # Créer le TreeMap
+                    if 'Sector' in df_heatmap.columns and market_choice != "Crypto Top 15":
+                        # TreeMap avec secteurs
+                        fig_heatmap = go.Figure(go.Treemap(
+                            labels=df_heatmap['Ticker'],
+                            parents=df_heatmap['Sector'],
+                            values=abs(df_heatmap['Change']),
+                            marker=dict(
+                                colors=df_heatmap['Change'],
+                                colorscale='RdYlGn',
+                                cmid=0,
+                                colorbar=dict(
+                                    title="Change %",
+                                    ticksuffix="%",
+                                    thickness=20
+                                ),
+                                line=dict(color='black', width=2)
+                            ),
+                            text=df_heatmap.apply(lambda x: f"{x['Ticker']}<br>{x['Change']:+.1f}%<br>${x['Price']:.2f}", axis=1),
+                            textposition='middle center',
+                            textfont=dict(size=14, color='white', family='Arial Black'),
+                            hovertemplate='<b>%{label}</b><br>Change: %{color:.2f}%<br><extra></extra>'
+                        ))
+                    else:
+                        # TreeMap simple (crypto)
+                        fig_heatmap = go.Figure(go.Treemap(
+                            labels=df_heatmap['Ticker'],
+                            values=abs(df_heatmap['Change']),
+                            marker=dict(
+                                colors=df_heatmap['Change'],
+                                colorscale='RdYlGn',
+                                cmid=0,
+                                colorbar=dict(
+                                    title="Change %",
+                                    ticksuffix="%",
+                                    thickness=20
+                                ),
+                                line=dict(color='black', width=2)
+                            ),
+                            text=df_heatmap.apply(lambda x: f"{x['Ticker']}<br>{x['Change']:+.1f}%", axis=1),
+                            textposition='middle center',
+                            textfont=dict(size=16, color='white', family='Arial Black'),
+                            hovertemplate='<b>%{label}</b><br>Change: %{color:.2f}%<br><extra></extra>'
+                        ))
+                    
+                    fig_heatmap.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor='black',
+                        height=700,
+                        title=f"Heatmap: {market_choice} - {time_period}",
+                        font=dict(size=12, color='white')
+                    )
+                    
+                    st.plotly_chart(fig_heatmap, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # Top gainers et losers
+                    st.markdown("### 🏆 TOP 5 GAINERS & LOSERS")
+                    
+                    col_gain, col_loss = st.columns(2)
+                    
+                    with col_gain:
+                        st.markdown("#### 🚀 TOP GAINERS")
+                        top_5_gainers = df_heatmap.nlargest(5, 'Change')
+                        
+                        for idx, row in top_5_gainers.iterrows():
+                            st.markdown(f"""
+                                <div style='padding: 12px; background: #00ff0022; border-left: 4px solid #00ff00; border-radius: 5px; margin: 8px 0;'>
+                                    <div style='display: flex; justify-content: space-between;'>
+                                        <b style='color: #00ff00; font-size: 16px;'>{row['Ticker']}</b>
+                                        <b style='color: white; font-size: 16px;'>{row['Change']:+.2f}%</b>
+                                    </div>
+                                    <small style='color: #ccc;'>${row['Price']:.2f}</small>
+                                </div>
+                            """, unsafe_allow_html=True)
+                    
+                    with col_loss:
+                        st.markdown("#### 📉 TOP LOSERS")
+                        top_5_losers = df_heatmap.nsmallest(5, 'Change')
+                        
+                        for idx, row in top_5_losers.iterrows():
+                            st.markdown(f"""
+                                <div style='padding: 12px; background: #ff000022; border-left: 4px solid #ff0000; border-radius: 5px; margin: 8px 0;'>
+                                    <div style='display: flex; justify-content: space-between;'>
+                                        <b style='color: #ff0000; font-size: 16px;'>{row['Ticker']}</b>
+                                        <b style='color: white; font-size: 16px;'>{row['Change']:+.2f}%</b>
+                                    </div>
+                                    <small style='color: #ccc;'>${row['Price']:.2f}</small>
+                                </div>
+                            """, unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    
+                    # Distribution des performances
+                    st.markdown("### 📊 DISTRIBUTION DES PERFORMANCES")
+                    
+                    fig_dist = go.Figure()
+                    
+                    fig_dist.add_trace(go.Histogram(
+                        x=df_heatmap['Change'],
+                        nbinsx=30,
+                        marker_color='cyan',
+                        marker_line_color='black',
+                        marker_line_width=1.5,
+                        name='Distribution'
+                    ))
+                    
+                    # Ligne de la moyenne
+                    fig_dist.add_vline(
+                        x=avg_change,
+                        line_dash="dash",
+                        line_color="orange",
+                        line_width=3,
+                        annotation_text=f"Moyenne: {avg_change:+.2f}%",
+                        annotation_position="top"
+                    )
+                    
+                    fig_dist.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor='black',
+                        plot_bgcolor='black',
+                        title="Distribution des variations",
+                        xaxis_title="Variation (%)",
+                        yaxis_title="Nombre d'actifs",
+                        height=400,
+                        showlegend=False
+                    )
+                    
+                    st.plotly_chart(fig_dist, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # Analyse par secteur (si applicable)
+                    if 'Sector' in df_heatmap.columns and market_choice not in ["Crypto Top 15", "Secteurs S&P 500"]:
+                        st.markdown("### 🎯 PERFORMANCE PAR SECTEUR")
+                        
+                        sector_perf = df_heatmap.groupby('Sector')['Change'].agg(['mean', 'count']).reset_index()
+                        sector_perf.columns = ['Secteur', 'Variation Moyenne (%)', 'Nombre']
+                        sector_perf = sector_perf.sort_values('Variation Moyenne (%)', ascending=False)
+                        
+                        fig_sector = go.Figure(go.Bar(
+                            x=sector_perf['Secteur'],
+                            y=sector_perf['Variation Moyenne (%)'],
+                            marker_color=['green' if x >= 0 else 'red' for x in sector_perf['Variation Moyenne (%)']],
+                            text=sector_perf['Variation Moyenne (%)'].apply(lambda x: f"{x:+.2f}%"),
+                            textposition='auto'
+                        ))
+                        
+                        fig_sector.update_layout(
+                            template="plotly_dark",
+                            paper_bgcolor='black',
+                            plot_bgcolor='black',
+                            title="Performance Moyenne par Secteur",
+                            xaxis_title="Secteur",
+                            yaxis_title="Variation Moyenne (%)",
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig_sector, use_container_width=True)
+                    
+                    # Tableau complet
+                    st.markdown("---")
+                    st.markdown("### 📋 TABLEAU COMPLET")
+                    
+                    df_display = df_heatmap.copy()
+                    df_display = df_display.sort_values('Change', ascending=False)
+                    df_display['Change'] = df_display['Change'].apply(lambda x: f"{x:+.2f}%")
+                    df_display['Price'] = df_display['Price'].apply(lambda x: f"${x:.2f}")
+                    
+                    st.dataframe(df_display, use_container_width=True, hide_index=True)
+                    
+                else:
+                    st.error("❌ Impossible de charger les données du marché")
+                    
+        except Exception as e:
+            st.error(f"Erreur lors de la génération: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
