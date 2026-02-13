@@ -4800,7 +4800,7 @@ elif outil == "ON-CHAIN ANALYSIS":
                     ), row=1, col=1)
                     
                     # Volume
-                    colors_vol = ['red' if df_crypto['Close'].iloc[i] < df_crypto['Open'].iloc[i] else 'green' for i in range(len(df_crypto))]
+                    colors_vol = ['red' if float(df_crypto['Close'].iloc[i]) < float(df_crypto['Open'].iloc[i]) else 'green' for i in range(len(df_crypto))]
                     fig_onchain.add_trace(go.Bar(
                         x=df_crypto.index,
                         y=df_crypto['Volume'],
