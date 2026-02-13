@@ -27,6 +27,231 @@ def get_crypto_price(symbol):
         except:
             return None
 
+# --- OUTIL DE VALORISATION FONDAMENTALE ---
+class ValuationCalculator:
+    """Calculateur de valeur fondamentale pour actions et cryptos"""
+    
+    def __init__(self, symbol):
+        self.symbol = symbol
+        self.ticker = yf.Ticker(symbol)
+        self.info = self._get_safe_info()
+        
+    def _get_safe_info(self):
+        try:
+            return self.ticker.info
+        except:
+            return {}
+    
+    def dcf_valuation(self, growth_rate=0.05, discount_rate=0.10, years=5):
+        """Calcule la valeur intrinsèque via DCF"""
+        try:
+            cash_flow = self.ticker.cashflow
+            if cash_flow.empty:
+                return {"error": "Données de cash flow non disponibles"}
+            
+            fcf = cash_flow.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cash_flow.index else None
+            
+            if fcf is None or pd.isna(fcf):
+                operating_cf = cash_flow.loc['Operating Cash Flow'].iloc[0] if 'Operating Cash Flow' in cash_flow.index else 0
+                capex = cash_flow.loc['Capital Expenditure'].iloc[0] if 'Capital Expenditure' in cash_flow.index else 0
+                fcf = operating_cf + capex
+            
+            projected_fcf = []
+            for year in range(1, years + 1):
+                future_fcf = fcf * ((1 + growth_rate) ** year)
+                discounted_fcf = future_fcf / ((1 + discount_rate) ** year)
+                projected_fcf.append({'year': year, 'fcf': future_fcf, 'discounted_fcf': discounted_fcf})
+            
+            terminal_value = (fcf * ((1 + growth_rate) ** years) * (1 + 0.02)) / (discount_rate - 0.02)
+            discounted_terminal_value = terminal_value / ((1 + discount_rate) ** years)
+            enterprise_value = sum([p['discounted_fcf'] for p in projected_fcf]) + discounted_terminal_value
+            
+            shares_outstanding = self.info.get('sharesOutstanding', 0)
+            if shares_outstanding == 0:
+                return {"error": "Nombre d'actions non disponible"}
+            
+            total_debt = self.info.get('totalDebt', 0)
+            cash = self.info.get('totalCash', 0)
+            net_debt = total_debt - cash
+            equity_value = enterprise_value - net_debt
+            fair_value_per_share = equity_value / shares_outstanding
+            current_price = self.info.get('currentPrice', 0)
+            upside = ((fair_value_per_share - current_price) / current_price) * 100 if current_price > 0 else 0
+            
+            return {
+                "method": "DCF",
+                "fair_value": round(fair_value_per_share, 2),
+                "current_price": round(current_price, 2),
+                "upside_pct": round(upside, 2),
+                "enterprise_value": round(enterprise_value, 2),
+                "equity_value": round(equity_value, 2),
+                "fcf_current": round(fcf, 2),
+                "parameters": {"growth_rate": growth_rate, "discount_rate": discount_rate, "years": years}
+            }
+        except Exception as e:
+            return {"error": f"Erreur DCF: {str(e)}"}
+    
+    def pe_valuation(self, target_pe=None):
+        """Valorisation basée sur le P/E ratio"""
+        try:
+            current_price = self.info.get('currentPrice', 0)
+            trailing_pe = self.info.get('trailingPE', 0)
+            forward_pe = self.info.get('forwardPE', 0)
+            trailing_eps = self.info.get('trailingEps', 0)
+            forward_eps = self.info.get('forwardEps', 0)
+            
+            if target_pe is None:
+                target_pe = trailing_pe if trailing_pe else 15
+            
+            if forward_eps > 0:
+                fair_value = forward_eps * target_pe
+                eps_used = forward_eps
+                eps_type = "Forward EPS"
+            elif trailing_eps > 0:
+                fair_value = trailing_eps * target_pe
+                eps_used = trailing_eps
+                eps_type = "Trailing EPS"
+            else:
+                return {"error": "EPS non disponible"}
+            
+            upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
+            
+            return {
+                "method": "P/E Ratio",
+                "fair_value": round(fair_value, 2),
+                "current_price": round(current_price, 2),
+                "upside_pct": round(upside, 2),
+                "current_pe": round(trailing_pe, 2) if trailing_pe else "N/A",
+                "target_pe": round(target_pe, 2) if target_pe else "N/A",
+                "eps": round(eps_used, 2),
+                "eps_type": eps_type
+            }
+        except Exception as e:
+            return {"error": f"Erreur P/E: {str(e)}"}
+    
+    def pb_valuation(self):
+        """Valorisation basée sur le Price/Book ratio"""
+        try:
+            current_price = self.info.get('currentPrice', 0)
+            book_value = self.info.get('bookValue', 0)
+            pb_ratio = self.info.get('priceToBook', 0)
+            
+            if book_value == 0:
+                return {"error": "Valeur comptable non disponible"}
+            
+            industry_pb = pb_ratio * 0.9
+            fair_value = book_value * industry_pb
+            upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
+            
+            return {
+                "method": "Price/Book",
+                "fair_value": round(fair_value, 2),
+                "current_price": round(current_price, 2),
+                "upside_pct": round(upside, 2),
+                "book_value": round(book_value, 2),
+                "current_pb": round(pb_ratio, 2),
+                "target_pb": round(industry_pb, 2)
+            }
+        except Exception as e:
+            return {"error": f"Erreur P/B: {str(e)}"}
+    
+    def nvt_valuation(self, window=90):
+        """Network Value to Transactions (pour crypto)"""
+        try:
+            hist = self.ticker.history(period=f"{window}d")
+            if hist.empty:
+                return {"error": "Données historiques non disponibles"}
+            
+            market_cap = self.info.get('marketCap', 0)
+            current_price = self.info.get('currentPrice', 0)
+            avg_volume = hist['Volume'].mean()
+            avg_price = hist['Close'].mean()
+            daily_transaction_value = avg_volume * avg_price
+            
+            if daily_transaction_value == 0:
+                return {"error": "Volume de transaction trop faible"}
+            
+            nvt_ratio = market_cap / daily_transaction_value
+            target_nvt = 15
+            fair_market_cap = daily_transaction_value * target_nvt
+            shares_equiv = market_cap / current_price if current_price > 0 else 1
+            fair_value = fair_market_cap / shares_equiv
+            upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
+            
+            if nvt_ratio > 20:
+                status = "Surévalué"
+            elif nvt_ratio < 10:
+                status = "Sous-évalué"
+            else:
+                status = "Juste valorisé"
+            
+            return {
+                "method": "NVT Ratio",
+                "fair_value": round(fair_value, 2),
+                "current_price": round(current_price, 2),
+                "upside_pct": round(upside, 2),
+                "nvt_ratio": round(nvt_ratio, 2),
+                "target_nvt": target_nvt,
+                "status": status,
+                "market_cap": market_cap,
+                "daily_tx_value": round(daily_transaction_value, 2)
+            }
+        except Exception as e:
+            return {"error": f"Erreur NVT: {str(e)}"}
+    
+    def get_comprehensive_valuation(self):
+        """Calcule toutes les valorisations possibles et retourne un consensus"""
+        results = {}
+        fair_values = []
+        is_crypto = "-USD" in self.symbol or self.symbol in ["BTC", "ETH", "BNB"]
+        
+        if is_crypto:
+            nvt = self.nvt_valuation()
+            if "error" not in nvt:
+                results["nvt"] = nvt
+                fair_values.append(nvt["fair_value"])
+        else:
+            dcf = self.dcf_valuation()
+            if "error" not in dcf:
+                results["dcf"] = dcf
+                fair_values.append(dcf["fair_value"])
+            
+            pe = self.pe_valuation()
+            if "error" not in pe:
+                results["pe"] = pe
+                fair_values.append(pe["fair_value"])
+            
+            pb = self.pb_valuation()
+            if "error" not in pb:
+                results["pb"] = pb
+                fair_values.append(pb["fair_value"])
+        
+        if fair_values:
+            consensus_value = np.median(fair_values)
+            current_price = self.info.get('currentPrice', 0)
+            consensus_upside = ((consensus_value - current_price) / current_price) * 100 if current_price > 0 else 0
+            
+            if consensus_upside > 20:
+                recommendation = "ACHAT FORT"
+            elif consensus_upside > 10:
+                recommendation = "ACHAT"
+            elif consensus_upside > -10:
+                recommendation = "CONSERVER"
+            elif consensus_upside > -20:
+                recommendation = "VENTE"
+            else:
+                recommendation = "VENTE FORTE"
+            
+            results["consensus"] = {
+                "fair_value": round(consensus_value, 2),
+                "current_price": round(current_price, 2),
+                "upside_pct": round(consensus_upside, 2),
+                "methods_used": len(fair_values),
+                "recommendation": recommendation
+            }
+        
+        return results
+
 # INITIALISATION : On crée un "coffre-fort" s'il n'existe pas encore
 if "multi_charts" not in st.session_state:
     st.session_state.multi_charts = []
@@ -297,8 +522,8 @@ elif categorie == "BOITE À OUTILS":
         "INTERETS COMPOSES",
         "ANALYSE TECHNIQUE PRO",
         "FIBONACCI CALCULATOR",
-        "BACKTESTING ENGINE"
-        
+        "BACKTESTING ENGINE",
+        "VALORISATION FONDAMENTALE"
     ])
 
 st.sidebar.markdown("---")
@@ -2761,3 +2986,244 @@ elif outil == "BACKTESTING ENGINE":
             st.error(f"Erreur lors du backtesting: {str(e)}")
             import traceback
             st.code(traceback.format_exc())
+
+# ============================================================================
+# VALORISATION FONDAMENTALE
+# ============================================================================
+elif outil == "VALORISATION FONDAMENTALE":
+    st.markdown("## 💰 VALORISATION FONDAMENTALE")
+    st.markdown("**Calculez la valeur théorique d'un actif avec plusieurs méthodes d'évaluation**")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        symbol = st.text_input("TICKER DE L'ACTIF", value="AAPL", 
+                               help="Ex: AAPL, MSFT, GOOGL, BTC-USD, ETH-USD, MC.PA")
+    
+    with col2:
+        st.write("")
+        st.write("")
+        if st.button("🔍 ANALYSER LA VALORISATION", use_container_width=True):
+            st.session_state['valuation_symbol'] = symbol
+    
+    if 'valuation_symbol' in st.session_state:
+        symbol = st.session_state['valuation_symbol']
+        
+        with st.spinner(f"Analyse fondamentale de {symbol} en cours..."):
+            calculator = ValuationCalculator(symbol)
+            results = calculator.get_comprehensive_valuation()
+            
+            if not results:
+                st.error("❌ Impossible de valoriser cet actif (données insuffisantes)")
+            else:
+                # CONSENSUS
+                if "consensus" in results:
+                    st.markdown("---")
+                    st.markdown("### 📊 CONSENSUS DE VALORISATION")
+                    
+                    cons = results["consensus"]
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("PRIX ACTUEL", f"${cons['current_price']:.2f}")
+                    
+                    with col2:
+                        st.metric("VALEUR JUSTE", f"${cons['fair_value']:.2f}")
+                    
+                    with col3:
+                        delta_color = "normal" if abs(cons['upside_pct']) < 10 else ("inverse" if cons['upside_pct'] > 0 else "off")
+                        st.metric("POTENTIEL", f"{cons['upside_pct']:+.1f}%", delta_color=delta_color)
+                    
+                    with col4:
+                        rec = cons['recommendation']
+                        if "ACHAT" in rec:
+                            st.success(f"**{rec}** 🚀")
+                        elif "VENTE" in rec:
+                            st.error(f"**{rec}** ⚠️")
+                        else:
+                            st.info(f"**{rec}** ⚖️")
+                    
+                    st.caption(f"Basé sur {cons['methods_used']} méthode(s) de valorisation")
+                    
+                    # Jauge visuelle
+                    upside = cons['upside_pct']
+                    if upside > 0:
+                        gauge_color = "#00ff00" if upside > 20 else "#00ffad"
+                        sentiment = f"SOUS-ÉVALUÉ de {upside:.1f}%"
+                    else:
+                        gauge_color = "#ff4b4b" if upside < -20 else "#ff9800"
+                        sentiment = f"SURÉVALUÉ de {abs(upside):.1f}%"
+                    
+                    gauge_score = 50 + (upside / 2)
+                    gauge_score = max(0, min(100, gauge_score))
+                    
+                    fig_gauge = go.Figure(go.Indicator(
+                        mode = "gauge+number",
+                        value = gauge_score,
+                        number = {'font': {'size': 30, 'color': "white"}},
+                        title = {'text': f"<b>INDICE DE VALORISATION</b><br><span style='color:{gauge_color}; font-size:14px;'>{sentiment}</span>", 
+                                 'font': {'size': 16, 'color': "white"}},
+                        gauge = {
+                            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+                            'bar': {'color': gauge_color, 'thickness': 0.3},
+                            'bgcolor': "rgba(0,0,0,0)",
+                            'steps': [
+                                {'range': [0, 25], 'color': "rgba(255, 75, 75, 0.2)"},
+                                {'range': [25, 45], 'color': "rgba(255, 152, 0, 0.2)"},
+                                {'range': [45, 55], 'color': "rgba(241, 196, 15, 0.2)"},
+                                {'range': [55, 75], 'color': "rgba(0, 255, 173, 0.2)"},
+                                {'range': [75, 100], 'color': "rgba(0, 255, 0, 0.2)"}
+                            ],
+                        }
+                    ))
+                    fig_gauge.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        font={'color': "white"}, 
+                        height=300, 
+                        margin=dict(l=25, r=25, t=100, b=20)
+                    )
+                    st.plotly_chart(fig_gauge, use_container_width=True)
+                
+                # DÉTAILS PAR MÉTHODE
+                st.markdown("---")
+                st.markdown("### 📈 DÉTAILS PAR MÉTHODE DE VALORISATION")
+                
+                methods_available = [method for method in results.keys() if method != "consensus"]
+                
+                if methods_available:
+                    tabs = st.tabs([method.upper() for method in methods_available])
+                    
+                    for idx, method in enumerate(methods_available):
+                        with tabs[idx]:
+                            data = results[method]
+                            
+                            if "error" in data:
+                                st.warning(f"⚠️ {data['error']}")
+                            else:
+                                col1, col2, col3 = st.columns(3)
+                                
+                                with col1:
+                                    st.metric("VALEUR JUSTE", f"${data['fair_value']:.2f}")
+                                with col2:
+                                    st.metric("PRIX ACTUEL", f"${data['current_price']:.2f}")
+                                with col3:
+                                    upside_val = data['upside_pct']
+                                    color = "normal" if abs(upside_val) < 10 else ("inverse" if upside_val > 0 else "off")
+                                    st.metric("POTENTIEL", f"{upside_val:+.1f}%", delta_color=color)
+                                
+                                st.markdown("---")
+                                st.markdown("**PARAMÈTRES DE LA MÉTHODE:**")
+                                
+                                # Affichage spécifique selon la méthode
+                                if method == "dcf":
+                                    col_param = st.columns(3)
+                                    with col_param[0]:
+                                        st.info(f"**Valeur d'Entreprise:** ${data['enterprise_value']:,.0f}")
+                                    with col_param[1]:
+                                        st.info(f"**Valeur des Actions:** ${data['equity_value']:,.0f}")
+                                    with col_param[2]:
+                                        st.info(f"**FCF Actuel:** ${data['fcf_current']:,.0f}")
+                                    
+                                    params = data['parameters']
+                                    st.write(f"- Taux de croissance: **{params['growth_rate']*100:.1f}%**")
+                                    st.write(f"- Taux d'actualisation: **{params['discount_rate']*100:.1f}%**")
+                                    st.write(f"- Projection: **{params['years']} ans**")
+                                
+                                elif method == "pe":
+                                    col_param = st.columns(3)
+                                    with col_param[0]:
+                                        st.info(f"**P/E Actuel:** {data['current_pe']}")
+                                    with col_param[1]:
+                                        st.info(f"**P/E Cible:** {data['target_pe']}")
+                                    with col_param[2]:
+                                        st.info(f"**EPS:** ${data['eps']:.2f}")
+                                    st.write(f"- Type EPS: **{data['eps_type']}**")
+                                
+                                elif method == "pb":
+                                    col_param = st.columns(3)
+                                    with col_param[0]:
+                                        st.info(f"**Valeur Comptable:** ${data['book_value']:.2f}")
+                                    with col_param[1]:
+                                        st.info(f"**P/B Actuel:** {data['current_pb']:.2f}")
+                                    with col_param[2]:
+                                        st.info(f"**P/B Cible:** {data['target_pb']:.2f}")
+                                
+                                elif method == "nvt":
+                                    col_param = st.columns(3)
+                                    with col_param[0]:
+                                        st.info(f"**NVT Ratio:** {data['nvt_ratio']:.2f}")
+                                    with col_param[1]:
+                                        st.info(f"**Status:** {data['status']}")
+                                    with col_param[2]:
+                                        st.info(f"**Market Cap:** ${data['market_cap']:,.0f}")
+                                    st.write(f"- Volume quotidien moyen: **${data['daily_tx_value']:,.0f}**")
+                                    st.write(f"- NVT cible: **{data['target_nvt']}**")
+                                    st.caption("NVT < 10 = Sous-évalué | NVT 10-20 = Juste valorisé | NVT > 20 = Surévalué")
+                
+                # INFORMATIONS COMPLÉMENTAIRES
+                st.markdown("---")
+                st.markdown("### ℹ️ INFORMATIONS COMPLÉMENTAIRES")
+                
+                info = calculator.info
+                if info:
+                    col_info = st.columns(4)
+                    
+                    with col_info[0]:
+                        sector = info.get('sector', 'N/A')
+                        st.write(f"**Secteur:** {sector}")
+                    
+                    with col_info[1]:
+                        industry = info.get('industry', 'N/A')
+                        st.write(f"**Industrie:** {industry}")
+                    
+                    with col_info[2]:
+                        market_cap = info.get('marketCap', 0)
+                        if market_cap > 0:
+                            st.write(f"**Cap. Boursière:** ${market_cap/1e9:.2f}B")
+                        else:
+                            st.write(f"**Cap. Boursière:** N/A")
+                    
+                    with col_info[3]:
+                        employees = info.get('fullTimeEmployees', 'N/A')
+                        st.write(f"**Employés:** {employees:,}" if isinstance(employees, int) else f"**Employés:** {employees}")
+                
+                # GUIDE D'INTERPRÉTATION
+                with st.expander("📖 GUIDE D'INTERPRÉTATION"):
+                    st.markdown("""
+                    **COMMENT INTERPRÉTER LES RÉSULTATS:**
+                    
+                    **Potentiel (Upside %):**
+                    - **> +20%** : Fortement sous-évalué → ACHAT FORT 🚀
+                    - **+10% à +20%** : Sous-évalué → ACHAT 📈
+                    - **-10% à +10%** : Juste valorisé → CONSERVER ⚖️
+                    - **-20% à -10%** : Surévalué → VENTE 📉
+                    - **< -20%** : Fortement surévalué → VENTE FORTE ⚠️
+                    
+                    **MÉTHODES DE VALORISATION:**
+                    
+                    **DCF (Discounted Cash Flow):**
+                    - Meilleure pour: Sociétés matures avec cash flows stables
+                    - Principe: Actualisation des flux futurs de trésorerie
+                    - Fiabilité: Haute (si les hypothèses sont bonnes)
+                    
+                    **P/E Ratio (Price/Earnings):**
+                    - Meilleure pour: Comparaison sectorielle rapide
+                    - Principe: Valorisation relative basée sur les bénéfices
+                    - Fiabilité: Moyenne (dépend du secteur)
+                    
+                    **Price/Book:**
+                    - Meilleure pour: Banques, financières, sociétés avec beaucoup d'actifs
+                    - Principe: Comparaison prix vs valeur comptable
+                    - Fiabilité: Moyenne (moins pertinent pour tech)
+                    
+                    **NVT Ratio (Network Value to Transactions):**
+                    - Meilleure pour: Cryptomonnaies uniquement
+                    - Principe: Ratio capitalisation / volume de transactions
+                    - Fiabilité: Moyenne (proxy, pas valorisation exacte)
+                    
+                    **⚠️ LIMITATIONS:**
+                    - Les valorisations dépendent de la qualité des données financières
+                    - Les projections futures sont incertaines
+                    - À combiner avec l'analyse technique pour de meilleures décisions
+                    - Ne constitue pas un conseil en investissement
+                    """)
