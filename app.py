@@ -1605,7 +1605,7 @@ elif outil == "ANALYSE TECHNIQUE PRO":
     with col1:
         ticker_tech = st.text_input("TICKER", value="AAPL", key="tech_ticker").upper()
     with col2:
-        period_tech = st.selectbox("PÉRIODE", ["1mo", "3mo", "6mo", "1y"], index=1, key="tech_period")
+        period_tech = st.selectbox("PÉRIODE", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "max"], index=2, key="tech_period")
     with col3:
         st.markdown("<br>", unsafe_allow_html=True)
         analyze_button = st.button("🚀 ANALYSER", key="tech_analyze")
@@ -1683,57 +1683,103 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                         signals = []
                         score = 0
                         
-                        # RSI Signal
-                        if rsi_val < 30:
-                            signals.append(("RSI", "🟢 OVERSOLD - Signal ACHAT", "bullish"))
-                            score += 2
-                        elif rsi_val > 70:
-                            signals.append(("RSI", "🔴 OVERBOUGHT - Signal VENTE", "bearish"))
-                            score -= 2
-                        else:
-                            signals.append(("RSI", "🟡 NEUTRE", "neutral"))
+                        # Affichage debug
+                        st.write(f"🔍 **Valeurs pour debug:** RSI={rsi_val:.2f}, MACD={macd_val:.4f}, Signal={signal_val:.4f}, Prix={close_val:.2f}, BB_Lower={bb_lower_val:.2f}, BB_Upper={bb_upper_val:.2f}")
                         
-                        # MACD Signal
-                        if macd_val > signal_val:
-                            signals.append(("MACD", "🟢 BULLISH - Signal positif", "bullish"))
+                        # RSI Signal (plus sensible)
+                        if rsi_val < 35:
+                            signals.append(("RSI", f"🟢 OVERSOLD ({rsi_val:.1f}) - Signal ACHAT", "bullish"))
+                            score += 2
+                        elif rsi_val > 65:
+                            signals.append(("RSI", f"🔴 OVERBOUGHT ({rsi_val:.1f}) - Signal VENTE", "bearish"))
+                            score -= 2
+                        elif rsi_val < 45:
+                            signals.append(("RSI", f"🟢 Légèrement bas ({rsi_val:.1f}) - Opportunité", "bullish"))
                             score += 1
-                        else:
-                            signals.append(("MACD", "🔴 BEARISH - Signal négatif", "bearish"))
+                        elif rsi_val > 55:
+                            signals.append(("RSI", f"🟡 Légèrement haut ({rsi_val:.1f}) - Prudence", "neutral"))
                             score -= 1
+                        else:
+                            signals.append(("RSI", f"🟡 NEUTRE ({rsi_val:.1f})", "neutral"))
                         
-                        # Bollinger Signal
-                        if close_val < bb_lower_val:
-                            signals.append(("Bollinger", "🟢 Prix sous bande basse - ACHAT", "bullish"))
+                        # MACD Signal (vérifie le croisement)
+                        macd_diff = macd_val - signal_val
+                        if macd_diff > 0:
+                            if macd_diff > 0.5:
+                                signals.append(("MACD", f"🟢 FORTEMENT BULLISH (+{macd_diff:.2f})", "bullish"))
+                                score += 2
+                            else:
+                                signals.append(("MACD", f"🟢 BULLISH (+{macd_diff:.2f})", "bullish"))
+                                score += 1
+                        else:
+                            if macd_diff < -0.5:
+                                signals.append(("MACD", f"🔴 FORTEMENT BEARISH ({macd_diff:.2f})", "bearish"))
+                                score -= 2
+                            else:
+                                signals.append(("MACD", f"🔴 BEARISH ({macd_diff:.2f})", "bearish"))
+                                score -= 1
+                        
+                        # Bollinger Signal (plus précis)
+                        bb_position = (close_val - bb_lower_val) / (bb_upper_val - bb_lower_val) * 100
+                        if bb_position < 10:
+                            signals.append(("Bollinger", f"🟢 Prix très proche bande basse ({bb_position:.0f}%) - ACHAT", "bullish"))
                             score += 2
-                        elif close_val > bb_upper_val:
-                            signals.append(("Bollinger", "🔴 Prix sur bande haute - VENTE", "bearish"))
+                        elif bb_position < 30:
+                            signals.append(("Bollinger", f"🟢 Prix dans zone basse ({bb_position:.0f}%)", "bullish"))
+                            score += 1
+                        elif bb_position > 90:
+                            signals.append(("Bollinger", f"🔴 Prix très proche bande haute ({bb_position:.0f}%) - VENTE", "bearish"))
+                            score -= 2
+                        elif bb_position > 70:
+                            signals.append(("Bollinger", f"🔴 Prix dans zone haute ({bb_position:.0f}%)", "bearish"))
+                            score -= 1
+                        else:
+                            signals.append(("Bollinger", f"🟡 Prix au milieu ({bb_position:.0f}%)", "neutral"))
+                        
+                        # Moving Average Signal (plus de détails)
+                        ma_diff_pct = ((close_val - sma50_val) / sma50_val) * 100
+                        if ma_diff_pct > 5:
+                            signals.append(("MA50", f"🟢 Prix bien au-dessus MA50 (+{ma_diff_pct:.1f}%)", "bullish"))
+                            score += 2
+                        elif ma_diff_pct > 0:
+                            signals.append(("MA50", f"🟢 Prix au-dessus MA50 (+{ma_diff_pct:.1f}%)", "bullish"))
+                            score += 1
+                        elif ma_diff_pct < -5:
+                            signals.append(("MA50", f"🔴 Prix bien en-dessous MA50 ({ma_diff_pct:.1f}%)", "bearish"))
                             score -= 2
                         else:
-                            signals.append(("Bollinger", "🟡 Prix dans la bande", "neutral"))
-                        
-                        # Moving Average Signal
-                        if close_val > sma50_val:
-                            signals.append(("MA50", "🟢 Prix > MA50 - Tendance haussière", "bullish"))
-                            score += 1
-                        else:
-                            signals.append(("MA50", "🔴 Prix < MA50 - Tendance baissière", "bearish"))
+                            signals.append(("MA50", f"🔴 Prix en-dessous MA50 ({ma_diff_pct:.1f}%)", "bearish"))
                             score -= 1
                         
                         # Volume Signal
-                        if volume_val > volume_ma_val * 1.5:
-                            signals.append(("Volume", "⚠️ Volume anormalement élevé", "important"))
+                        volume_ratio = volume_val / volume_ma_val
+                        if volume_ratio > 2:
+                            signals.append(("Volume", f"⚠️ Volume TRÈS élevé (x{volume_ratio:.1f})", "important"))
+                            score += 2
+                        elif volume_ratio > 1.5:
+                            signals.append(("Volume", f"⚠️ Volume élevé (x{volume_ratio:.1f})", "important"))
                             score += 1
+                        elif volume_ratio < 0.5:
+                            signals.append(("Volume", f"📊 Volume faible (x{volume_ratio:.1f})", "neutral"))
+                        else:
+                            signals.append(("Volume", f"📊 Volume normal (x{volume_ratio:.1f})", "neutral"))
                         
-                        # Déterminer le sentiment global
-                        if score >= 3:
+                        # Déterminer le sentiment global (sur un score de -10 à +10 maintenant)
+                        if score >= 5:
                             sentiment = "FORTEMENT HAUSSIER 🚀"
                             sentiment_color = "#00ff00"
+                        elif score >= 2:
+                            sentiment = "HAUSSIER 📈"
+                            sentiment_color = "#7fff00"
                         elif score >= 1:
                             sentiment = "LÉGÈREMENT HAUSSIER 📈"
-                            sentiment_color = "#7fff00"
-                        elif score <= -3:
+                            sentiment_color = "#90ee90"
+                        elif score <= -5:
                             sentiment = "FORTEMENT BAISSIER 📉"
                             sentiment_color = "#ff0000"
+                        elif score <= -2:
+                            sentiment = "BAISSIER 📉"
+                            sentiment_color = "#ff4444"
                         elif score <= -1:
                             sentiment = "LÉGÈREMENT BAISSIER 📉"
                             sentiment_color = "#ff6347"
@@ -1745,7 +1791,8 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                         st.markdown(f"""
                             <div style='text-align: center; padding: 20px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px; margin: 20px 0;'>
                                 <h1 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h1>
-                                <p style='color: white; font-size: 20px; margin: 10px 0;'>Score Technique: {score}</p>
+                                <p style='color: white; font-size: 20px; margin: 10px 0;'>Score Technique: {score}/10</p>
+                                <p style='color: #ccc; font-size: 14px; margin: 5px 0;'>Analyse basée sur 5 indicateurs techniques</p>
                             </div>
                         """, unsafe_allow_html=True)
                         
