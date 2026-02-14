@@ -615,7 +615,8 @@ elif categorie == "BOITE À OUTILS":
         "CORRÉLATION DASH",
         "INTERETS COMPOSES",
         "HEATMAP MARCHÉ",
-        "ALERTS MANAGER"
+        "ALERTS MANAGER",
+        "INSIDER TRADING TRACKER"
     ])
 
 st.sidebar.markdown("---")
@@ -5548,3 +5549,305 @@ elif outil == "ALERTS MANAGER":
     with col_stats3:
         triggered_count = len(st.session_state.triggered_alerts)
         st.metric("Alertes Déclenchées", triggered_count)
+
+# ==========================================
+# MODULE : INSIDER TRADING TRACKER 👔
+# ==========================================
+
+elif outil == "INSIDER TRADING TRACKER":
+    st.markdown("""
+        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
+            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>👔 INSIDER TRADING TRACKER</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Transactions des Dirigeants & Initiés</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Input ticker
+    col_input1, col_input2 = st.columns([3, 1])
+    
+    with col_input1:
+        insider_ticker = st.text_input("TICKER", value="AAPL", key="insider_ticker").upper()
+    
+    with col_input2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        search_insider = st.button("🔍 RECHERCHER", key="search_insider", use_container_width=True)
+    
+    if search_insider:
+        try:
+            with st.spinner(f"Recherche des transactions d'initiés pour {insider_ticker}..."):
+                
+                # Note: Pour de vraies données, utiliser l'API SEC (EDGAR) ou des services payants
+                # Ici on simule des transactions réalistes
+                
+                ticker_obj = yf.Ticker(insider_ticker)
+                info = ticker_obj.info
+                
+                company_name = info.get('longName', insider_ticker)
+                current_price = info.get('currentPrice', info.get('regularMarketPrice', 100))
+                
+                # Simulations de transactions d'initiés (réalistes)
+                insider_transactions = [
+                    {
+                        "date": datetime.now() - timedelta(days=5),
+                        "insider": "Timothy D. Cook",
+                        "position": "CEO",
+                        "transaction": "Vente",
+                        "shares": 511890,
+                        "price": current_price * 0.98,
+                        "value": 511890 * current_price * 0.98,
+                        "shares_after": 3200000
+                    },
+                    {
+                        "date": datetime.now() - timedelta(days=12),
+                        "insider": "Luca Maestri",
+                        "position": "CFO",
+                        "transaction": "Achat",
+                        "shares": 15000,
+                        "price": current_price * 0.95,
+                        "value": 15000 * current_price * 0.95,
+                        "shares_after": 125000
+                    },
+                    {
+                        "date": datetime.now() - timedelta(days=18),
+                        "insider": "Deirdre O'Brien",
+                        "position": "SVP Retail",
+                        "transaction": "Vente",
+                        "shares": 8500,
+                        "price": current_price * 1.02,
+                        "value": 8500 * current_price * 1.02,
+                        "shares_after": 95000
+                    },
+                    {
+                        "date": datetime.now() - timedelta(days=25),
+                        "insider": "Jeff Williams",
+                        "position": "COO",
+                        "transaction": "Vente",
+                        "shares": 12400,
+                        "price": current_price * 0.97,
+                        "value": 12400 * current_price * 0.97,
+                        "shares_after": 180000
+                    },
+                    {
+                        "date": datetime.now() - timedelta(days=30),
+                        "insider": "Arthur D. Levinson",
+                        "position": "Chairman",
+                        "transaction": "Achat",
+                        "shares": 25000,
+                        "price": current_price * 0.92,
+                        "value": 25000 * current_price * 0.92,
+                        "shares_after": 1200000
+                    },
+                ]
+                
+                # Affichage header
+                st.markdown(f"### 📊 {company_name}")
+                
+                col_header1, col_header2, col_header3 = st.columns(3)
+                
+                with col_header1:
+                    st.metric("Prix Actuel", f"${current_price:.2f}")
+                
+                with col_header2:
+                    total_transactions = len(insider_transactions)
+                    st.metric("Transactions (30j)", total_transactions)
+                
+                with col_header3:
+                    achats = len([t for t in insider_transactions if t['transaction'] == "Achat"])
+                    ventes = len([t for t in insider_transactions if t['transaction'] == "Vente"])
+                    ratio_text = f"{achats} 🟢 / {ventes} 🔴"
+                    st.metric("Achats / Ventes", ratio_text)
+                
+                st.markdown("---")
+                
+                # Liste des transactions
+                st.markdown("### 📋 TRANSACTIONS RÉCENTES")
+                
+                for trans in insider_transactions:
+                    # Couleur selon type de transaction
+                    if trans['transaction'] == "Achat":
+                        border_color = "#00ff00"
+                        bg_color = "#00ff0011"
+                        emoji = "🟢"
+                    else:
+                        border_color = "#ff0000"
+                        bg_color = "#ff000011"
+                        emoji = "🔴"
+                    
+                    st.markdown(f"""
+                        <div style='padding: 20px; background: {bg_color}; border-radius: 12px; margin: 15px 0; border-left: 5px solid {border_color};'>
+                            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;'>
+                                <div>
+                                    <h3 style='color: white; margin: 0 0 5px 0;'>{emoji} {trans['transaction'].upper()}</h3>
+                                    <p style='color: #999; margin: 0; font-size: 13px;'>{trans['date'].strftime('%d/%m/%Y')}</p>
+                                </div>
+                                <div style='text-align: right;'>
+                                    <h2 style='color: {border_color}; margin: 0;'>${trans['value']:,.0f}</h2>
+                                    <p style='color: #999; margin: 0; font-size: 12px;'>Valeur totale</p>
+                                </div>
+                            </div>
+                            
+                            <div style='background: #0a0a0a; padding: 15px; border-radius: 8px;'>
+                                <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;'>
+                                    <div>
+                                        <p style='color: #666; font-size: 11px; margin: 0;'>INITIÉ</p>
+                                        <h4 style='color: white; margin: 5px 0 0 0;'>{trans['insider']}</h4>
+                                        <small style='color: #999;'>{trans['position']}</small>
+                                    </div>
+                                    <div>
+                                        <p style='color: #666; font-size: 11px; margin: 0;'>DÉTAILS</p>
+                                        <p style='color: white; margin: 5px 0;'>{trans['shares']:,} actions @ ${trans['price']:.2f}</p>
+                                        <small style='color: #999;'>Détention après: {trans['shares_after']:,}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                st.markdown("---")
+                
+                # Analyse
+                st.markdown("### 💡 ANALYSE")
+                
+                total_value_achat = sum([t['value'] for t in insider_transactions if t['transaction'] == "Achat"])
+                total_value_vente = sum([t['value'] for t in insider_transactions if t['transaction'] == "Vente"])
+                
+                net_value = total_value_achat - total_value_vente
+                
+                col_analysis1, col_analysis2 = st.columns(2)
+                
+                with col_analysis1:
+                    st.markdown(f"""
+                        <div style='padding: 20px; background: #00ff0022; border: 2px solid #00ff00; border-radius: 10px;'>
+                            <h4 style='color: #00ff00; margin: 0 0 10px 0;'>🟢 ACHATS</h4>
+                            <h2 style='color: white; margin: 0;'>${total_value_achat:,.0f}</h2>
+                            <p style='color: #ccc; margin: 10px 0 0 0; font-size: 14px;'>{achats} transaction(s)</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                with col_analysis2:
+                    st.markdown(f"""
+                        <div style='padding: 20px; background: #ff000022; border: 2px solid #ff0000; border-radius: 10px;'>
+                            <h4 style='color: #ff0000; margin: 0 0 10px 0;'>🔴 VENTES</h4>
+                            <h2 style='color: white; margin: 0;'>${total_value_vente:,.0f}</h2>
+                            <p style='color: #ccc; margin: 10px 0 0 0; font-size: 14px;'>{ventes} transaction(s)</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                
+                # Sentiment
+                if net_value > 1000000:
+                    sentiment = "HAUSSIER 🚀"
+                    sentiment_color = "#00ff00"
+                    sentiment_text = "Les initiés achètent massivement"
+                elif net_value > 0:
+                    sentiment = "LÉGÈREMENT HAUSSIER 📈"
+                    sentiment_color = "#7fff00"
+                    sentiment_text = "Légère tendance acheteuse"
+                elif net_value < -1000000:
+                    sentiment = "BAISSIER 📉"
+                    sentiment_color = "#ff0000"
+                    sentiment_text = "Les initiés vendent massivement"
+                elif net_value < 0:
+                    sentiment = "LÉGÈREMENT BAISSIER 📉"
+                    sentiment_color = "#ff6347"
+                    sentiment_text = "Légère tendance vendeuse"
+                else:
+                    sentiment = "NEUTRE ➡️"
+                    sentiment_color = "#ff9800"
+                    sentiment_text = "Activité équilibrée"
+                
+                st.markdown(f"""
+                    <div style='text-align: center; padding: 25px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px; margin: 20px 0;'>
+                        <h2 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h2>
+                        <h1 style='color: white; margin: 15px 0; font-size: 36px;'>${abs(net_value):,.0f}</h1>
+                        <p style='color: #ccc; font-size: 16px; margin: 0;'>{sentiment_text}</p>
+                        <small style='color: #999;'>Flux net (Achats - Ventes)</small>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Graphique
+                st.markdown("### 📊 GRAPHIQUE DES TRANSACTIONS")
+                
+                df_trans = pd.DataFrame(insider_transactions)
+                df_trans['date_str'] = df_trans['date'].dt.strftime('%d/%m')
+                
+                fig_insider = go.Figure()
+                
+                # Achats
+                achats_df = df_trans[df_trans['transaction'] == "Achat"]
+                if not achats_df.empty:
+                    fig_insider.add_trace(go.Bar(
+                        x=achats_df['date_str'],
+                        y=achats_df['value'],
+                        name='Achats',
+                        marker_color='green',
+                        text=achats_df['insider'],
+                        textposition='auto'
+                    ))
+                
+                # Ventes
+                ventes_df = df_trans[df_trans['transaction'] == "Vente"]
+                if not ventes_df.empty:
+                    fig_insider.add_trace(go.Bar(
+                        x=ventes_df['date_str'],
+                        y=-ventes_df['value'],  # Négatif pour afficher en bas
+                        name='Ventes',
+                        marker_color='red',
+                        text=ventes_df['insider'],
+                        textposition='auto'
+                    ))
+                
+                fig_insider.update_layout(
+                    template='plotly_dark',
+                    paper_bgcolor='black',
+                    plot_bgcolor='black',
+                    title="Flux d'Initiés (30 derniers jours)",
+                    xaxis_title="Date",
+                    yaxis_title="Valeur ($)",
+                    height=500,
+                    barmode='relative'
+                )
+                
+                st.plotly_chart(fig_insider, use_container_width=True)
+                
+                st.caption("⚠️ Données simulées à des fins de démonstration. Pour des données réelles, consultez les dépôts SEC Form 4.")
+                
+        except Exception as e:
+            st.error(f"Erreur: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+    
+    # Guide
+    st.markdown("---")
+    with st.expander("📖 GUIDE INSIDER TRADING"):
+        st.markdown("""
+        ### Comment interpréter les transactions d'initiés ?
+        
+        **🟢 SIGNAUX HAUSSIERS**
+        - Achats massifs des dirigeants (CEO, CFO)
+        - Achats multiples sur courte période
+        - Achats après une baisse du cours
+        - Ratio Achats/Ventes > 2
+        
+        **🔴 SIGNAUX BAISSIERS**
+        - Ventes importantes du top management
+        - Ventes groupées de plusieurs dirigeants
+        - Ratio Ventes/Achats > 3
+        
+        **⚠️ ATTENTION**
+        - Les ventes peuvent être planifiées (10b5-1)
+        - Certaines ventes sont dues à la fiscalité
+        - Regarder le contexte (divorce, retraite...)
+        - Analyser la taille relative à la détention totale
+        
+        **💡 MEILLEURS INDICATEURS**
+        - **Achats** sont plus significatifs que ventes
+        - **CEO/CFO** = signaux les plus forts
+        - **Clusters** d'achats = très bullish
+        - Comparer avec le prix actuel
+        
+        **📊 SOURCES DE DONNÉES**
+        - SEC Form 4 (USA)
+        - AMF (France)
+        - Insider Monkey, GuruFocus
+        - OpenInsider, Finviz
+        """)
