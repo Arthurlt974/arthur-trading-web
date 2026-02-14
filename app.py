@@ -5808,16 +5808,12 @@ elif outil == "INSIDER TRADING TRACKER":
         """)
 
 # ==========================================
-# MODULE : DIVIDEND CALENDAR 💰
+# MODULE : DIVIDEND CALENDAR 💰 (VERSION SIMPLIFIÉE)
 # ==========================================
 
 elif outil == "DIVIDEND CALENDAR":
-    st.markdown("""
-        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
-            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>💰 DIVIDEND CALENDAR</h1>
-            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Calendrier des Dividendes</p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.title("💰 DIVIDEND CALENDAR")
+    st.info("Calendrier des Dividendes")
     
     # Sélection de l'indice
     index_choice = st.selectbox(
@@ -5857,7 +5853,6 @@ elif outil == "DIVIDEND CALENDAR":
             ]
         
         for i, company in enumerate(companies):
-            # Dates de détachement simulées
             ex_date = today + timedelta(days=3 + i*7)
             payment_date = ex_date + timedelta(days=14)
             
@@ -5895,72 +5890,52 @@ elif outil == "DIVIDEND CALENDAR":
     
     st.markdown("---")
     
-    # Calendrier
+    # Calendrier avec expanders (SANS HTML)
     st.markdown("### 📅 CALENDRIER DES DÉTACHEMENTS")
     
     for div in dividends:
-        # Couleur selon le statut
-        if div['status'] == "À venir":
-            border_color = "#00ff00"
-            bg_color = "#00ff0011"
-        else:
-            border_color = "#666"
-            bg_color = "#66666611"
+        # Emoji selon le statut
+        status_emoji = "🟢" if div['status'] == "À venir" else "⚪"
         
-        # Couleur selon le rendement
+        # Emoji selon le rendement
         if div['yield'] >= 4:
-            yield_color = "#00ff00"
+            yield_emoji = "🔥"
         elif div['yield'] >= 2:
-            yield_color = "#ff9800"
+            yield_emoji = "⭐"
         else:
-            yield_color = "#ff6b6b"
+            yield_emoji = "📊"
         
-        st.markdown(f"""
-            <div style='padding: 20px; background: {bg_color}; border-radius: 12px; margin: 15px 0; border-left: 5px solid {border_color};'>
-                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;'>
-                    <div>
-                        <h3 style='color: white; margin: 0 0 5px 0;'>{div['name']}</h3>
-                        <p style='color: #999; margin: 0; font-size: 13px;'>{div['ticker']} • {div['freq']}</p>
-                    </div>
-                    <div style='text-align: right;'>
-                        <h2 style='color: {yield_color}; margin: 0;'>{div['yield']:.2f}%</h2>
-                        <p style='color: #999; margin: 0; font-size: 12px;'>Rendement</p>
-                    </div>
-                </div>
-                
-                <div style='background: #0a0a0a; padding: 15px; border-radius: 8px;'>
-                    <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;'>
-                        <div>
-                            <p style='color: #666; font-size: 11px; margin: 0;'>MONTANT</p>
-                            <h4 style='color: white; margin: 5px 0 0 0;'>${div['amount']:.2f}</h4>
-                        </div>
-                        <div>
-                            <p style='color: #666; font-size: 11px; margin: 0;'>EX-DATE</p>
-                            <h4 style='color: #00bfff; margin: 5px 0 0 0;'>{div['ex_date'].strftime('%d/%m/%Y')}</h4>
-                        </div>
-                        <div>
-                            <p style='color: #666; font-size: 11px; margin: 0;'>PAIEMENT</p>
-                            <h4 style='color: #7fff00; margin: 5px 0 0 0;'>{div['payment_date'].strftime('%d/%m/%Y')}</h4>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        # Utiliser un expander pour chaque dividende
+        with st.expander(f"{status_emoji} {div['name']} - {div['yield']:.2f}% {yield_emoji}"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write(f"**Ticker:** {div['ticker']}")
+                st.write(f"**Fréquence:** {div['freq']}")
+                st.write(f"**Statut:** {div['status']}")
+            
+            with col2:
+                st.write(f"**Montant:** ${div['amount']:.2f}")
+                st.write(f"**Ex-Date:** {div['ex_date'].strftime('%d/%m/%Y')}")
+                st.write(f"**Paiement:** {div['payment_date'].strftime('%d/%m/%Y')}")
     
     st.markdown("---")
     
-    # Top rendements
-    st.markdown("### 🏆 TOP RENDEMENTS")
+    # Top rendements (VERSION SIMPLE)
+    st.markdown("### 🏆 TOP 5 RENDEMENTS")
     
     top_yields = sorted(dividends, key=lambda x: x['yield'], reverse=True)[:5]
     
-    for div in top_yields:
-        col_top1, col_top2 = st.columns([3, 1])
-        
-        with col_top1:
-            st.markdown(f"**{div['name']}** ({div['ticker']})")
-        
-        with col_top2:
-            st.markdown(f"<h3 style='color: #00ff00; text-align: right;'>{div['yield']:.2f}%</h3>", unsafe_allow_html=True)
+    # Créer un DataFrame pour affichage propre
+    df_top = pd.DataFrame([{
+        'Rang': idx + 1,
+        'Société': div['name'],
+        'Ticker': div['ticker'],
+        'Rendement': f"{div['yield']:.2f}%",
+        'Montant': f"${div['amount']:.2f}",
+        'Ex-Date': div['ex_date'].strftime('%d/%m/%Y')
+    } for idx, div in enumerate(top_yields)])
+    
+    st.dataframe(df_top, use_container_width=True, hide_index=True)
     
     st.caption("⚠️ Données simulées. Pour des données réelles, consultez Dividend.com ou les sites des sociétés.")
