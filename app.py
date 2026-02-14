@@ -5659,52 +5659,6 @@ elif outil == "INSIDER TRADING TRACKER":
                 
                 st.markdown("---")
                 
-                # Liste des transactions
-                st.markdown("### 📋 TRANSACTIONS RÉCENTES")
-                
-                for trans in insider_transactions:
-                    # Couleur selon type de transaction
-                    if trans['transaction'] == "Achat":
-                        border_color = "#00ff00"
-                        bg_color = "#00ff0011"
-                        emoji = "🟢"
-                    else:
-                        border_color = "#ff0000"
-                        bg_color = "#ff000011"
-                        emoji = "🔴"
-                    
-                    st.markdown(f"""
-                        <div style='padding: 20px; background: {bg_color}; border-radius: 12px; margin: 15px 0; border-left: 5px solid {border_color};'>
-                            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;'>
-                                <div>
-                                    <h3 style='color: white; margin: 0 0 5px 0;'>{emoji} {trans['transaction'].upper()}</h3>
-                                    <p style='color: #999; margin: 0; font-size: 13px;'>{trans['date'].strftime('%d/%m/%Y')}</p>
-                                </div>
-                                <div style='text-align: right;'>
-                                    <h2 style='color: {border_color}; margin: 0;'>${trans['value']:,.0f}</h2>
-                                    <p style='color: #999; margin: 0; font-size: 12px;'>Valeur totale</p>
-                                </div>
-                            </div>
-                            
-                            <div style='background: #0a0a0a; padding: 15px; border-radius: 8px;'>
-                                <div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;'>
-                                    <div>
-                                        <p style='color: #666; font-size: 11px; margin: 0;'>INITIÉ</p>
-                                        <h4 style='color: white; margin: 5px 0 0 0;'>{trans['insider']}</h4>
-                                        <small style='color: #999;'>{trans['position']}</small>
-                                    </div>
-                                    <div>
-                                        <p style='color: #666; font-size: 11px; margin: 0;'>DÉTAILS</p>
-                                        <p style='color: white; margin: 5px 0;'>{trans['shares']:,} actions @ ${trans['price']:.2f}</p>
-                                        <small style='color: #999;'>Détention après: {trans['shares_after']:,}</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                
-                st.markdown("---")
-                
                 # Analyse
                 st.markdown("### 💡 ANALYSE")
                 
