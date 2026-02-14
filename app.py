@@ -614,7 +614,8 @@ elif categorie == "BOITE À OUTILS":
         "Fear and Gread Index",
         "CORRÉLATION DASH",
         "INTERETS COMPOSES",
-        "HEATMAP MARCHÉ"
+        "HEATMAP MARCHÉ",
+        "ALERTS MANAGER"
     ])
 
 st.sidebar.markdown("---")
@@ -5256,3 +5257,294 @@ elif outil == "CRYPTO BUBBLE CHART":
             st.error(f"Erreur: {str(e)}")
             import traceback
             st.code(traceback.format_exc())
+
+# ==========================================
+# MODULE : ALERTS MANAGER 🔔
+# ==========================================
+
+elif outil == "ALERTS MANAGER":
+    st.markdown("""
+        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
+            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>🔔 ALERTS MANAGER</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Système d'Alertes Prix & Volume</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Initialiser les alertes dans session state
+    if 'alerts' not in st.session_state:
+        st.session_state.alerts = []
+    
+    if 'triggered_alerts' not in st.session_state:
+        st.session_state.triggered_alerts = []
+    
+    # Tabs pour séparer création et gestion
+    tab1, tab2, tab3 = st.tabs(["➕ CRÉER ALERTE", "📋 MES ALERTES", "✅ ALERTES DÉCLENCHÉES"])
+    
+    # ==========================================
+    # TAB 1: CRÉER UNE ALERTE
+    # ==========================================
+    with tab1:
+        st.markdown("### ➕ NOUVELLE ALERTE")
+        
+        col_create1, col_create2 = st.columns(2)
+        
+        with col_create1:
+            alert_ticker = st.text_input("TICKER", value="AAPL", key="alert_ticker").upper()
+            alert_type = st.selectbox(
+                "TYPE D'ALERTE",
+                ["Prix au-dessus", "Prix en-dessous", "Volume supérieur", "Variation % positive", "Variation % négative"],
+                key="alert_type"
+            )
+        
+        with col_create2:
+            if "Prix" in alert_type:
+                alert_value = st.number_input("PRIX CIBLE ($)", min_value=0.01, value=150.0, step=1.0, key="alert_value")
+            elif "Volume" in alert_type:
+                alert_value = st.number_input("VOLUME MINIMUM", min_value=1000000, value=100000000, step=1000000, key="alert_value_vol")
+            else:
+                alert_value = st.number_input("VARIATION (%)", min_value=0.1, value=5.0, step=0.5, key="alert_value_pct")
+            
+            alert_name = st.text_input("NOM DE L'ALERTE (optionnel)", key="alert_name", placeholder="Ex: AAPL breakout 150")
+        
+        if st.button("🚀 CRÉER L'ALERTE", key="create_alert_btn", use_container_width=True):
+            new_alert = {
+                'id': len(st.session_state.alerts) + 1,
+                'ticker': alert_ticker,
+                'type': alert_type,
+                'value': alert_value,
+                'name': alert_name if alert_name else f"{alert_ticker} {alert_type}",
+                'created_at': datetime.now(),
+                'active': True
+            }
+            st.session_state.alerts.append(new_alert)
+            st.success(f"✅ Alerte créée : {new_alert['name']}")
+            st.rerun()
+    
+    # ==========================================
+    # TAB 2: MES ALERTES ACTIVES
+    # ==========================================
+    with tab2:
+        st.markdown("### 📋 ALERTES ACTIVES")
+        
+        if st.session_state.alerts:
+            # Bouton pour vérifier toutes les alertes
+            if st.button("🔍 VÉRIFIER TOUTES LES ALERTES", key="check_all"):
+                with st.spinner("Vérification des alertes en cours..."):
+                    for alert in st.session_state.alerts:
+                        if not alert['active']:
+                            continue
+                        
+                        try:
+                            ticker = alert['ticker']
+                            df = yf.download(ticker, period="2d", progress=False)
+                            
+                            if df.empty:
+                                continue
+                            
+                            if isinstance(df.columns, pd.MultiIndex):
+                                df.columns = df.columns.get_level_values(0)
+                            
+                            current_price = float(df['Close'].iloc[-1])
+                            current_volume = float(df['Volume'].iloc[-1])
+                            
+                            if len(df) >= 2:
+                                prev_price = float(df['Close'].iloc[-2])
+                                change_pct = ((current_price - prev_price) / prev_price) * 100
+                            else:
+                                change_pct = 0
+                            
+                            triggered = False
+                            
+                            # Vérifier les conditions
+                            if alert['type'] == "Prix au-dessus" and current_price >= alert['value']:
+                                triggered = True
+                            elif alert['type'] == "Prix en-dessous" and current_price <= alert['value']:
+                                triggered = True
+                            elif alert['type'] == "Volume supérieur" and current_volume >= alert['value']:
+                                triggered = True
+                            elif alert['type'] == "Variation % positive" and change_pct >= alert['value']:
+                                triggered = True
+                            elif alert['type'] == "Variation % négative" and change_pct <= -alert['value']:
+                                triggered = True
+                            
+                            if triggered:
+                                # Ajouter aux alertes déclenchées
+                                st.session_state.triggered_alerts.append({
+                                    'alert': alert,
+                                    'triggered_at': datetime.now(),
+                                    'current_price': current_price,
+                                    'current_volume': current_volume,
+                                    'change_pct': change_pct
+                                })
+                                # Désactiver l'alerte
+                                alert['active'] = False
+                        
+                        except:
+                            continue
+                    
+                    st.success("✅ Vérification terminée !")
+                    st.rerun()
+            
+            st.markdown("---")
+            
+            # Afficher les alertes
+            active_alerts = [a for a in st.session_state.alerts if a['active']]
+            
+            if active_alerts:
+                for alert in active_alerts:
+                    col_alert1, col_alert2 = st.columns([4, 1])
+                    
+                    with col_alert1:
+                        # Type d'alerte en emoji
+                        emoji_map = {
+                            "Prix au-dessus": "📈",
+                            "Prix en-dessous": "📉",
+                            "Volume supérieur": "📊",
+                            "Variation % positive": "🚀",
+                            "Variation % négative": "⚠️"
+                        }
+                        
+                        emoji = emoji_map.get(alert['type'], "🔔")
+                        
+                        st.markdown(f"""
+                            <div style='padding: 15px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border-radius: 10px; margin: 10px 0; border: 2px solid #ff9800;'>
+                                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                                    <div>
+                                        <h4 style='color: #ff9800; margin: 0 0 5px 0;'>{emoji} {alert['name']}</h4>
+                                        <p style='color: #ccc; margin: 0; font-size: 14px;'>
+                                            {alert['ticker']} • {alert['type']} • Valeur: {alert['value']:,.2f}
+                                        </p>
+                                        <small style='color: #666;'>Créée le {alert['created_at'].strftime('%d/%m/%Y %H:%M')}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_alert2:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("🗑️", key=f"del_alert_{alert['id']}", help="Supprimer l'alerte"):
+                            st.session_state.alerts.remove(alert)
+                            st.rerun()
+            else:
+                st.info("Aucune alerte active. Créez-en une dans l'onglet 'CRÉER ALERTE'")
+        
+        else:
+            st.info("Aucune alerte créée. Créez votre première alerte !")
+    
+    # ==========================================
+    # TAB 3: ALERTES DÉCLENCHÉES
+    # ==========================================
+    with tab3:
+        st.markdown("### ✅ ALERTES DÉCLENCHÉES")
+        
+        if st.session_state.triggered_alerts:
+            # Bouton pour effacer l'historique
+            if st.button("🗑️ Effacer l'historique", key="clear_triggered"):
+                st.session_state.triggered_alerts = []
+                st.rerun()
+            
+            st.markdown("---")
+            
+            for triggered in sorted(st.session_state.triggered_alerts, key=lambda x: x['triggered_at'], reverse=True):
+                alert = triggered['alert']
+                
+                st.markdown(f"""
+                    <div style='padding: 20px; background: #00ff0022; border-radius: 10px; margin: 15px 0; border: 3px solid #00ff00;'>
+                        <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'>
+                            <h3 style='color: #00ff00; margin: 0;'>✅ {alert['name']}</h3>
+                            <span style='color: #00ff00; font-size: 18px; font-weight: bold;'>DÉCLENCHÉE</span>
+                        </div>
+                        
+                        <p style='color: #ccc; margin: 5px 0;'>
+                            <b>Ticker:</b> {alert['ticker']} | 
+                            <b>Type:</b> {alert['type']} | 
+                            <b>Seuil:</b> {alert['value']:,.2f}
+                        </p>
+                        
+                        <div style='background: #0a0a0a; padding: 15px; border-radius: 8px; margin-top: 10px;'>
+                            <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;'>
+                                <div>
+                                    <p style='color: #999; font-size: 11px; margin: 0;'>PRIX ACTUEL</p>
+                                    <h4 style='color: white; margin: 5px 0 0 0;'>${triggered['current_price']:,.2f}</h4>
+                                </div>
+                                <div>
+                                    <p style='color: #999; font-size: 11px; margin: 0;'>VOLUME</p>
+                                    <h4 style='color: white; margin: 5px 0 0 0;'>{triggered['current_volume']:,.0f}</h4>
+                                </div>
+                                <div>
+                                    <p style='color: #999; font-size: 11px; margin: 0;'>VARIATION</p>
+                                    <h4 style='color: {"#00ff00" if triggered["change_pct"] >= 0 else "#ff0000"}; margin: 5px 0 0 0;'>{triggered['change_pct']:+.2f}%</h4>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p style='color: #666; font-size: 12px; margin: 10px 0 0 0;'>
+                            🕐 Déclenchée le {triggered['triggered_at'].strftime('%d/%m/%Y à %H:%M:%S')}
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
+        
+        else:
+            st.info("Aucune alerte déclenchée pour le moment")
+    
+    # ==========================================
+    # GUIDE D'UTILISATION
+    # ==========================================
+    st.markdown("---")
+    with st.expander("📖 GUIDE D'UTILISATION"):
+        st.markdown("""
+        ### Comment utiliser l'Alerts Manager ?
+        
+        **1️⃣ CRÉER UNE ALERTE**
+        - Onglet "CRÉER ALERTE"
+        - Choisir le ticker (ex: AAPL, BTC-USD)
+        - Sélectionner le type d'alerte
+        - Définir la valeur cible
+        - Cliquer sur "CRÉER L'ALERTE"
+        
+        **2️⃣ VÉRIFIER LES ALERTES**
+        - Onglet "MES ALERTES"
+        - Cliquer sur "VÉRIFIER TOUTES LES ALERTES"
+        - Les alertes déclenchées passent dans l'onglet suivant
+        
+        **3️⃣ CONSULTER LES DÉCLENCHEMENTS**
+        - Onglet "ALERTES DÉCLENCHÉES"
+        - Voir les alertes activées avec détails
+        - Effacer l'historique si besoin
+        
+        **⚡ TYPES D'ALERTES DISPONIBLES**
+        - **Prix au-dessus** : Se déclenche quand le prix dépasse le seuil
+        - **Prix en-dessous** : Se déclenche quand le prix passe sous le seuil
+        - **Volume supérieur** : Se déclenche quand le volume dépasse le seuil
+        - **Variation % positive** : Se déclenche quand la hausse dépasse X%
+        - **Variation % négative** : Se déclenche quand la baisse dépasse X%
+        
+        **💡 ASTUCES**
+        - Les alertes se vérifient manuellement (bouton "VÉRIFIER")
+        - Une alerte déclenchée est automatiquement désactivée
+        - Vous pouvez créer plusieurs alertes pour le même ticker
+        - Donnez un nom clair à vos alertes pour mieux les retrouver
+        
+        **⚠️ NOTE**
+        - Les alertes sont stockées en mémoire de session
+        - Elles seront perdues si vous fermez l'application
+        - Pour des alertes permanentes, utilisez un système externe
+        """)
+    
+    # Statistiques
+    st.markdown("---")
+    st.markdown("### 📊 STATISTIQUES")
+    
+    col_stats1, col_stats2, col_stats3 = st.columns(3)
+    
+    with col_stats1:
+        total_alerts = len(st.session_state.alerts)
+        st.metric("Total Alertes", total_alerts)
+    
+    with col_stats2:
+        active_count = len([a for a in st.session_state.alerts if a['active']])
+        st.metric("Alertes Actives", active_count)
+    
+    with col_stats3:
+        triggered_count = len(st.session_state.triggered_alerts)
+        st.metric("Alertes Déclenchées", triggered_count)
