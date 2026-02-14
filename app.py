@@ -604,7 +604,8 @@ elif categorie == "ACTIONS & BOURSE":
         "THE GRAND COUNCIL️",
         "MODE DUEL",
         "MARKET MONITOR",
-        "SCREENER CAC 40"
+        "SCREENER CAC 40",
+        "DIVIDEND CALENDAR"
     ])
 
 elif categorie == "BOITE À OUTILS":
@@ -5805,3 +5806,161 @@ elif outil == "INSIDER TRADING TRACKER":
         - Insider Monkey, GuruFocus
         - OpenInsider, Finviz
         """)
+
+# ==========================================
+# MODULE : DIVIDEND CALENDAR 💰
+# ==========================================
+
+elif outil == "DIVIDEND CALENDAR":
+    st.markdown("""
+        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
+            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>💰 DIVIDEND CALENDAR</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Calendrier des Dividendes</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # Sélection de l'indice
+    index_choice = st.selectbox(
+        "📊 INDICE",
+        ["S&P 500 Dividend Aristocrats", "CAC 40", "NASDAQ Dividend", "Custom Watchlist"],
+        key="div_index"
+    )
+    
+    # Générer les données de dividendes
+    def generate_dividend_data():
+        today = datetime.now()
+        dividends = []
+        
+        if index_choice == "S&P 500 Dividend Aristocrats":
+            companies = [
+                {"ticker": "JNJ", "name": "Johnson & Johnson", "yield": 3.1, "amount": 1.19, "freq": "Trimestriel"},
+                {"ticker": "PG", "name": "Procter & Gamble", "yield": 2.5, "amount": 0.94, "freq": "Trimestriel"},
+                {"ticker": "KO", "name": "Coca-Cola", "yield": 3.0, "amount": 0.48, "freq": "Trimestriel"},
+                {"ticker": "PEP", "name": "PepsiCo", "yield": 2.8, "amount": 1.27, "freq": "Trimestriel"},
+                {"ticker": "MCD", "name": "McDonald's", "yield": 2.2, "amount": 1.67, "freq": "Trimestriel"},
+                {"ticker": "WMT", "name": "Walmart", "yield": 1.5, "amount": 0.57, "freq": "Trimestriel"},
+                {"ticker": "MMM", "name": "3M Company", "yield": 6.2, "amount": 1.51, "freq": "Trimestriel"},
+                {"ticker": "KMB", "name": "Kimberly-Clark", "yield": 3.7, "amount": 1.21, "freq": "Trimestriel"},
+            ]
+        elif index_choice == "CAC 40":
+            companies = [
+                {"ticker": "TTE.PA", "name": "TotalEnergies", "yield": 5.2, "amount": 0.79, "freq": "Trimestriel"},
+                {"ticker": "SAN.PA", "name": "Sanofi", "yield": 4.1, "amount": 3.70, "freq": "Annuel"},
+                {"ticker": "OR.PA", "name": "L'Oréal", "yield": 1.8, "amount": 5.50, "freq": "Annuel"},
+                {"ticker": "BNP.PA", "name": "BNP Paribas", "yield": 5.8, "amount": 4.40, "freq": "Annuel"},
+                {"ticker": "EN.PA", "name": "Bouygues", "yield": 4.5, "amount": 1.90, "freq": "Annuel"},
+            ]
+        else:
+            companies = [
+                {"ticker": "AAPL", "name": "Apple", "yield": 0.5, "amount": 0.24, "freq": "Trimestriel"},
+                {"ticker": "MSFT", "name": "Microsoft", "yield": 0.8, "amount": 0.75, "freq": "Trimestriel"},
+            ]
+        
+        for i, company in enumerate(companies):
+            # Dates de détachement simulées
+            ex_date = today + timedelta(days=3 + i*7)
+            payment_date = ex_date + timedelta(days=14)
+            
+            dividends.append({
+                **company,
+                "ex_date": ex_date,
+                "payment_date": payment_date,
+                "status": "À venir" if ex_date > today else "Détaché"
+            })
+        
+        return sorted(dividends, key=lambda x: x['ex_date'])
+    
+    dividends = generate_dividend_data()
+    
+    # Statistiques globales
+    st.markdown("### 📊 STATISTIQUES")
+    
+    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+    
+    with col_stat1:
+        avg_yield = sum([d['yield'] for d in dividends]) / len(dividends)
+        st.metric("Rendement Moyen", f"{avg_yield:.2f}%")
+    
+    with col_stat2:
+        upcoming = len([d for d in dividends if d['status'] == "À venir"])
+        st.metric("Dividendes à venir", upcoming)
+    
+    with col_stat3:
+        total_amount = sum([d['amount'] for d in dividends])
+        st.metric("Montant Total", f"${total_amount:.2f}")
+    
+    with col_stat4:
+        high_yield = max([d['yield'] for d in dividends])
+        st.metric("Rendement Max", f"{high_yield:.1f}%")
+    
+    st.markdown("---")
+    
+    # Calendrier
+    st.markdown("### 📅 CALENDRIER DES DÉTACHEMENTS")
+    
+    for div in dividends:
+        # Couleur selon le statut
+        if div['status'] == "À venir":
+            border_color = "#00ff00"
+            bg_color = "#00ff0011"
+        else:
+            border_color = "#666"
+            bg_color = "#66666611"
+        
+        # Couleur selon le rendement
+        if div['yield'] >= 4:
+            yield_color = "#00ff00"
+        elif div['yield'] >= 2:
+            yield_color = "#ff9800"
+        else:
+            yield_color = "#ff6b6b"
+        
+        st.markdown(f"""
+            <div style='padding: 20px; background: {bg_color}; border-radius: 12px; margin: 15px 0; border-left: 5px solid {border_color};'>
+                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;'>
+                    <div>
+                        <h3 style='color: white; margin: 0 0 5px 0;'>{div['name']}</h3>
+                        <p style='color: #999; margin: 0; font-size: 13px;'>{div['ticker']} • {div['freq']}</p>
+                    </div>
+                    <div style='text-align: right;'>
+                        <h2 style='color: {yield_color}; margin: 0;'>{div['yield']:.2f}%</h2>
+                        <p style='color: #999; margin: 0; font-size: 12px;'>Rendement</p>
+                    </div>
+                </div>
+                
+                <div style='background: #0a0a0a; padding: 15px; border-radius: 8px;'>
+                    <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;'>
+                        <div>
+                            <p style='color: #666; font-size: 11px; margin: 0;'>MONTANT</p>
+                            <h4 style='color: white; margin: 5px 0 0 0;'>${div['amount']:.2f}</h4>
+                        </div>
+                        <div>
+                            <p style='color: #666; font-size: 11px; margin: 0;'>EX-DATE</p>
+                            <h4 style='color: #00bfff; margin: 5px 0 0 0;'>{div['ex_date'].strftime('%d/%m/%Y')}</h4>
+                        </div>
+                        <div>
+                            <p style='color: #666; font-size: 11px; margin: 0;'>PAIEMENT</p>
+                            <h4 style='color: #7fff00; margin: 5px 0 0 0;'>{div['payment_date'].strftime('%d/%m/%Y')}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Top rendements
+    st.markdown("### 🏆 TOP RENDEMENTS")
+    
+    top_yields = sorted(dividends, key=lambda x: x['yield'], reverse=True)[:5]
+    
+    for div in top_yields:
+        col_top1, col_top2 = st.columns([3, 1])
+        
+        with col_top1:
+            st.markdown(f"**{div['name']}** ({div['ticker']})")
+        
+        with col_top2:
+            st.markdown(f"<h3 style='color: #00ff00; text-align: right;'>{div['yield']:.2f}%</h3>", unsafe_allow_html=True)
+    
+    st.caption("⚠️ Données simulées. Pour des données réelles, consultez Dividend.com ou les sites des sociétés.")
