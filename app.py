@@ -579,7 +579,7 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
 
 # --- SYSTÈME DE MENUS CATÉGORISÉS ---
 st.sidebar.markdown("### 🗂️ NAVIGATION")
-categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", ["MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS"])
+categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", ["MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "INTERFACE PRO"])
 
 st.sidebar.markdown("---")
 
