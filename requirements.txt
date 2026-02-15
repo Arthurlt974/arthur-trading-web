@@ -10,4 +10,5 @@ fpdf2
 scipy
 ta
 scikit-learn
-interface_pro
+
+
