@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import numpy as np
 from fpdf import FPDF
 import io
+import interface_pro
 
 # --- FONCTIONS UTILES ---
 def get_crypto_price(symbol):
@@ -591,6 +592,8 @@ if categorie == "MARCHÉ CRYPTO":
         "CRYPTO BUBBLE CHART",
         "WHALE WATCHER"
     ])
+if categorie  == "INTERFACE PRO":
+          outil  =  interface_pro.show_interface_pro()
 
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
