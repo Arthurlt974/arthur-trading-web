@@ -1,0 +1,178 @@
+import streamlit as st
+import streamlit.components.v1 as components
+import pandas as pd
+import requests
+
+# ==========================================
+# 1. FONCTIONS UTILITAIRES (TradingView & Ticker)
+# ==========================================
+
+def render_tradingview_chart(symbol, interval="D", height=400, key_suffix="1"):
+    """Affiche le widget TradingView Advanced Real-Time Chart"""
+    # Adaptation du symbole pour TradingView (ex: BTC -> BINANCE:BTCUSDT)
+    tv_symbol = f"BINANCE:{symbol}USDT" if symbol.isalnum() else symbol
+    
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div id="tradingview_{key_suffix}"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget(
+      {{
+        "width": "100%",
+        "height": {height},
+        "symbol": "{tv_symbol}",
+        "interval": "{interval}",
+        "timezone": "Etc/UTC",
+        "theme": "dark",
+        "style": "1",
+        "locale": "fr",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "hide_top_toolbar": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_{key_suffix}",
+        "overrides": {{
+            "paneProperties.background": "#000000",
+            "paneProperties.vertGridProperties.color": "#1a1a1a",
+            "paneProperties.horzGridProperties.color": "#1a1a1a",
+            "scalesProperties.textColor" : "#ff9800"
+        }}
+      }});
+      </script>
+    </div>
+    """
+    components.html(html_code, height=height)
+
+
+
+# ==========================================
+# 2. LES MINI-MODULES (WIDGETS)
+# ==========================================
+
+def mini_screener():
+    st.markdown("<h6 style='color:#ff9800; border-bottom:1px solid #333;'>🔍 Screener (Top Vol)</h6>", unsafe_allow_html=True)
+    # Données fictives pour l'exemple
+    df = pd.DataFrame({
+        "Token": ["BTC", "ETH", "SOL", "PEPE", "WIF"],
+        "Price": [98420, 3890, 145, 0.000008, 2.4],
+        "Chg%": [2.4, -1.1, 5.6, 12.4, -5.0]
+    })
+    st.dataframe(
+        df.style.applymap(lambda v: f'color: {"#00ff00" if v > 0 else "#ff4b4b"}', subset=['Chg%']),
+        hide_index=True, use_container_width=True, height=150
+    )
+
+def mini_news():
+    st.markdown("<h6 style='color:#ff9800; border-bottom:1px solid #333;'>📰 Flash News</h6>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="font-size: 12px;">
+    • <b style="color:#fff">SEC:</b> Décision ETF attendue demain<br>
+    • <b style="color:#fff">Macro:</b> Inflation US en baisse<br>
+    • <b style="color:#fff">Binance:</b> Nouveau listing $AI
+    </div>
+    """, unsafe_allow_html=True)
+
+def mini_whale():
+    st.markdown("<h6 style='color:#ff9800; border-bottom:1px solid #333;'>🐋 Whale Alert</h6>", unsafe_allow_html=True)
+    st.info("🚨 500 BTC transférés vers Coinbase")
+    st.warning("⚠️ 10M USDT mintés à l'instant")
+
+# Dictionnaire pour le sélecteur
+MODULES_MAP = {
+    "Screener": mini_screener,
+    "Flash News": mini_news,
+    "Whale Alert": mini_whale,
+    "Vide": lambda: st.write("...")
+}
+
+# ==========================================
+# 3. FONCTION PRINCIPALE (A appeler dans app.py)
+# ==========================================
+
+def show_interface_pro():
+    # --- CSS PRO & ZOOM 80% ---
+    st.markdown("""
+        <style>
+        /* 1. Réduction globale de l'interface à 80% */
+        .block-container { 
+            padding-top: 0rem; 
+            padding-bottom: 1rem; 
+            padding-left: 1rem; 
+            padding-right: 1rem;
+            
+            /* L'astuce magique pour le dézoom */
+            zoom: 0.80; 
+            -moz-transform: scale(0.8); /* Support Firefox */
+            -moz-transform-origin: top center;
+        }
+
+        /* 2. Fond Noir Total */
+        .stApp { background-color: #000000; }
+
+        /* 3. Style des Inputs plus compacts */
+        .stTextInput > div > div > input {
+            background-color: #111; 
+            color: #ff9800; 
+            border: 1px solid #333; 
+            font-size: 12px; 
+            height: 30px;
+        }
+
+        /* 4. Cadre autour des modules de droite */
+        .mini-module-box {
+            background-color: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        
+        /* Ajustement des titres pour qu'ils ne soient pas trop petits après le zoom */
+        h6 { font-size: 16px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+
+    # 2. LAYOUT PRINCIPAL (70% Gauche / 30% Droite)
+    col_charts, col_widgets = st.columns([75, 25], gap="small")
+
+    # --- PARTIE GAUCHE : LES GRAPHIQUES ---
+    with col_charts:
+        # Chart 1
+        c1, c2 = st.columns([1, 4])
+        with c1:
+            sym1 = st.text_input("Actif 1", "BTC", key="s1", label_visibility="collapsed")
+        # J'ai réduit la hauteur à 320px pour que les 2 charts rentrent mieux verticalement
+        render_tradingview_chart(sym1, height=320, key_suffix="A")
+        
+        st.write("") # Espace entre les deux charts
+        
+        # Chart 2
+        c3, c4 = st.columns([1, 4])
+        with c3:
+            sym2 = st.text_input("Actif 2", "ETH", key="s2", label_visibility="collapsed")
+        render_tradingview_chart(sym2, height=320, key_suffix="B")
+
+    # --- PARTIE DROITE : LES WIDGETS MINIATURISÉS ---
+    with col_widgets:
+        # Widget 1 (Haut)
+        st.markdown('<div class="mini-module-box">', unsafe_allow_html=True)
+        # On ajoute un petit label HTML manuel pour gagner de la place
+        st.markdown("<span style='color:#666; font-size:10px'>MODULE HAUT</span>", unsafe_allow_html=True)
+        choice_1 = st.selectbox("Module Haut", list(MODULES_MAP.keys()), index=0, key="w1", label_visibility="collapsed")
+        MODULES_MAP[choice_1]() # Exécute la fonction choisie
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.write("") # Espace
+
+        # Widget 2 (Bas)
+        st.markdown('<div class="mini-module-box">', unsafe_allow_html=True)
+        st.markdown("<span style='color:#666; font-size:10px'>MODULE BAS</span>", unsafe_allow_html=True)
+        choice_2 = st.selectbox("Module Bas", list(MODULES_MAP.keys()), index=1, key="w2", label_visibility="collapsed")
+        MODULES_MAP[choice_2]() # Exécute la fonction choisie
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Indicateur système bas
+        st.divider()
+        st.caption("🟢 System: ONLINE | Latency: 12ms")
