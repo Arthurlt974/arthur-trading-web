@@ -1,129 +1,16 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import feedparser
 import requests
-from datetime import datetime
+import feedparser
+import streamlit.components.v1 as components
+from datetime import datetime, timedelta
+from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-
-# ============================================
-# CONFIGURATION ET STYLE
-# ============================================
-st.set_page_config(page_title="Bloomberg Terminal Pro", layout="wide", page_icon="⚡")
-
-def apply_custom_style():
-    st.markdown("""
-    <style>
-        .stApp { background-color: #000000; color: #FFFFFF; }
-        [data-testid="stHeader"] { background: rgba(0,0,0,0); }
-        .bloomberg-header { 
-            background: linear-gradient(90deg, #FF9500 0%, #FFB84D 100%); 
-            padding: 15px; color: black; font-weight: 900; 
-            border-radius: 4px; margin-bottom: 20px; letter-spacing: 1px;
-        }
-        .metric-card { 
-            background: #111111; border-left: 4px solid #FF9500; 
-            padding: 15px; border-radius: 4px; margin: 5px 0;
-        }
-        .price-up { color: #00C853; font-family: 'Courier New', monospace; font-weight: bold; }
-        .price-down { color: #FF3B30; font-family: 'Courier New', monospace; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# ============================================
-# LOGIQUE DE DONNÉES
-# ============================================
-
-@st.cache_data(ttl=300)
-def get_rss_news(source):
-    rss_urls = {
-        "Boursorama": "https://www.boursorama.com/rss/actualites/economie/",
-        "Investing": "https://fr.investing.com/rss/news.rss",
-        "Reuters": "https://news.google.com/rss/search?q=finance+Reuters&hl=fr",
-        "Bloomberg": "https://news.google.com/rss/search?q=finance+Bloomberg&hl=fr"
-    }
-    items = []
-    try:
-        feed = feedparser.parse(rss_urls.get(source))
-        for entry in feed.entries[:10]:
-            items.append({
-                "title": entry.title,
-                "link": entry.link,
-                "time": datetime.now().strftime("%H:%M") # Fallback simple pour le temps
-            })
-    except: pass
-    return items
-
-@st.cache_data(ttl=60)
-def get_stock_data(ticker_symbol):
-    try:
-        ticker = yf.Ticker(ticker_symbol)
-        hist = ticker.history(period="1y")
-        if hist.empty: return None
-        info = ticker.info
-        return {"hist": hist, "info": info, "symbol": ticker_symbol}
-    except: return None
-
-# ============================================
-# INTERFACE PRINCIPALE
-# ============================================
-
-def main():
-    apply_custom_style()
-    st.markdown("<div class='bloomberg-header'>⚡ BLOOMBERG TERMINAL PRO | MARKET INTELLIGENCE</div>", unsafe_allow_html=True)
-
-    col_main, col_side = st.columns([7, 3])
-
-    with col_main:
-        # Recherche
-        search = st.text_input("RECHERCHE TICKER (ex: NVDA, TSLA, AAPL, BTC-USD)", value="NVDA").upper()
-        data = get_stock_data(search)
-
-        if data:
-            current_price = data['hist']['Close'].iloc[-1]
-            prev_price = data['hist']['Close'].iloc[-2]
-            change = ((current_price - prev_price) / prev_price) * 100
-            color_class = "price-up" if change >= 0 else "price-down"
-            symbol_sign = "+" if change >= 0 else ""
-
-            st.markdown(f"## {data['info'].get('longName', search)}")
-            st.markdown(f"### <span class='{color_class}'>{current_price:,.2f} {data['info'].get('currency', 'USD')} ({symbol_sign}{change:.2f}%)</span>", unsafe_allow_html=True)
-
-            # Graphique
-            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7, 0.3], vertical_spacing=0.05)
-            fig.add_trace(go.Candlestick(
-                x=data['hist'].index, open=data['hist']['Open'], 
-                high=data['hist']['High'], low=data['hist']['Low'], 
-                close=data['hist']['Close'], name="Prix"
-            ), row=1, col=1)
-            fig.add_trace(go.Bar(x=data['hist'].index, y=data['hist']['Volume'], name="Volume", marker_color='#333'), row=2, col=1)
-            fig.update_layout(template="plotly_dark", height=600, xaxis_rangeslider_visible=False, margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Ratios
-            st.markdown("#### 📊 RATIOS CLÉS")
-            r1, r2, r3 = st.columns(3)
-            r1.metric("P/E Ratio", f"{data['info'].get('trailingPE', 'N/A')}")
-            r2.metric("Market Cap", f"{data['info'].get('marketCap', 0)/1e9:.2f}B")
-            r3.metric("52W High", f"{data['info'].get('fiftyTwoWeekHigh', 0):,.2f}")
-        else:
-            st.error("Ticker non trouvé ou erreur de connexion API.")
-
-    with col_side:
-        st.markdown("### 📡 FLUX DE NOUVELLES")
-        src = st.selectbox("Source", ["Boursorama", "Investing", "Reuters", "Bloomberg"])
-        news = get_rss_news(src)
-        for n in news:
-            st.markdown(f"""
-            <div class='metric-card'>
-                <small>{n['time']}</small><br>
-                <a href='{n['link']}' target='_blank' style='color:#FF9500; text-decoration:none; font-weight:bold;'>{n['title']}</a>
-            </div>
-            """, unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    main()
+import numpy as np
+from fpdf import FPDF
+import io
+import interface_pro
 
 # --- FONCTIONS UTILES ---
 def get_crypto_price(symbol):
