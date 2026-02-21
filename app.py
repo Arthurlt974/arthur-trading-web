@@ -10,7 +10,21 @@ import plotly.graph_objects as go
 import numpy as np
 from fpdf import FPDF
 import io
-import interface_pro
+
+# ============================================
+# LANCEMENT DE L'APPLICATION
+# ============================================
+
+if __name__ == "__main__":
+    # Configuration de la page (doit être la première commande Streamlit)
+    st.set_page_config(
+        page_title="Bloomberg Terminal Pro",
+        layout="wide",
+        page_icon="⚡"
+    )
+    
+    # Appel de la fonction principale définie dans ton code
+    show_interface_pro()
 
 # --- FONCTIONS UTILES ---
 def get_crypto_price(symbol):
