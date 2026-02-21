@@ -1,30 +1,44 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
-import requests
 import feedparser
-import streamlit.components.v1 as components
+import requests
 from datetime import datetime, timedelta
-from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import numpy as np
-from fpdf import FPDF
-import io
 
 # ============================================
-# LANCEMENT DE L'APPLICATION
+# CONFIGURATION DE LA PAGE (DOIT ÊTRE EN PREMIER)
+# ============================================
+st.set_page_config(page_title="Bloomberg Terminal Pro", layout="wide", page_icon="⚡")
+
+# ============================================
+# FONCTIONS DE DONNÉES
 # ============================================
 
-if __name__ == "__main__":
-    # Configuration de la page (doit être la première commande Streamlit)
-    st.set_page_config(
-        page_title="Bloomberg Terminal Pro",
-        layout="wide",
-        page_icon="⚡"
-    )
-    
-    # Appel de la fonction principale définie dans ton code
-    show_interface_pro()
+def get_ticker_from_name(query):
+    query = query.strip()
+    if len(query) <= 5 and query.isalpha():
+        return query.upper()
+    try:
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}"
+        res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=3).json()
+        if res.get('quotes'):
+            return res['quotes'][0]['symbol']
+    except:
+        pass
+    return query.upper()
+
+@st.cache_data(ttl=300)
+def get_rss_news(source):
+    news_items = []
+    rss_urls = {
+        "Boursorama": "https://www.boursorama.com/rss/actualites/economie/",
+        "Investing": "https://fr.investing.com/rss/news.rss",
+        "Reuters": "https://news.google.com/rss/search?q=finance+Reuters&hl=fr&gl=FR&ceid=FR:fr",
+        "Bloomberg": "
 
 # --- FONCTIONS UTILES ---
 def get_crypto_price(symbol):
