@@ -11,6 +11,7 @@ import numpy as np
 from fpdf import FPDF
 import io
 import interface_pro
+import interface_crypto_pro
 
 # --- FONCTIONS UTILES ---
 def get_crypto_price(symbol):
@@ -579,7 +580,7 @@ def afficher_jauge_pro(score, titre, couleur, sentiment):
 
 # --- SYSTÈME DE MENUS CATÉGORISÉS ---
 st.sidebar.markdown("### 🗂️ NAVIGATION")
-categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", ["MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "INTERFACE PRO"])
+categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", ["MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "INTERFACE PRO", "INTERFACE CRYPTO PRO"])
 
 st.sidebar.markdown("---")
 
@@ -594,6 +595,9 @@ if categorie == "MARCHÉ CRYPTO":
     ])
 if categorie  == "INTERFACE PRO":
           outil  =  interface_pro.show_interface_pro()
+          
+if categorie == "INTERFACE CRYPTO PRO":
+    outil = interface_crypto_pro.show_interface_crypto()
 
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
