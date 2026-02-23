@@ -595,12 +595,19 @@ if categorie == "MARCHÉ CRYPTO":
         "ORDER BOOK LIVE",
         "WHALE WATCHER"
     ])
-if categorie == "INTERFACE PRO":
-    outil = interface_pro.show_interface_pro()
-if categorie == "INTERFACE CRYPTO PRO":
-    outil = interface_crypto_pro.show_interface_crypto()
 if categorie == "ÉCONOMIE":
     interface_economie.show_economie()
+    st.stop()  # ← empêche le reste du code de s'exécuter
+
+elif categorie == "INTERFACE PRO":
+    outil = interface_pro.show_interface_pro()
+
+elif categorie == "INTERFACE CRYPTO PRO":
+    outil = interface_crypto_pro.show_interface_crypto()
+
+else:
+    if "outil" not in dir():
+        outil = ""
 
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
