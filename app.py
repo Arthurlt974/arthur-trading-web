@@ -12,6 +12,8 @@ from fpdf import FPDF
 import io
 import interface_pro
 import interface_crypto_pro
+import json
+from websocket import create_connection
 
 # --- FONCTIONS UTILES ---
 def get_crypto_price(symbol):
@@ -342,6 +344,40 @@ class ValuationCalculator:
         
         return results
 
+# --- MODULE ORDER BOOK BINANCE ---
+def get_binance_order_book(symbol="BTCUSDT", limit=10):
+    """Récupère le carnet d'ordres via WebSocket (Snapshot)"""
+    try:
+        ws = create_connection(f"wss://stream.binance.com:9443/ws/{symbol.lower()}@depth{limit}")
+        data = json.loads(ws.recv())
+        ws.close()
+        
+        bids = pd.DataFrame(data['bids'], columns=['Price', 'Quantity']).astype(float)
+        asks = pd.DataFrame(data['asks'], columns=['Price', 'Quantity']).astype(float)
+        return bids.sort_values(by='Price', ascending=False), asks.sort_values(by='Price', ascending=True)
+    except:
+        return None, None
+
+def show_order_book_ui():
+    st.markdown("### 📖 LIVE ORDER BOOK (BINANCE)")
+    symbol = st.text_input("PAIRE (ex: BTCUSDT, ETHUSDT)", value="BTCUSDT").upper()
+    
+    if st.button("🔄 ACTUALISER LE CARNET"):
+        bids, asks = get_binance_order_book(symbol)
+        if bids is not None:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("<span style='color:#ff4b4b;'>Ventes (Asks)</span>", unsafe_allow_html=True)
+                st.dataframe(asks.sort_values('Price', ascending=False).style.bar(subset=['Quantity'], color='#441111'), hide_index=True)
+            with col2:
+                st.markdown("<span style='color:#00ffad;'>Achats (Bids)</span>", unsafe_allow_html=True)
+                st.dataframe(bids.style.bar(subset=['Quantity'], color='#114411'), hide_index=True)
+            
+            spread = asks['Price'].min() - bids['Price'].max()
+            st.metric("SPREAD", f"{spread:.2f} USDT")
+        else:
+            st.error("Erreur de connexion à Binance")
+
 # INITIALISATION : On crée un "coffre-fort" s'il n'existe pas encore
 if "multi_charts" not in st.session_state:
     st.session_state.multi_charts = []
@@ -589,6 +625,7 @@ if categorie == "MARCHÉ CRYPTO":
         "BITCOIN DOMINANCE",
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
+        "ORDER BOOK LIVE",
         "WHALE WATCHER"
     ])
 if categorie  == "INTERFACE PRO":
@@ -5319,3 +5356,7 @@ elif outil == "DIVIDEND CALENDAR":
     st.dataframe(df_top, use_container_width=True, hide_index=True)
     
     st.caption("⚠️ Données simulées. Pour des données réelles, consultez Dividend.com ou les sites des sociétés.")
+
+# Vers la fin du fichier, après les autres conditions 'elif outil == ...'
+elif outil == "ORDER BOOK LIVE":
+    show_order_book_ui()
