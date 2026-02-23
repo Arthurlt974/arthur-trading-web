@@ -344,39 +344,68 @@ class ValuationCalculator:
         
         return results
 
-# --- MODULE ORDER BOOK BINANCE ---
+# --- MODULE ORDER BOOK BINANCE (VERSION CORRIGÉE) ---
 def get_binance_order_book(symbol="BTCUSDT", limit=10):
-    """Récupère le carnet d'ordres via WebSocket (Snapshot)"""
+    """Récupère le carnet d'ordres avec gestion d'erreurs avancée"""
     try:
-        ws = create_connection(f"wss://stream.binance.com:9443/ws/{symbol.lower()}@depth{limit}")
-        data = json.loads(ws.recv())
+        # Formatage du symbole pour Binance (ex: BTCUSDT)
+        clean_symbol = symbol.replace("-", "").replace("/", "").lower()
+        url = f"wss://stream.binance.com:9443/ws/{clean_symbol}@depth{limit}"
+        
+        # Ajout d'un timeout pour éviter de bloquer Streamlit
+        ws = create_connection(url, timeout=5)
+        result = ws.recv()
+        data = json.loads(result)
         ws.close()
         
+        if 'bids' not in data:
+            return None, "Format de données invalide"
+            
         bids = pd.DataFrame(data['bids'], columns=['Price', 'Quantity']).astype(float)
         asks = pd.DataFrame(data['asks'], columns=['Price', 'Quantity']).astype(float)
-        return bids.sort_values(by='Price', ascending=False), asks.sort_values(by='Price', ascending=True)
-    except:
-        return None, None
+        return (bids.sort_values(by='Price', ascending=False), 
+                asks.sort_values(by='Price', ascending=True)), None
+    except Exception as e:
+        return None, str(e)
 
 def show_order_book_ui():
     st.markdown("### 📖 LIVE ORDER BOOK (BINANCE)")
-    symbol = st.text_input("PAIRE (ex: BTCUSDT, ETHUSDT)", value="BTCUSDT").upper()
+    
+    # Aide à la saisie
+    symbol = st.text_input("PAIRE BINANCE (ex: BTCUSDT, ETHUSDT, SOLUSDT)", value="BTCUSDT").upper()
     
     if st.button("🔄 ACTUALISER LE CARNET"):
-        bids, asks = get_binance_order_book(symbol)
-        if bids is not None:
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("<span style='color:#ff4b4b;'>Ventes (Asks)</span>", unsafe_allow_html=True)
-                st.dataframe(asks.sort_values('Price', ascending=False).style.bar(subset=['Quantity'], color='#441111'), hide_index=True)
-            with col2:
-                st.markdown("<span style='color:#00ffad;'>Achats (Bids)</span>", unsafe_allow_html=True)
-                st.dataframe(bids.style.bar(subset=['Quantity'], color='#114411'), hide_index=True)
+        with st.spinner("Connexion aux serveurs Binance..."):
+            data_result, error_msg = get_binance_order_book(symbol)
             
-            spread = asks['Price'].min() - bids['Price'].max()
-            st.metric("SPREAD", f"{spread:.2f} USDT")
-        else:
-            st.error("Erreur de connexion à Binance")
+            if data_result:
+                bids, asks = data_result
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("<span style='color:#ff4b4b; font-weight:bold;'>🔴 VENTES (ASKS)</span>", unsafe_allow_html=True)
+                    # On affiche les prix les plus élevés en haut pour les ventes
+                    st.dataframe(asks.sort_values('Price', ascending=False).style.bar(subset=['Quantity'], color='#441111'), 
+                                 hide_index=True, use_container_width=True)
+                
+                with col2:
+                    st.markdown("<span style='color:#00ffad; font-weight:bold;'>🟢 ACHATS (BIDS)</span>", unsafe_allow_html=True)
+                    st.dataframe(bids.style.bar(subset=['Quantity'], color='#114411'), 
+                                 hide_index=True, use_container_width=True)
+                
+                # Calcul des statistiques du carnet
+                best_ask = asks['Price'].min()
+                best_bid = bids['Price'].max()
+                spread = best_ask - best_bid
+                
+                st.divider()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("MEILLEUR PRIX (VENTE)", f"{best_ask:,.2f}")
+                c2.metric("MEILLEUR PRIX (ACHAT)", f"{best_bid:,.2f}")
+                c3.metric("SPREAD", f"{spread:.4f}", delta=f"{(spread/best_ask)*100:.4f}%", delta_color="off")
+            else:
+                st.error(f"Erreur : {error_msg}")
+                st.info("Conseil : Vérifiez que le symbole est correct (ex: BTCUSDT et non BTC-USD).")
 
 # INITIALISATION : On crée un "coffre-fort" s'il n'existe pas encore
 if "multi_charts" not in st.session_state:
