@@ -16,8 +16,6 @@ import json
 from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 
-st.write(st.secrets["FIREBASE_API_KEY"])
-
 # ============================================================
 #  FONCTIONS UTILES GLOBALES
 # ============================================================
