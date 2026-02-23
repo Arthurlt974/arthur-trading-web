@@ -5474,6 +5474,5 @@ def show_order_book_ui():
                 
             else:
                 st.error(f"Erreur : {error_msg}")
-
-elif outil == "ORDER BOOK LIVE":
+    elif outil == "ORDER BOOK LIVE":
     show_order_book_ui()
