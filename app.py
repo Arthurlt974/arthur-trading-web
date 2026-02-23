@@ -2897,24 +2897,34 @@ elif outil == "DAILY BRIEF":
 # ==========================================
 elif outil == "CALENDRIER ÉCO":
     st.title("» ECONOMIC CALENDAR")
-    st.info("REAL-TIME GLOBAL MACRO EVENTS.")
-    calendrier_tv = """
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
-      {
-      "colorTheme": "dark",
-      "isMaximized": true,
-      "width": "100%",
-      "height": "800",
-      "locale": "fr",
-      "importanceFilter": "-1,0,1",
-      "countryFilter": "fr,us,eu,gb,jp"
-      }
-      </script>
-    </div>
+    st.markdown("""
+        <div style='display:flex; gap:10px; margin-bottom:15px;'>
+            <div style='border:1px solid #333; padding:10px; text-align:center; flex:1;'>
+                <b>SOURCE:</b> FOREX FACTORY
+            </div>
+            <div style='border:1px solid #333; padding:10px; text-align:center; flex:1;'>
+                <b>MODE:</b> LIVE FEED
+            </div>
+            <div style='border:1px solid #333; padding:10px; text-align:center; flex:1;'>
+                <b>FILTRE:</b> HIGH IMPACT
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    forex_factory_html = """
+        <iframe
+            src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&importance=2,3&features=datepicker,timezone&countries=5,22,25,34,35&calType=week&timeZone=55&lang=1"
+            width="100%"
+            height="750"
+            frameborder="0"
+            allowtransparency="true"
+            marginwidth="0"
+            marginheight="0"
+            style="border:none;">
+        </iframe>
     """
-    components.html(calendrier_tv, height=800, scrolling=True)
+
+    components.html(forex_factory_html, height=770, scrolling=True)
 
 # ==========================================
 # OUTIL : FEAR & GREED INDEX
