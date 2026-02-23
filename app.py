@@ -344,47 +344,47 @@ class ValuationCalculator:
         
         return results
 
-# --- MODULE ORDER BOOK BINANCE (VERSION CORRIGÉE) ---
-def get_binance_order_book(symbol="BTCUSDT", limit=10):
-    """Récupère le carnet d'ordres avec gestion d'erreurs avancée"""
+def get_binance_order_book(symbol="BTCUSDT", limit=15):
+    """Récupère le carnet d'ordres via API REST (plus robuste face aux restrictions)"""
     try:
-        # Formatage du symbole pour Binance (ex: BTCUSDT)
-        clean_symbol = symbol.replace("-", "").replace("/", "").lower()
-        url = f"wss://stream.binance.com:9443/ws/{clean_symbol}@depth{limit}"
+        # Nettoyage du symbole
+        clean_symbol = symbol.replace("-", "").replace("/", "").upper()
         
-        # Ajout d'un timeout pour éviter de bloquer Streamlit
-        ws = create_connection(url, timeout=5)
-        result = ws.recv()
-        data = json.loads(result)
-        ws.close()
+        # Utilisation de l'API REST au lieu du WebSocket
+        url = f"https://api.binance.com/api/v3/depth?symbol={clean_symbol}&limit={limit}"
+        response = requests.get(url, timeout=5)
         
-        if 'bids' not in data:
-            return None, "Format de données invalide"
-            
-        bids = pd.DataFrame(data['bids'], columns=['Price', 'Quantity']).astype(float)
-        asks = pd.DataFrame(data['asks'], columns=['Price', 'Quantity']).astype(float)
-        return (bids.sort_values(by='Price', ascending=False), 
-                asks.sort_values(by='Price', ascending=True)), None
+        if response.status_code == 200:
+            data = response.json()
+            bids = pd.DataFrame(data['bids'], columns=['Price', 'Quantity']).astype(float)
+            asks = pd.DataFrame(data['asks'], columns=['Price', 'Quantity']).astype(float)
+            return (bids.sort_values(by='Price', ascending=False), 
+                    asks.sort_values(by='Price', ascending=True)), None
+        else:
+            return None, f"Binance API Error {response.status_code}: {response.text}"
     except Exception as e:
         return None, str(e)
 
 def show_order_book_ui():
-    st.markdown("### 📖 LIVE ORDER BOOK (BINANCE)")
+    st.markdown("### 📖 LIVE ORDER BOOK (BINANCE REST)")
     
-    # Aide à la saisie
-    symbol = st.text_input("PAIRE BINANCE (ex: BTCUSDT, ETHUSDT, SOLUSDT)", value="BTCUSDT").upper()
+    # Input pour le symbole
+    symbol = st.text_input("PAIRE (ex: BTCUSDT, ETHUSDT)", value="BTCUSDT").upper()
     
-    if st.button("🔄 ACTUALISER LE CARNET"):
-        with st.spinner("Connexion aux serveurs Binance..."):
+    # Bouton d'actualisation
+    if st.button("🔄 ACTUALISER LES DONNÉES"):
+        with st.spinner("Récupération du carnet..."):
             data_result, error_msg = get_binance_order_book(symbol)
             
             if data_result:
                 bids, asks = data_result
+                
+                # Mise en page
                 col1, col2 = st.columns(2)
                 
                 with col1:
                     st.markdown("<span style='color:#ff4b4b; font-weight:bold;'>🔴 VENTES (ASKS)</span>", unsafe_allow_html=True)
-                    # On affiche les prix les plus élevés en haut pour les ventes
+                    # On affiche les prix les plus élevés en haut
                     st.dataframe(asks.sort_values('Price', ascending=False).style.bar(subset=['Quantity'], color='#441111'), 
                                  hide_index=True, use_container_width=True)
                 
@@ -393,19 +393,19 @@ def show_order_book_ui():
                     st.dataframe(bids.style.bar(subset=['Quantity'], color='#114411'), 
                                  hide_index=True, use_container_width=True)
                 
-                # Calcul des statistiques du carnet
+                # Stats
                 best_ask = asks['Price'].min()
                 best_bid = bids['Price'].max()
                 spread = best_ask - best_bid
                 
                 st.divider()
                 c1, c2, c3 = st.columns(3)
-                c1.metric("MEILLEUR PRIX (VENTE)", f"{best_ask:,.2f}")
-                c2.metric("MEILLEUR PRIX (ACHAT)", f"{best_bid:,.2f}")
+                c1.metric("PRIX VENDEUR", f"{best_ask:,.2f}")
+                c2.metric("PRIX ACHETEUR", f"{best_bid:,.2f}")
                 c3.metric("SPREAD", f"{spread:.4f}", delta=f"{(spread/best_ask)*100:.4f}%", delta_color="off")
             else:
-                st.error(f"Erreur : {error_msg}")
-                st.info("Conseil : Vérifiez que le symbole est correct (ex: BTCUSDT et non BTC-USD).")
+                st.error(f"Accès restreint ou Symbole inconnu.")
+                st.warning("Note : Si vous êtes sur un serveur Cloud (USA), Binance restreint parfois l'accès. Essayez avec une autre paire.")
 
 # INITIALISATION : On crée un "coffre-fort" s'il n'existe pas encore
 if "multi_charts" not in st.session_state:
