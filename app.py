@@ -5386,55 +5386,94 @@ elif outil == "DIVIDEND CALENDAR":
     
     st.caption("⚠️ Données simulées. Pour des données réelles, consultez Dividend.com ou les sites des sociétés.")
 
-##                 ##
-## Order Book Live ##
-##                 ##
-elif outil == "ORDER BOOK LIVE":
-    def show_order_book_ui():
-    st.markdown("### 🐳 WHALE TRACKER - ORDER BOOK (COINBASE)")
-    st.info("Filtrez les ordres pour ne voir que la liquidité importante.")
+# ============================================
+# MODULE : ORDER BOOK LIVE (COINBASE)
+# ============================================
+
+def get_coinbase_order_book(product_id="BTC-USD"):
+    """
+    Récupère le carnet d'ordres via Coinbase API (REST)
+    Format supporté : BTC, ETH, SOL...
+    """
+    try:
+        # Formatage pour Coinbase (ex: BTC-USD)
+        symbol = product_id.replace("USDT", "").replace("-", "").upper()
+        clean_symbol = f"{symbol}-USD"
+            
+        url = f"https://api.exchange.coinbase.com/products/{clean_symbol}/book?level=2"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Bids = Achats | Asks = Ventes
+            bids = pd.DataFrame(data['bids'], columns=['Price', 'Quantity', 'NumOrders']).astype(float)
+            asks = pd.DataFrame(data['asks'], columns=['Price', 'Quantity', 'NumOrders']).astype(float)
+            # On retire NumOrders pour la clarté
+            return (bids[['Price', 'Quantity']], asks[['Price', 'Quantity']]), None
+        else:
+            return None, f"Coinbase indisponible ({response.status_code})"
+    except Exception as e:
+        return None, str(e)
+
+def show_order_book_ui():
+    st.markdown("### 🐳 WHALE TRACKER - CARNET D'ORDRES")
+    st.caption("Données en direct de Coinbase Pro (Anti-blocage Cloud)")
     
-    col_input, col_filter = st.columns([2, 2])
+    col_config, col_filter = st.columns([2, 2])
     
-    with col_input:
-        symbol = st.text_input("PAIRE (ex: BTC, ETH, SOL)", value="BTC").upper()
+    with col_config:
+        symbol = st.text_input("SYMBOLE CRYPTO (ex: BTC, ETH, SOL)", value="BTC").upper()
     
     with col_filter:
-        # Filtre de taille minimum
-        min_size = st.number_input("Taille min. (Quantité)", min_value=0.0, value=1.0, step=0.1)
+        min_size = st.number_input("FILTRE TAILLE MIN. (Quantité)", min_value=0.0, value=1.0, step=0.1)
     
-    if st.button("🔄 ANALYSER LE CARNET"):
-        with st.spinner("Filtrage des ordres en cours..."):
+    if st.button("🔄 SYNCHRONISER LE CARNET"):
+        with st.spinner("Analyse du carnet en cours..."):
             data_result, error_msg = get_coinbase_order_book(symbol)
             
             if data_result:
                 bids, asks = data_result
                 
-                # --- APPLICATION DU FILTRE ---
-                bids_filtered = bids[bids['Quantity'] >= min_size]
-                asks_filtered = asks[asks['Quantity'] >= min_size]
+                # Application du filtre demandé (ex: >= 1 BTC)
+                bids_f = bids[bids['Quantity'] >= min_size]
+                asks_f = asks[asks['Quantity'] >= min_size]
                 
-                if bids_filtered.empty and asks_filtered.empty:
-                    st.warning(f"Aucun ordre trouvé avec une taille >= {min_size} {symbol}")
-                else:
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.markdown(f"<span style='color:#ff4b4b; font-weight:bold;'>🔴 VENTES ≥ {min_size}</span>", unsafe_allow_html=True)
+                # Calcul du Spread
+                best_ask = asks['Price'].min()
+                best_bid = bids['Price'].max()
+                spread = best_ask - best_bid
+
+                col_asks, col_bids = st.columns(2)
+                
+                with col_asks:
+                    st.markdown(f"<span style='color:#ff4b4b; font-weight:bold;'>🔴 VENTES (ASKS) ≥ {min_size}</span>", unsafe_allow_html=True)
+                    if not asks_f.empty:
+                        # On affiche les prix les plus hauts en haut du tableau pour simuler un vrai carnet
                         st.dataframe(
-                            asks_filtered.sort_values('Price', ascending=False).style.bar(subset=['Quantity'], color='#441111'), 
+                            asks_f.head(20).sort_values('Price', ascending=False).style.bar(subset=['Quantity'], color='#441111'), 
                             hide_index=True, use_container_width=True
                         )
-                    
-                    with col2:
-                        st.markdown(f"<span style='color:#00ffad; font-weight:bold;'>🟢 ACHATS ≥ {min_size}</span>", unsafe_allow_html=True)
+                    else:
+                        st.warning("Aucun vendeur trouvé avec cette taille.")
+                
+                with col_bids:
+                    st.markdown(f"<span style='color:#00ffad; font-weight:bold;'>🟢 ACHATS (BIDS) ≥ {min_size}</span>", unsafe_allow_html=True)
+                    if not bids_f.empty:
                         st.dataframe(
-                            bids_filtered.style.bar(subset=['Quantity'], color='#114411'), 
+                            bids_f.head(20).style.bar(subset=['Quantity'], color='#114411'), 
                             hide_index=True, use_container_width=True
                         )
-                    
-                    # Stats sur les baleines
-                    st.divider()
-                    st.markdown(f"**Analyse :** {len(bids_filtered) + len(asks_filtered)} ordres institutionnels détectés à proximité du prix actuel.")
+                    else:
+                        st.warning("Aucun acheteur trouvé avec cette taille.")
+                
+                st.divider()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("MEILLEUR PRIX VENDEUR", f"${best_ask:,.2f}")
+                c2.metric("MEILLEUR PRIX ACHETEUR", f"${best_bid:,.2f}")
+                c3.metric("SPREAD", f"${spread:.2f}", delta=f"{(spread/best_ask)*100:.4f}%", delta_color="inverse")
+                
             else:
                 st.error(f"Erreur : {error_msg}")
+
+elif outil == "ORDER BOOK LIVE":
+    show_order_book_ui()
