@@ -14,6 +14,7 @@ import interface_pro
 import interface_crypto_pro
 import json
 from websocket import create_connection
+from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 
 
 # ============================================================
@@ -567,25 +568,10 @@ st.markdown("""
 
 
 # ============================================================
-#  SYSTÈME DE MOT DE PASSE
+#  AUTHENTIFICATION FIREBASE
 # ============================================================
 
-def check_password():
-    if "password_correct" not in st.session_state:
-        st.session_state["password_correct"] = False
-    if st.session_state["password_correct"]:
-        return True
-    st.markdown("### [ SECURITY ] TERMINAL ACCESS REQUIRED")
-    pwd = st.text_input("ENTER ACCESS CODE :", type="password")
-    if st.button("EXECUTE LOGIN"):
-        if pwd == "1234":
-            st.session_state["password_correct"] = True
-            st.rerun()
-        else:
-            st.error("!! ACCESS DENIED - INVALID CODE")
-    return False
-
-if not check_password():
+if not render_auth_page():
     st.stop()
 
 st_autorefresh(interval=600000, key="global_refresh")
@@ -645,11 +631,15 @@ elif categorie == "BOITE À OUTILS":
 st.sidebar.markdown("---")
 st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
 
+# Barre utilisateur (compte + déconnexion)
+render_user_sidebar()
+
 
 # ============================================================
 #  BANDEAU DÉFILANT (MARQUEE)
 # ============================================================
 
+# La watchlist est chargée depuis Firebase si user connecté, sinon valeur par défaut
 if "watchlist" not in st.session_state:
     st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "NVDA", "INTC", "AMD",
                                    "GOOGL", "MSFT", "PEP", "KO", "MC.PA", "TTE", "BNP.PA"]
