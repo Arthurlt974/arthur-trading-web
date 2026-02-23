@@ -1,7 +1,7 @@
 """
 firebase_auth.py
 Module d'authentification Firebase pour AM-Trading Terminal
-Gère : inscription, connexion, sauvegarde/chargement config utilisateur
+Gère : inscription, connexion, mode invité, sauvegarde/chargement config utilisateur
 """
 
 import streamlit as st
@@ -10,15 +10,12 @@ import json
 from datetime import datetime
 
 # ─────────────────────────────────────────────
-#  CONFIG FIREBASE (à remplir avec tes clés)
-#  → Récupère-les dans Firebase Console >
-#    Project Settings > General > Web App
+#  CONFIG FIREBASE
 # ─────────────────────────────────────────────
 FIREBASE_API_KEY        = st.secrets["FIREBASE_API_KEY"]
 FIREBASE_PROJECT_ID     = st.secrets["FIREBASE_PROJECT_ID"]
 
-# URLs Firebase REST API
-AUTH_URL    = f"https://identitytoolkit.googleapis.com/v1/accounts"
+AUTH_URL      = f"https://identitytoolkit.googleapis.com/v1/accounts"
 FIRESTORE_URL = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents"
 
 
@@ -27,21 +24,18 @@ FIRESTORE_URL = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT
 # ══════════════════════════════════════════════
 
 def sign_up(email: str, password: str) -> dict:
-    """Crée un nouveau compte Firebase."""
     url = f"{AUTH_URL}:signUp?key={FIREBASE_API_KEY}"
     payload = {"email": email, "password": password, "returnSecureToken": True}
     r = requests.post(url, json=payload)
     return r.json()
 
 def sign_in(email: str, password: str) -> dict:
-    """Connexion avec email/mot de passe."""
     url = f"{AUTH_URL}:signInWithPassword?key={FIREBASE_API_KEY}"
     payload = {"email": email, "password": password, "returnSecureToken": True}
     r = requests.post(url, json=payload)
     return r.json()
 
 def reset_password(email: str) -> dict:
-    """Envoie un email de réinitialisation de mot de passe."""
     url = f"{AUTH_URL}:sendOobCode?key={FIREBASE_API_KEY}"
     payload = {"requestType": "PASSWORD_RESET", "email": email}
     r = requests.post(url, json=payload)
@@ -56,11 +50,10 @@ def _firestore_headers(id_token: str) -> dict:
     return {"Authorization": f"Bearer {id_token}", "Content-Type": "application/json"}
 
 def _to_firestore(value):
-    """Convertit une valeur Python en format Firestore."""
-    if isinstance(value, bool):    return {"booleanValue": value}
-    if isinstance(value, int):     return {"integerValue": str(value)}
-    if isinstance(value, float):   return {"doubleValue": value}
-    if isinstance(value, str):     return {"stringValue": value}
+    if isinstance(value, bool):  return {"booleanValue": value}
+    if isinstance(value, int):   return {"integerValue": str(value)}
+    if isinstance(value, float): return {"doubleValue": value}
+    if isinstance(value, str):   return {"stringValue": value}
     if isinstance(value, list):
         return {"arrayValue": {"values": [_to_firestore(v) for v in value]}}
     if isinstance(value, dict):
@@ -68,17 +61,14 @@ def _to_firestore(value):
     return {"stringValue": str(value)}
 
 def _from_firestore(field):
-    """Convertit un champ Firestore en valeur Python."""
     if "stringValue"  in field: return field["stringValue"]
     if "integerValue" in field: return int(field["integerValue"])
     if "doubleValue"  in field: return float(field["doubleValue"])
     if "booleanValue" in field: return field["booleanValue"]
     if "arrayValue"   in field:
-        values = field["arrayValue"].get("values", [])
-        return [_from_firestore(v) for v in values]
+        return [_from_firestore(v) for v in field["arrayValue"].get("values", [])]
     if "mapValue" in field:
-        fields = field["mapValue"].get("fields", {})
-        return {k: _from_firestore(v) for k, v in fields.items()}
+        return {k: _from_firestore(v) for k, v in field["mapValue"].get("fields", {}).items()}
     return None
 
 
@@ -87,32 +77,20 @@ def _from_firestore(field):
 # ══════════════════════════════════════════════
 
 def save_user_config(id_token: str, uid: str, config: dict) -> bool:
-    """
-    Sauvegarde la config complète de l'utilisateur dans Firestore.
-    Collection : users / {uid}
-    """
     url = f"{FIRESTORE_URL}/users/{uid}"
     fields = {k: _to_firestore(v) for k, v in config.items()}
-    payload = {"fields": fields}
-
-    r = requests.patch(url, headers=_firestore_headers(id_token), json=payload)
+    r = requests.patch(url, headers=_firestore_headers(id_token), json={"fields": fields})
     return r.status_code == 200
 
 def load_user_config(id_token: str, uid: str) -> dict:
-    """
-    Charge la config de l'utilisateur depuis Firestore.
-    Retourne un dict vide si pas encore de données.
-    """
     url = f"{FIRESTORE_URL}/users/{uid}"
     r = requests.get(url, headers=_firestore_headers(id_token))
     if r.status_code == 200:
-        doc = r.json()
-        fields = doc.get("fields", {})
+        fields = r.json().get("fields", {})
         return {k: _from_firestore(v) for k, v in fields.items()}
     return {}
 
 def save_user_field(id_token: str, uid: str, field_name: str, value) -> bool:
-    """Sauvegarde un seul champ (mise à jour partielle)."""
     url = f"{FIRESTORE_URL}/users/{uid}?updateMask.fieldPaths={field_name}"
     payload = {"fields": {field_name: _to_firestore(value)}}
     r = requests.patch(url, headers=_firestore_headers(id_token), json=payload)
@@ -124,27 +102,18 @@ def save_user_field(id_token: str, uid: str, field_name: str, value) -> bool:
 # ══════════════════════════════════════════════
 
 DEFAULT_CONFIG = {
-    # Watchlist
     "watchlist": ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "NVDA", "MC.PA", "TTE.PA"],
-
-    # Alertes prix (liste de dicts)
     "alerts": [],
-
-    # Portefeuille crypto
     "portfolio": [
         {"symbol": "BTC", "qty": 0.0, "buy_price": 0.0},
         {"symbol": "ETH", "qty": 0.0, "buy_price": 0.0},
     ],
-
-    # Thème / préférences visuelles
     "theme": {
         "accent_color": "#ff9800",
-        "chart_style":  "candles",      # candles / line / area
+        "chart_style":  "candles",
         "default_period": "6mo",
         "default_category": "ACTIONS & BOURSE",
     },
-
-    # Métadonnées
     "created_at": datetime.now().isoformat(),
     "last_login":  datetime.now().isoformat(),
 }
@@ -157,11 +126,11 @@ DEFAULT_CONFIG = {
 def render_auth_page() -> bool:
     """
     Affiche la page d'authentification.
-    Retourne True si l'utilisateur est connecté.
+    Retourne True si l'utilisateur est connecté (ou en mode invité).
     """
 
-    # ── Déjà connecté ──
-    if st.session_state.get("user_logged_in"):
+    # ── Déjà connecté ou mode invité ──
+    if st.session_state.get("user_logged_in") or st.session_state.get("guest_mode"):
         return True
 
     # ── CSS terminal ──
@@ -190,6 +159,16 @@ def render_auth_page() -> bool:
                 font-size: 12px;
                 margin-bottom: 30px;
             }
+            .guest-btn > button {
+                background-color: #1a1a1a !important;
+                color: #aaaaaa !important;
+                border: 1px solid #444 !important;
+                font-size: 13px !important;
+            }
+            .guest-btn > button:hover {
+                background-color: #333 !important;
+                color: #fff !important;
+            }
         </style>
     """, unsafe_allow_html=True)
 
@@ -200,7 +179,7 @@ def render_auth_page() -> bool:
         </div>
     """, unsafe_allow_html=True)
 
-    # ── Code d'accès global (ton "1234" existant) ──
+    # ── Code d'accès global ──
     with st.expander("🔐 CODE D'ACCÈS TERMINAL", expanded=True):
         access_code = st.text_input("CODE D'ACCÈS GLOBAL", type="password", key="access_code_input",
                                     placeholder="Code fourni par l'administrateur")
@@ -213,7 +192,36 @@ def render_auth_page() -> bool:
 
     st.markdown("---")
 
-    # ── Onglets Connexion / Inscription ──
+    # ══════════════════════════════════════════
+    #  BOUTON MODE INVITÉ (bien visible)
+    # ══════════════════════════════════════════
+    st.markdown("""
+        <div style='text-align: center; margin-bottom: 10px;'>
+            <span style='color: #888; font-size: 13px; font-family: monospace;'>
+                Pas de compte ? Accès limité sans sauvegarde
+            </span>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_guest1, col_guest2, col_guest3 = st.columns([1, 2, 1])
+    with col_guest2:
+        if st.button("👤 CONTINUER EN MODE INVITÉ", use_container_width=True, key="btn_guest"):
+            st.session_state["guest_mode"]   = True
+            st.session_state["user_logged_in"] = False
+            st.session_state["user_email"]   = "Invité"
+            # Appliquer la config par défaut pour l'invité
+            _apply_config_to_session(DEFAULT_CONFIG.copy())
+            st.info("✅ Mode invité activé. Vos données ne seront pas sauvegardées.")
+            st.rerun()
+
+    st.markdown("""
+        <div style='text-align: center; color: #444; font-size: 11px; margin-top: 5px; font-family: monospace;'>
+            ── OU CONNECTEZ-VOUS ──
+        </div>
+    """, unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Onglets Connexion / Inscription / Reset ──
     tab_login, tab_signup, tab_reset = st.tabs(["🔑 CONNEXION", "📝 CRÉER UN COMPTE", "🔄 MOT DE PASSE OUBLIÉ"])
 
     # ─────────────────
@@ -231,13 +239,12 @@ def render_auth_page() -> bool:
                 with st.spinner("Authentification..."):
                     res = sign_in(login_email, login_pwd)
                 if "idToken" in res:
-                    # Stocker la session
                     st.session_state["user_logged_in"]  = True
+                    st.session_state["guest_mode"]      = False
                     st.session_state["user_email"]      = res["email"]
                     st.session_state["user_uid"]        = res["localId"]
                     st.session_state["user_id_token"]   = res["idToken"]
 
-                    # Charger la config
                     config = load_user_config(res["idToken"], res["localId"])
                     if not config:
                         config = DEFAULT_CONFIG.copy()
@@ -251,8 +258,8 @@ def render_auth_page() -> bool:
                     st.rerun()
                 else:
                     error_msg = res.get("error", {}).get("message", "Erreur inconnue")
-                    if error_msg == "EMAIL_NOT_FOUND":    st.error("Email introuvable.")
-                    elif error_msg == "INVALID_PASSWORD": st.error("Mot de passe incorrect.")
+                    if error_msg == "EMAIL_NOT_FOUND":             st.error("Email introuvable.")
+                    elif error_msg == "INVALID_PASSWORD":          st.error("Mot de passe incorrect.")
                     elif error_msg == "INVALID_LOGIN_CREDENTIALS": st.error("Email ou mot de passe incorrect.")
                     else: st.error(f"Erreur : {error_msg}")
 
@@ -263,10 +270,9 @@ def render_auth_page() -> bool:
         st.markdown("#### CRÉER UN COMPTE")
         st.info("Votre configuration (watchlist, alertes, portefeuille) sera sauvegardée automatiquement.")
 
-        signup_email  = st.text_input("EMAIL", key="signup_email", placeholder="votre@email.com")
-        signup_pwd    = st.text_input("MOT DE PASSE", type="password", key="signup_pwd",
-                                      help="Minimum 6 caractères")
-        signup_pwd2   = st.text_input("CONFIRMER LE MOT DE PASSE", type="password", key="signup_pwd2")
+        signup_email = st.text_input("EMAIL", key="signup_email", placeholder="votre@email.com")
+        signup_pwd   = st.text_input("MOT DE PASSE", type="password", key="signup_pwd", help="Minimum 6 caractères")
+        signup_pwd2  = st.text_input("CONFIRMER LE MOT DE PASSE", type="password", key="signup_pwd2")
 
         if st.button("✅ CRÉER MON COMPTE", key="btn_signup", use_container_width=True):
             if not signup_email or not signup_pwd:
@@ -279,12 +285,12 @@ def render_auth_page() -> bool:
                 with st.spinner("Création du compte..."):
                     res = sign_up(signup_email, signup_pwd)
                 if "idToken" in res:
-                    # Créer le profil Firestore avec config par défaut
                     config = DEFAULT_CONFIG.copy()
                     config["created_at"] = datetime.now().isoformat()
                     save_user_config(res["idToken"], res["localId"], config)
 
                     st.session_state["user_logged_in"]  = True
+                    st.session_state["guest_mode"]      = False
                     st.session_state["user_email"]      = res["email"]
                     st.session_state["user_uid"]        = res["localId"]
                     st.session_state["user_id_token"]   = res["idToken"]
@@ -326,22 +332,38 @@ def render_auth_page() -> bool:
 
 def render_user_sidebar():
     """Affiche les infos utilisateur + bouton déconnexion dans la sidebar."""
-    if not st.session_state.get("user_logged_in"):
+    if not st.session_state.get("user_logged_in") and not st.session_state.get("guest_mode"):
         return
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 👤 MON COMPTE")
     email = st.session_state.get("user_email", "")
-    st.sidebar.markdown(f"<small style='color:#ff9800;'>📧 {email}</small>", unsafe_allow_html=True)
 
-    if st.sidebar.button("💾 SAUVEGARDER MA CONFIG", key="btn_save_config", use_container_width=True):
-        _save_current_session_config()
-        st.sidebar.success("Config sauvegardée ✅")
+    # ── Badge mode invité ──
+    if st.session_state.get("guest_mode"):
+        st.sidebar.markdown("""
+            <div style='background:#1a1a1a; border:1px solid #444; border-radius:5px; padding:8px; text-align:center;'>
+                <span style='color:#aaa; font-size:12px;'>👤 MODE INVITÉ</span><br>
+                <span style='color:#555; font-size:10px;'>Config non sauvegardée</span>
+            </div>
+        """, unsafe_allow_html=True)
+        st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
-    if st.sidebar.button("🚪 DÉCONNEXION", key="btn_logout", use_container_width=True):
-        _save_current_session_config()
-        _clear_session()
-        st.rerun()
+        # Bouton pour se connecter depuis la sidebar
+        if st.sidebar.button("🔑 SE CONNECTER / CRÉER UN COMPTE", key="btn_login_from_guest", use_container_width=True):
+            _clear_session()
+            st.rerun()
+    else:
+        st.sidebar.markdown(f"<small style='color:#ff9800;'>📧 {email}</small>", unsafe_allow_html=True)
+
+        if st.sidebar.button("💾 SAUVEGARDER MA CONFIG", key="btn_save_config", use_container_width=True):
+            _save_current_session_config()
+            st.sidebar.success("Config sauvegardée ✅")
+
+        if st.sidebar.button("🚪 DÉCONNEXION", key="btn_logout", use_container_width=True):
+            _save_current_session_config()
+            _clear_session()
+            st.rerun()
 
 
 # ══════════════════════════════════════════════
@@ -349,12 +371,10 @@ def render_user_sidebar():
 # ══════════════════════════════════════════════
 
 def _apply_config_to_session(config: dict):
-    """Applique la config chargée depuis Firestore dans st.session_state."""
     if "watchlist" in config:
         st.session_state["watchlist"] = config["watchlist"]
 
     if "alerts" in config:
-        # Recomposer les alertes avec des dates si nécessaire
         alerts = config["alerts"]
         fixed = []
         for a in alerts:
@@ -374,21 +394,21 @@ def _apply_config_to_session(config: dict):
 
 
 def _save_current_session_config():
-    """Sérialise la session en cours et sauvegarde dans Firestore."""
+    """Sauvegarde seulement si connecté (pas en mode invité)."""
+    if st.session_state.get("guest_mode"):
+        return  # On ne sauvegarde pas pour les invités
+
     uid      = st.session_state.get("user_uid")
     id_token = st.session_state.get("user_id_token")
     if not uid or not id_token:
         return
 
-    # Sérialiser les alertes (convertir datetime en string)
     alerts_raw = st.session_state.get("alerts", [])
     alerts_serializable = []
     for a in alerts_raw:
         a2 = dict(a)
         if "created_at" in a2 and isinstance(a2["created_at"], datetime):
             a2["created_at"] = a2["created_at"].isoformat()
-        if isinstance(a2.get("active"), bool):
-            pass  # ok
         alerts_serializable.append(a2)
 
     config = {
@@ -402,9 +422,8 @@ def _save_current_session_config():
 
 
 def _clear_session():
-    """Supprime les données de session utilisateur."""
     keys_to_remove = [
-        "user_logged_in", "user_email", "user_uid", "user_id_token",
+        "user_logged_in", "guest_mode", "user_email", "user_uid", "user_id_token",
         "user_config_loaded", "user_theme",
         "watchlist", "alerts", "portfolio",
         "password_correct",
