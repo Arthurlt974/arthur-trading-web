@@ -2896,35 +2896,70 @@ elif outil == "DAILY BRIEF":
 # OUTIL : CALENDRIER ÉCONOMIQUE
 # ==========================================
 elif outil == "CALENDRIER ÉCO":
-    st.title("» ECONOMIC CALENDAR")
-    st.markdown("""
-        <div style='display:flex; gap:10px; margin-bottom:15px;'>
-            <div style='border:1px solid #333; padding:10px; text-align:center; flex:1;'>
-                <b>SOURCE:</b> FOREX FACTORY
-            </div>
-            <div style='border:1px solid #333; padding:10px; text-align:center; flex:1;'>
-                <b>MODE:</b> LIVE FEED
-            </div>
-            <div style='border:1px solid #333; padding:10px; text-align:center; flex:1;'>
-                <b>FILTRE:</b> HIGH IMPACT
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("<h1 style='color:#ff9800;'>» ECONOMIC CALENDAR</h1>", unsafe_allow_html=True)
 
-    forex_factory_html = """
-        <iframe
-            src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&importance=2,3&features=datepicker,timezone&countries=5,22,25,34,35&calType=week&timeZone=55&lang=1"
-            width="100%"
-            height="750"
-            frameborder="0"
-            allowtransparency="true"
-            marginwidth="0"
-            marginheight="0"
-            style="border:none;">
-        </iframe>
+    # Filtres
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        pays = st.multiselect("🌍 PAYS", 
+            ["US", "EU", "FR", "GB", "JP", "CN", "DE"],
+            default=["US", "EU", "FR"])
+    with col2:
+        importance = st.selectbox("⚡ IMPORTANCE", 
+            ["Tous", "High only", "Medium + High"],
+            index=2)
+    with col3:
+        periode = st.selectbox("📅 PÉRIODE",
+            ["Cette semaine", "Aujourd'hui", "Demain", "Ce mois"],
+            index=0)
+
+    # Mapping
+    pays_map = {"US": "us", "EU": "eu", "FR": "fr", "GB": "gb", "JP": "jp", "CN": "cn", "DE": "de"}
+    periode_map = {
+        "Cette semaine": "thisWeek",
+        "Aujourd'hui":   "today",
+        "Demain":        "tomorrow",
+        "Ce mois":       "thisMonth"
+    }
+    importance_map = {
+        "Tous":            "-1,0,1",
+        "High only":       "1",
+        "Medium + High":   "0,1"
+    }
+
+    pays_str       = ",".join([pays_map[p] for p in pays]) if pays else "us,eu,fr"
+    importance_str = importance_map[importance]
+    periode_str    = periode_map[periode]
+
+    calendrier_html = f"""
+    <div style="background:#000; border:1px solid #ff9800; border-radius:8px; padding:5px;">
+        <div class="tradingview-widget-container" style="height:750px;">
+            <div class="tradingview-widget-container__widget"></div>
+            <script type="text/javascript" 
+                src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+            {{
+                "colorTheme": "dark",
+                "isMaximized": true,
+                "width": "100%",
+                "height": "750",
+                "locale": "fr",
+                "importanceFilter": "{importance_str}",
+                "countryFilter": "{pays_str}",
+                "dateRange": "{periode_str}"
+            }}
+            </script>
+        </div>
+    </div>
     """
 
-    components.html(forex_factory_html, height=770, scrolling=True)
+    components.html(calendrier_html, height=780, scrolling=True)
+
+    st.markdown("""
+        <div style='display:flex; justify-content:space-between; color:#555; font-size:11px; margin-top:8px; font-family:monospace;'>
+            <span>⚡ ROUGE = Impact Fort | 🟡 ORANGE = Impact Moyen | ⚪ GRIS = Faible</span>
+            <span>SOURCE: TRADINGVIEW LIVE</span>
+        </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================
 # OUTIL : FEAR & GREED INDEX
