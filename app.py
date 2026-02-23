@@ -5386,6 +5386,55 @@ elif outil == "DIVIDEND CALENDAR":
     
     st.caption("⚠️ Données simulées. Pour des données réelles, consultez Dividend.com ou les sites des sociétés.")
 
-# Vers la fin du fichier, après les autres conditions 'elif outil == ...'
+##                 ##
+## Order Book Live ##
+##                 ##
 elif outil == "ORDER BOOK LIVE":
-    show_order_book_ui()
+    def show_order_book_ui():
+    st.markdown("### 🐳 WHALE TRACKER - ORDER BOOK (COINBASE)")
+    st.info("Filtrez les ordres pour ne voir que la liquidité importante.")
+    
+    col_input, col_filter = st.columns([2, 2])
+    
+    with col_input:
+        symbol = st.text_input("PAIRE (ex: BTC, ETH, SOL)", value="BTC").upper()
+    
+    with col_filter:
+        # Filtre de taille minimum
+        min_size = st.number_input("Taille min. (Quantité)", min_value=0.0, value=1.0, step=0.1)
+    
+    if st.button("🔄 ANALYSER LE CARNET"):
+        with st.spinner("Filtrage des ordres en cours..."):
+            data_result, error_msg = get_coinbase_order_book(symbol)
+            
+            if data_result:
+                bids, asks = data_result
+                
+                # --- APPLICATION DU FILTRE ---
+                bids_filtered = bids[bids['Quantity'] >= min_size]
+                asks_filtered = asks[asks['Quantity'] >= min_size]
+                
+                if bids_filtered.empty and asks_filtered.empty:
+                    st.warning(f"Aucun ordre trouvé avec une taille >= {min_size} {symbol}")
+                else:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"<span style='color:#ff4b4b; font-weight:bold;'>🔴 VENTES ≥ {min_size}</span>", unsafe_allow_html=True)
+                        st.dataframe(
+                            asks_filtered.sort_values('Price', ascending=False).style.bar(subset=['Quantity'], color='#441111'), 
+                            hide_index=True, use_container_width=True
+                        )
+                    
+                    with col2:
+                        st.markdown(f"<span style='color:#00ffad; font-weight:bold;'>🟢 ACHATS ≥ {min_size}</span>", unsafe_allow_html=True)
+                        st.dataframe(
+                            bids_filtered.style.bar(subset=['Quantity'], color='#114411'), 
+                            hide_index=True, use_container_width=True
+                        )
+                    
+                    # Stats sur les baleines
+                    st.divider()
+                    st.markdown(f"**Analyse :** {len(bids_filtered) + len(asks_filtered)} ordres institutionnels détectés à proximité du prix actuel.")
+            else:
+                st.error(f"Erreur : {error_msg}")
