@@ -610,12 +610,7 @@ if categorie == "ÉCONOMIE":
 elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
-elif outil == "ON-CHAIN ANALYTICS":
-    crypto_tools.show_onchain()
-elif outil == "LIQUIDATIONS & FUNDING":
-    crypto_tools.show_liquidations()
-elif outil == "STAKING & YIELD":
-    crypto_tools.show_staking()
+
 
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
