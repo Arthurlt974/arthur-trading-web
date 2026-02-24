@@ -603,7 +603,7 @@ if categorie == "INTERFACE CRYPTO PRO":
 if categorie == "ÉCONOMIE":
     interface_economie.show_economie()
     st.stop()
-elif categorie == "FOREX":
+if categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
 
