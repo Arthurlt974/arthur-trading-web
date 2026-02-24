@@ -1200,23 +1200,109 @@ def trouver_ticker(nom):
     except:
         return nom
 
-def calculer_score_sentiment(ticker):
+def get_fear_greed_crypto():
+    """Récupère le vrai Fear & Greed Index crypto via Alternative.me API."""
     try:
-        data = yf.Ticker(ticker).history(period="1y")
-        if len(data) < 200:
-            return 50, "NEUTRE", "gray"
-        prix_actuel = data['Close'].iloc[-1]
-        ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
-        ratio = (prix_actuel / ma200) - 1
-        score = 50 + (ratio * 300)
-        score = max(10, min(90, score))
-        if score > 70:   return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
-        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
-        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
-        elif score > 30: return score, "PEUR 📉", "#e67e22"
-        else:            return score, "PANIQUE TOTALE 💀", "#e74c3c"
+        r = requests.get("https://api.alternative.me/fng/?limit=30&format=json", timeout=8)
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            if data:
+                current = data[0]
+                score = int(current.get("value", 50))
+                label_raw = current.get("value_classification", "Neutral")
+                history = [(int(d["value"]), datetime.fromtimestamp(int(d["timestamp"]))) for d in data]
+                return score, label_raw, history
     except:
-        return 50, "ERREUR", "gray"
+        pass
+    return None, None, []
+
+def calculer_score_sentiment_avance(ticker):
+    """
+    Score de sentiment multi-facteurs fiable :
+    - RSI 14 (momentum oscillateur)
+    - Position par rapport à MA20 / MA50 / MA200
+    - Volatilité relative (VIX-like)
+    - Momentum 30j
+    - Ratio Volume vs moyenne
+    Pondération : chaque facteur contribue au score final 0-100.
+    """
+    try:
+        data = yf.Ticker(ticker).history(period="1y", interval="1d")
+        if data is None or len(data) < 60:
+            return 50, "NEUTRE ⚖️", "#f1c40f", {}
+
+        close = data['Close']
+        volume = data['Volume']
+        prix = float(close.iloc[-1])
+
+        # ── 1. RSI 14 ──
+        delta = close.diff()
+        gain = delta.clip(lower=0).rolling(14).mean()
+        loss = (-delta.clip(upper=0)).rolling(14).mean()
+        rs = gain / loss.replace(0, 1e-9)
+        rsi = float((100 - 100 / (1 + rs)).iloc[-1])
+        # RSI → score 0-100 (RSI 30=peur, 70=euphorie)
+        score_rsi = max(0, min(100, rsi))
+
+        # ── 2. Position vs Moyennes Mobiles ──
+        ma20  = float(close.rolling(20).mean().iloc[-1])
+        ma50  = float(close.rolling(50).mean().iloc[-1])
+        ma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else ma50
+        above_ma20  = 1 if prix > ma20  else 0
+        above_ma50  = 1 if prix > ma50  else 0
+        above_ma200 = 1 if prix > ma200 else 0
+        score_ma = (above_ma20 + above_ma50 + above_ma200) / 3 * 100
+
+        # ── 3. Momentum 30j ──
+        prix_30j = float(close.iloc[-31]) if len(close) >= 31 else float(close.iloc[0])
+        momentum = (prix - prix_30j) / prix_30j * 100
+        score_momentum = max(0, min(100, 50 + momentum * 2.5))
+
+        # ── 4. Volatilité (inverse : haute volat = peur) ──
+        returns = close.pct_change().dropna()
+        vol_20j = float(returns.rolling(20).std().iloc[-1]) * np.sqrt(252) * 100
+        vol_hist = float(returns.rolling(60).std().iloc[-1]) * np.sqrt(252) * 100 if len(returns) >= 60 else vol_20j
+        vol_ratio = vol_20j / (vol_hist + 1e-9)
+        score_vol = max(0, min(100, 100 - (vol_ratio - 1) * 50))
+
+        # ── 5. Volume vs Moyenne ──
+        vol_moy = float(volume.rolling(20).mean().iloc[-1])
+        vol_actuel = float(volume.iloc[-1])
+        vol_surge = vol_actuel / (vol_moy + 1e-9)
+        # Volume élevé + prix en hausse = bullish ; on simplifie en neutre si pas de contexte
+        score_volume = max(0, min(100, 50 + (vol_surge - 1) * 15))
+
+        # ── Score final pondéré ──
+        score = (
+            score_rsi      * 0.30 +
+            score_ma       * 0.25 +
+            score_momentum * 0.25 +
+            score_vol      * 0.10 +
+            score_volume   * 0.10
+        )
+        score = max(5, min(95, score))
+
+        details = {
+            "RSI (14)": f"{rsi:.1f}",
+            "Position MA20/50/200": f"{above_ma20}/{above_ma50}/{above_ma200}",
+            "Momentum 30j": f"{momentum:+.1f}%",
+            "Volatilité 20j": f"{vol_20j:.1f}%/an",
+            "Volume vs moy.": f"{vol_surge:.2f}x",
+        }
+
+        if score >= 75:   return score, "EXTRÊME EUPHORIE 🚀", "#00ffad", details
+        elif score >= 60: return score, "OPTIMISME 📈", "#2ecc71", details
+        elif score >= 45: return score, "NEUTRE ⚖️", "#f1c40f", details
+        elif score >= 30: return score, "PEUR 📉", "#e67e22", details
+        else:             return score, "PANIQUE TOTALE 💀", "#e74c3c", details
+
+    except Exception as e:
+        return 50, "NEUTRE ⚖️", "#f1c40f", {}
+
+# Alias rétrocompatibilité (utilisé ailleurs dans le code)
+def calculer_score_sentiment(ticker):
+    score, label, couleur, _ = calculer_score_sentiment_avance(ticker)
+    return score, label, couleur
 
 def afficher_jauge_pro(score, titre, couleur, sentiment):
     fig = go.Figure(go.Indicator(
@@ -1468,6 +1554,7 @@ if categorie == "MARCHÉ CRYPTO":
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
         "ORDER BOOK LIVE",
+        "WHALE WATCHER",
         "ON-CHAIN ANALYTICS",
         "LIQUIDATIONS & FUNDING",
         "STAKING & YIELD"
@@ -1728,7 +1815,88 @@ elif outil == "HEATMAP LIQUIDATIONS":
 # ==========================================
 elif outil == "ORDER BOOK LIVE":
     show_order_book_ui()
-    
+
+# ==========================================
+# OUTIL : WHALE WATCHER
+# ==========================================
+elif outil == "WHALE WATCHER":
+    st.title("🐋 BITCOIN WHALE TRACKER")
+    st.write("Surveillance des transactions sur Binance (Flux Temps Réel)")
+
+    if 'whale_logs' not in st.session_state:
+        st.session_state.whale_logs = []
+    if 'pressure_data' not in st.session_state:
+        st.session_state.pressure_data = []
+
+    seuil_baleine = st.slider("SEUIL DE FILTRAGE (BTC)", 0.1, 5.0, 0.5)
+
+    def get_live_trades():
+        try:
+            url = "https://api.binance.com/api/v3/trades?symbol=BTCUSDT&limit=50"
+            res = requests.get(url, timeout=2).json()
+            return res
+        except:
+            return []
+
+    trades = get_live_trades()
+
+    for t in trades:
+        try:
+            qty = float(t.get('qty', 0))
+            prix = float(t.get('price', 0))
+            if qty >= seuil_baleine:
+                is_seller = t.get('isBuyerMaker', False)
+                color = "🔴" if is_seller else "🟢"
+                label = "SELL" if is_seller else "BUY"
+                timestamp = t.get('time', 0)
+                time_str = datetime.fromtimestamp(timestamp/1000).strftime('%H:%M:%S')
+                log = f"{color} | {time_str} | {label} {qty:.2f} BTC @ {prix:,.0f} $"
+                if log not in st.session_state.whale_logs:
+                    st.session_state.whale_logs.insert(0, log)
+                    st.session_state.pressure_data.append(0 if is_seller else 1)
+        except:
+            continue
+
+    st.session_state.whale_logs = st.session_state.whale_logs[:15]
+    if len(st.session_state.pressure_data) > 50:
+        st.session_state.pressure_data.pop(0)
+
+    pct_a, pct_v = 50, 50
+    if st.session_state.pressure_data:
+        total_p = len(st.session_state.pressure_data)
+        achats = sum(st.session_state.pressure_data)
+        ventes = total_p - achats
+        pct_a = (achats / total_p) * 100
+        pct_v = (ventes / total_p) * 100
+
+        st.subheader("📊 BUY vs SELL PRESSURE (Whales)")
+        c_p1, c_p2 = st.columns([max(1, pct_a), max(1, pct_v)])
+        c_p1.markdown(f"<div style='background:#00ff00; height:25px; border-radius:5px 0 0 5px; text-align:center; color:black; font-weight:bold; line-height:25px;'>{pct_a:.0f}% BUY</div>", unsafe_allow_html=True)
+        c_p2.markdown(f"<div style='background:#ff0000; height:25px; border-radius:0 5px 5px 0; text-align:center; color:white; font-weight:bold; line-height:25px;'>{pct_v:.0f}% SELL</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.subheader("📝 LIVE ACTIVITY LOG")
+        if not st.session_state.whale_logs:
+            st.info(f"En attente de mouvements > {seuil_baleine} BTC...")
+        else:
+            for l in st.session_state.whale_logs:
+                if "🟢" in l:
+                    st.markdown(f"<span style='color:#00ff00; font-family:monospace;'>{l}</span>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<span style='color:#ff4b4b; font-family:monospace;'>{l}</span>", unsafe_allow_html=True)
+    with col2:
+        st.subheader("💡 INSIGHT")
+        if pct_a > 60:
+            st.success("ACCUMULATION : Les baleines achètent agressivement.")
+        elif pct_v > 60:
+            st.error("DISTRIBUTION : Les baleines vendent leurs positions.")
+        else:
+            st.warning("INDÉCISION : Flux équilibré entre acheteurs et vendeurs.")
+
+
 # ==========================================
 # OUTIL : ON-CHAIN ANALYTICS
 # ==========================================
@@ -3784,27 +3952,189 @@ elif outil == "CALENDRIER ÉCO":
 # OUTIL : FEAR & GREED INDEX
 # ==========================================
 elif outil == "Fear and Gread Index":
-    st.title("🌡️ Market Sentiment Index")
-    st.write("Analyse de la force du marché par rapport à sa moyenne long terme (MA200).")
+    st.markdown("""
+        <div style='text-align:center;padding:20px;background:linear-gradient(135deg,#1a1a1a,#0d0d0d);
+             border:2px solid #ff9800;border-radius:12px;margin-bottom:20px;'>
+            <h1 style='color:#ff9800;margin:0;font-size:36px;'>🌡️ FEAR & GREED INDEX</h1>
+            <p style='color:#ffb84d;margin:8px 0 0;font-size:14px;'>
+                Sentiment multi-facteurs · RSI · Momentum · Volatilité · Moyennes Mobiles · Volume
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
 
-    marches = {
-        "^GSPC": "🇺🇸 USA (S&P 500)",
-        "^FCHI": "🇫🇷 France (CAC 40)",
-        "^HSI":  "🇨🇳 Chine (Hang Seng)",
-        "BTC-USD": "₿ Bitcoin",
-        "GC=F": "🟡 Or (Métal Précieux)"
-    }
-    c1, c2 = st.columns(2)
-    items = list(marches.items())
-    for i in range(len(items)):
-        ticker, nom = items[i]
-        score, label, couleur = calculer_score_sentiment(ticker)
-        fig = afficher_jauge_pro(score, nom, couleur, label)
-        if i % 2 == 0: c1.plotly_chart(fig, use_container_width=True)
-        else:           c2.plotly_chart(fig, use_container_width=True)
+    tab_crypto, tab_marches, tab_historique = st.tabs([
+        "₿ CRYPTO (Alternative.me)",
+        "📊 MARCHÉS MULTI-FACTEURS",
+        "📈 HISTORIQUE CRYPTO"
+    ])
 
-    st.markdown("---")
-    st.info("💡 **Conseil** : La 'Panique' (0-30%) indique souvent une opportunité d'achat, tandis que l'Euphorie (70-100%) suggère une bulle potentielle.")
+    # ── TAB 1 : Vrai Fear & Greed Crypto ──
+    with tab_crypto:
+        st.markdown("### ₿ FEAR & GREED INDEX — BITCOIN / CRYPTO")
+        st.caption("Source : Alternative.me API — Indice officiel utilisé par les professionnels")
+
+        with st.spinner("Chargement de l'indice officiel..."):
+            fg_score, fg_label, fg_history = get_fear_greed_crypto()
+
+        if fg_score is not None:
+            # Couleur selon zone
+            if fg_score >= 75:   fg_color = "#00ffad"
+            elif fg_score >= 55: fg_color = "#2ecc71"
+            elif fg_score >= 45: fg_color = "#f1c40f"
+            elif fg_score >= 25: fg_color = "#e67e22"
+            else:                fg_color = "#e74c3c"
+
+            label_fr = {
+                "Extreme Greed": "EXTRÊME AVIDITÉ 🚀",
+                "Greed": "AVIDITÉ 📈",
+                "Neutral": "NEUTRE ⚖️",
+                "Fear": "PEUR 📉",
+                "Extreme Fear": "PEUR EXTRÊME 💀"
+            }.get(fg_label, fg_label)
+
+            col_jauge, col_info = st.columns([1, 1])
+            with col_jauge:
+                fig_fg = afficher_jauge_pro(fg_score, "CRYPTO FEAR & GREED", fg_color, label_fr)
+                st.plotly_chart(fig_fg, use_container_width=True)
+
+            with col_info:
+                st.markdown("<br><br>", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div style='background:#0d0d0d;border:1px solid {fg_color};border-radius:10px;padding:20px;text-align:center;'>
+                        <div style='color:#888;font-size:12px;font-family:monospace;'>SCORE ACTUEL</div>
+                        <div style='color:{fg_color};font-size:64px;font-weight:bold;line-height:1.1;'>{fg_score}</div>
+                        <div style='color:{fg_color};font-size:18px;font-weight:bold;margin-top:8px;'>{label_fr}</div>
+                        <hr style='border-color:#333;margin:12px 0;'>
+                        <div style='color:#666;font-size:11px;'>Source : alternative.me/fng · Mis à jour quotidiennement</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # Zones d'interprétation
+            st.markdown("---")
+            st.markdown("### 📖 ZONES D'INTERPRÉTATION")
+            z1, z2, z3, z4, z5 = st.columns(5)
+            zones = [
+                (z1, "0–24", "PEUR EXTRÊME", "#e74c3c", "Opportunité d'achat historique"),
+                (z2, "25–44", "PEUR", "#e67e22", "Pessimisme, sous-évaluation possible"),
+                (z3, "45–54", "NEUTRE", "#f1c40f", "Marché équilibré"),
+                (z4, "55–74", "AVIDITÉ", "#2ecc71", "Optimisme, attention aux bulles"),
+                (z5, "75–100", "EXTRÊME AVIDITÉ", "#00ffad", "Correction probable imminente"),
+            ]
+            for col, rng, lbl, clr, desc in zones:
+                is_current = False
+                r_min, r_max = int(rng.split("–")[0]), int(rng.split("–")[1])
+                if r_min <= fg_score <= r_max:
+                    is_current = True
+                border = f"3px solid {clr}" if is_current else f"1px solid {clr}44"
+                col.markdown(f"""
+                    <div style='background:#0d0d0d;border:{border};border-radius:8px;padding:10px;text-align:center;'>
+                        <div style='color:{clr};font-size:11px;font-weight:bold;'>{rng}</div>
+                        <div style='color:{clr};font-size:13px;font-weight:bold;margin:4px 0;'>{"▶ " if is_current else ""}{lbl}</div>
+                        <div style='color:#666;font-size:10px;'>{desc}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ API Alternative.me indisponible. Vérifiez votre connexion.")
+
+    # ── TAB 2 : Multi-marchés multi-facteurs ──
+    with tab_marches:
+        st.markdown("### 📊 SENTIMENT MULTI-FACTEURS PAR MARCHÉ")
+        st.caption("Calcul basé sur : RSI(14) · MA20/50/200 · Momentum 30j · Volatilité · Volume (pondérés)")
+
+        marches = {
+            "^GSPC":   "🇺🇸 S&P 500",
+            "^FCHI":   "🇫🇷 CAC 40",
+            "^IXIC":   "🇺🇸 NASDAQ",
+            "BTC-USD": "₿ Bitcoin",
+            "ETH-USD": "⟠ Ethereum",
+            "GC=F":    "🟡 Or",
+        }
+
+        with st.spinner("Calcul des scores multi-facteurs..."):
+            resultats = {}
+            for ticker, nom in marches.items():
+                score, label, couleur, details = calculer_score_sentiment_avance(ticker)
+                resultats[nom] = (score, label, couleur, details)
+
+        # Jauges
+        cols = st.columns(3)
+        for i, (nom, (score, label, couleur, details)) in enumerate(resultats.items()):
+            with cols[i % 3]:
+                fig = afficher_jauge_pro(score, nom, couleur, label)
+                st.plotly_chart(fig, use_container_width=True)
+                if details:
+                    with st.expander("🔬 Détail des facteurs"):
+                        for k, v in details.items():
+                            st.markdown(f"<span style='color:#888;font-size:11px;font-family:monospace;'>{k}: <b style='color:#fff;'>{v}</b></span>", unsafe_allow_html=True)
+
+        # Tableau synthèse
+        st.markdown("---")
+        st.markdown("### 📋 TABLEAU SYNTHÈSE")
+        rows_table = []
+        for nom, (score, label, couleur, _) in resultats.items():
+            rows_table.append({"Marché": nom, "Score": f"{score:.0f}/100", "Sentiment": label})
+        df_table = pd.DataFrame(rows_table)
+        st.dataframe(df_table, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+        st.info("💡 **Conseil** : Score < 30 = zone de panique historique, souvent une opportunité d'achat. Score > 75 = euphorie, prudence recommandée. Les facteurs RSI et Momentum ont le plus de poids (55% combinés).")
+
+    # ── TAB 3 : Historique 30j Crypto ──
+    with tab_historique:
+        st.markdown("### 📈 HISTORIQUE 30 JOURS — FEAR & GREED CRYPTO")
+
+        with st.spinner("Chargement de l'historique..."):
+            _, _, fg_history = get_fear_greed_crypto()
+
+        if fg_history:
+            scores_h = [s for s, _ in fg_history]
+            dates_h  = [d for _, d in fg_history]
+            scores_h.reverse(); dates_h.reverse()
+
+            colors_h = []
+            for s in scores_h:
+                if s >= 75:   colors_h.append("#00ffad")
+                elif s >= 55: colors_h.append("#2ecc71")
+                elif s >= 45: colors_h.append("#f1c40f")
+                elif s >= 25: colors_h.append("#e67e22")
+                else:         colors_h.append("#e74c3c")
+
+            fig_hist = go.Figure()
+            fig_hist.add_hrect(y0=0,  y1=25,  fillcolor="rgba(231,76,60,0.08)",   line_width=0)
+            fig_hist.add_hrect(y0=25, y1=45,  fillcolor="rgba(230,126,34,0.08)",  line_width=0)
+            fig_hist.add_hrect(y0=45, y1=55,  fillcolor="rgba(241,196,15,0.08)",  line_width=0)
+            fig_hist.add_hrect(y0=55, y1=75,  fillcolor="rgba(46,204,113,0.08)",  line_width=0)
+            fig_hist.add_hrect(y0=75, y1=100, fillcolor="rgba(0,255,173,0.08)",   line_width=0)
+            fig_hist.add_trace(go.Scatter(
+                x=dates_h, y=scores_h,
+                mode="lines+markers",
+                line=dict(color="#ff9800", width=2.5),
+                marker=dict(color=colors_h, size=8, line=dict(color="white", width=1)),
+                hovertemplate="<b>%{x|%d %b}</b><br>Score: %{y}<extra></extra>"
+            ))
+            fig_hist.update_layout(
+                template="plotly_dark", paper_bgcolor="#000000", plot_bgcolor="#0a0a0a",
+                font=dict(color="#cccccc", family="Courier New"),
+                height=400, hovermode="x unified",
+                title=dict(text="Fear & Greed Index Crypto — 30 derniers jours", font=dict(color="#ff9800", size=15)),
+                xaxis=dict(gridcolor="#1a1a1a", showgrid=True),
+                yaxis=dict(gridcolor="#1a1a1a", showgrid=True, range=[0, 100],
+                           tickvals=[0,25,45,55,75,100],
+                           ticktext=["0","Peur extrême","Peur","Neutre","Avidité","100"]),
+                margin=dict(l=50, r=20, t=50, b=40)
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+            # Stats
+            scores_arr = np.array(scores_h)
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Moyenne 30j", f"{scores_arr.mean():.0f}")
+            c2.metric("Min 30j",     f"{scores_arr.min():.0f}")
+            c3.metric("Max 30j",     f"{scores_arr.max():.0f}")
+            trend = "↑ Hausse" if scores_arr[-1] > scores_arr[-7] else "↓ Baisse"
+            c4.metric("Tendance 7j", trend)
+        else:
+            st.warning("⚠️ Historique indisponible — API Alternative.me inaccessible.")
 
 # ==========================================
 # OUTIL : CORRÉLATION DASH
