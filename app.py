@@ -1468,7 +1468,6 @@ if categorie == "MARCHÉ CRYPTO":
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
         "ORDER BOOK LIVE",
-        "WHALE WATCHER",
         "ON-CHAIN ANALYTICS",
         "LIQUIDATIONS & FUNDING",
         "STAKING & YIELD"
@@ -1729,88 +1728,7 @@ elif outil == "HEATMAP LIQUIDATIONS":
 # ==========================================
 elif outil == "ORDER BOOK LIVE":
     show_order_book_ui()
-
-# ==========================================
-# OUTIL : WHALE WATCHER
-# ==========================================
-elif outil == "WHALE WATCHER":
-    st.title("🐋 BITCOIN WHALE TRACKER")
-    st.write("Surveillance des transactions sur Binance (Flux Temps Réel)")
-
-    if 'whale_logs' not in st.session_state:
-        st.session_state.whale_logs = []
-    if 'pressure_data' not in st.session_state:
-        st.session_state.pressure_data = []
-
-    seuil_baleine = st.slider("SEUIL DE FILTRAGE (BTC)", 0.1, 5.0, 0.5)
-
-    def get_live_trades():
-        try:
-            url = "https://api.binance.com/api/v3/trades?symbol=BTCUSDT&limit=50"
-            res = requests.get(url, timeout=2).json()
-            return res
-        except:
-            return []
-
-    trades = get_live_trades()
-
-    for t in trades:
-        try:
-            qty = float(t.get('qty', 0))
-            prix = float(t.get('price', 0))
-            if qty >= seuil_baleine:
-                is_seller = t.get('isBuyerMaker', False)
-                color = "🔴" if is_seller else "🟢"
-                label = "SELL" if is_seller else "BUY"
-                timestamp = t.get('time', 0)
-                time_str = datetime.fromtimestamp(timestamp/1000).strftime('%H:%M:%S')
-                log = f"{color} | {time_str} | {label} {qty:.2f} BTC @ {prix:,.0f} $"
-                if log not in st.session_state.whale_logs:
-                    st.session_state.whale_logs.insert(0, log)
-                    st.session_state.pressure_data.append(0 if is_seller else 1)
-        except:
-            continue
-
-    st.session_state.whale_logs = st.session_state.whale_logs[:15]
-    if len(st.session_state.pressure_data) > 50:
-        st.session_state.pressure_data.pop(0)
-
-    pct_a, pct_v = 50, 50
-    if st.session_state.pressure_data:
-        total_p = len(st.session_state.pressure_data)
-        achats = sum(st.session_state.pressure_data)
-        ventes = total_p - achats
-        pct_a = (achats / total_p) * 100
-        pct_v = (ventes / total_p) * 100
-
-        st.subheader("📊 BUY vs SELL PRESSURE (Whales)")
-        c_p1, c_p2 = st.columns([max(1, pct_a), max(1, pct_v)])
-        c_p1.markdown(f"<div style='background:#00ff00; height:25px; border-radius:5px 0 0 5px; text-align:center; color:black; font-weight:bold; line-height:25px;'>{pct_a:.0f}% BUY</div>", unsafe_allow_html=True)
-        c_p2.markdown(f"<div style='background:#ff0000; height:25px; border-radius:0 5px 5px 0; text-align:center; color:white; font-weight:bold; line-height:25px;'>{pct_v:.0f}% SELL</div>", unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader("📝 LIVE ACTIVITY LOG")
-        if not st.session_state.whale_logs:
-            st.info(f"En attente de mouvements > {seuil_baleine} BTC...")
-        else:
-            for l in st.session_state.whale_logs:
-                if "🟢" in l:
-                    st.markdown(f"<span style='color:#00ff00; font-family:monospace;'>{l}</span>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<span style='color:#ff4b4b; font-family:monospace;'>{l}</span>", unsafe_allow_html=True)
-    with col2:
-        st.subheader("💡 INSIGHT")
-        if pct_a > 60:
-            st.success("ACCUMULATION : Les baleines achètent agressivement.")
-        elif pct_v > 60:
-            st.error("DISTRIBUTION : Les baleines vendent leurs positions.")
-        else:
-            st.warning("INDÉCISION : Flux équilibré entre acheteurs et vendeurs.")
-
-
+    
 # ==========================================
 # OUTIL : ON-CHAIN ANALYTICS
 # ==========================================
