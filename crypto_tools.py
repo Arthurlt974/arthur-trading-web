@@ -279,7 +279,7 @@ def show_onchain():
     st.markdown("""
         <div style='text-align:center;padding:20px;background:linear-gradient(135deg,#1a1a1a,#0d0d0d);
              border:2px solid #00ffad;border-radius:12px;margin-bottom:20px;'>
-            <h2 style='color:#00ffad;margin:0;'>🔗 ON-CHAIN ANALYTICS</h2>
+            <h2 style='color:#00ffad;margin:0;'>ON-CHAIN ANALYTICS</h2>
             <p style='color:#00cc88;margin:5px 0 0;font-size:13px;'>
                 Métriques blockchain — Baleines · Flux Exchanges · Activité Réseau
             </p>
@@ -448,7 +448,7 @@ def show_liquidations():
     st.markdown("""
         <div style='text-align:center;padding:20px;background:linear-gradient(135deg,#1a1a1a,#0d0d0d);
              border:2px solid #ff4b4b;border-radius:12px;margin-bottom:20px;'>
-            <h2 style='color:#ff4b4b;margin:0;'>💥 LIQUIDATIONS & FUNDING RATE</h2>
+            <h2 style='color:#ff4b4b;margin:0;'>LIQUIDATIONS & FUNDING RATE</h2>
             <p style='color:#ff7777;margin:5px 0 0;font-size:13px;'>
                 Futures Binance — Liquidations forcées · Taux de financement · Open Interest
             </p>
@@ -707,7 +707,7 @@ def show_staking():
     st.markdown("""
         <div style='text-align:center;padding:20px;background:linear-gradient(135deg,#1a1a1a,#0d0d0d);
              border:2px solid #4fc3f7;border-radius:12px;margin-bottom:20px;'>
-            <h2 style='color:#4fc3f7;margin:0;'>🥩 STAKING & YIELD TRACKER</h2>
+            <h2 style='color:#4fc3f7;margin:0;'>STAKING & YIELD TRACKER</h2>
             <p style='color:#7dd3f5;margin:5px 0 0;font-size:13px;'>
                 Rendements DeFi · Staking natif · Simulateur de revenus passifs
             </p>
