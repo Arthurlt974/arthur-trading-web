@@ -4039,45 +4039,104 @@ elif outil == "Fear and Gread Index":
     # ── TAB 2 : Multi-marchés multi-facteurs ──
     with tab_marches:
         st.markdown("### 📊 SENTIMENT MULTI-FACTEURS PAR MARCHÉ")
-        st.caption("Calcul basé sur : RSI(14) · MA20/50/200 · Momentum 30j · Volatilité · Volume (pondérés)")
+        st.caption("₿ BTC & ETH : Alternative.me API (officiel) · Autres marchés : RSI(14) · MA20/50/200 · Momentum · Volatilité · Volume")
 
-        marches = {
+        marches_calcul = {
             "^GSPC":   "🇺🇸 S&P 500",
             "^FCHI":   "🇫🇷 CAC 40",
             "^IXIC":   "🇺🇸 NASDAQ",
-            "BTC-USD": "₿ Bitcoin",
-            "ETH-USD": "⟠ Ethereum",
             "GC=F":    "🟡 Or",
         }
 
-        with st.spinner("Calcul des scores multi-facteurs..."):
-            resultats = {}
-            for ticker, nom in marches.items():
-                score, label, couleur, details = calculer_score_sentiment_avance(ticker)
-                resultats[nom] = (score, label, couleur, details)
+        def _fg_color(s):
+            if s >= 75:   return "#00ffad"
+            elif s >= 55: return "#2ecc71"
+            elif s >= 45: return "#f1c40f"
+            elif s >= 25: return "#e67e22"
+            else:         return "#e74c3c"
 
-        # Jauges
+        def _fg_label_fr(raw):
+            return {
+                "Extreme Greed": "EXTRÊME AVIDITÉ 🚀",
+                "Greed":         "AVIDITÉ 📈",
+                "Neutral":       "NEUTRE ⚖️",
+                "Fear":          "PEUR 📉",
+                "Extreme Fear":  "PEUR EXTRÊME 💀",
+            }.get(raw, raw)
+
+        with st.spinner("Chargement des données..."):
+            # Alternative.me pour BTC & ETH
+            fg_score, fg_label_raw, _ = get_fear_greed_crypto()
+
+            # Multi-facteurs pour les autres marchés
+            resultats = {}
+            for ticker, nom in marches_calcul.items():
+                score, label, couleur, details = calculer_score_sentiment_avance(ticker)
+                resultats[nom] = (score, label, couleur, details, "calcul")
+
+            # Injecter BTC et ETH depuis Alternative.me
+            if fg_score is not None:
+                btc_score = fg_score
+                btc_label = _fg_label_fr(fg_label_raw)
+                btc_color = _fg_color(btc_score)
+                # ETH suit le même indice (Alternative.me est global crypto)
+                eth_score = fg_score
+                eth_label = _fg_label_fr(fg_label_raw)
+                eth_color = _fg_color(eth_score)
+                resultats["₿ Bitcoin"]   = (btc_score, btc_label, btc_color, {}, "alternative.me")
+                resultats["⟠ Ethereum"]  = (eth_score, eth_label, eth_color, {}, "alternative.me")
+            else:
+                # Fallback calcul si API indispo
+                s, l, c, d = calculer_score_sentiment_avance("BTC-USD")
+                resultats["₿ Bitcoin"]  = (s, l, c, d, "calcul (fallback)")
+                s, l, c, d = calculer_score_sentiment_avance("ETH-USD")
+                resultats["⟠ Ethereum"] = (s, l, c, d, "calcul (fallback)")
+
+        # ── Affichage des jauges ──
+        # Ordre d'affichage souhaité
+        ordre = ["₿ Bitcoin", "⟠ Ethereum", "🇺🇸 S&P 500", "🇺🇸 NASDAQ", "🇫🇷 CAC 40", "🟡 Or"]
         cols = st.columns(3)
-        for i, (nom, (score, label, couleur, details)) in enumerate(resultats.items()):
+        for i, nom in enumerate(ordre):
+            if nom not in resultats:
+                continue
+            score, label, couleur, details, source = resultats[nom]
             with cols[i % 3]:
                 fig = afficher_jauge_pro(score, nom, couleur, label)
                 st.plotly_chart(fig, use_container_width=True)
+                # Badge source
+                badge_color = "#00ffad" if source == "alternative.me" else "#4fc3f7"
+                badge_text  = "✅ Alternative.me" if source == "alternative.me" else "🔬 Multi-facteurs"
+                st.markdown(f"""
+                    <div style='text-align:center;margin-top:-10px;margin-bottom:8px;'>
+                        <span style='background:#0d0d0d;border:1px solid {badge_color};color:{badge_color};
+                               font-size:10px;font-family:monospace;padding:2px 8px;border-radius:10px;'>
+                            {badge_text}
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
                 if details:
                     with st.expander("🔬 Détail des facteurs"):
                         for k, v in details.items():
                             st.markdown(f"<span style='color:#888;font-size:11px;font-family:monospace;'>{k}: <b style='color:#fff;'>{v}</b></span>", unsafe_allow_html=True)
 
-        # Tableau synthèse
+        # ── Tableau synthèse ──
         st.markdown("---")
         st.markdown("### 📋 TABLEAU SYNTHÈSE")
         rows_table = []
-        for nom, (score, label, couleur, _) in resultats.items():
-            rows_table.append({"Marché": nom, "Score": f"{score:.0f}/100", "Sentiment": label})
-        df_table = pd.DataFrame(rows_table)
-        st.dataframe(df_table, use_container_width=True, hide_index=True)
+        for nom in ordre:
+            if nom not in resultats:
+                continue
+            score, label, couleur, _, source = resultats[nom]
+            rows_table.append({
+                "Marché": nom,
+                "Score": f"{score:.0f}/100",
+                "Sentiment": label,
+                "Source": "Alternative.me" if source == "alternative.me" else "Multi-facteurs"
+            })
+        st.dataframe(pd.DataFrame(rows_table), use_container_width=True, hide_index=True)
 
         st.markdown("---")
-        st.info("💡 **Conseil** : Score < 30 = zone de panique historique, souvent une opportunité d'achat. Score > 75 = euphorie, prudence recommandée. Les facteurs RSI et Momentum ont le plus de poids (55% combinés).")
+        st.info("💡 **BTC & ETH** utilisent l'indice officiel Alternative.me (même source que l'onglet Crypto). Les autres marchés utilisent un calcul multi-facteurs : RSI, moyennes mobiles, momentum, volatilité et volume.")
 
     # ── TAB 3 : Historique 30j Crypto ──
     with tab_historique:
