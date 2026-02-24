@@ -1,5 +1,5 @@
 import streamlit as st
-import yfinance as yf
+import data_provider as dp  # ✅ Remplace yfinance (interdit commercialement)
 import pandas as pd
 import requests
 import feedparser
@@ -17,7 +17,6 @@ from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
 import interface_forex
-import crypto_tools
 
 # ============================================================
 #  FONCTIONS UTILES GLOBALES
@@ -30,9 +29,7 @@ def get_crypto_price(symbol):
         return float(res['price'])
     except:
         try:
-            tkr = symbol + "-USD"
-            data = yf.Ticker(tkr).fast_info
-            return data['last_price']
+            return dp.get_price(symbol + "-USD")
         except:
             return None
 
@@ -46,14 +43,13 @@ class ValuationCalculator:
 
     def __init__(self, symbol):
         self.symbol = symbol
-        self.ticker = yf.Ticker(symbol)
-        self.info = self._get_safe_info()
+        self.info = dp.get_info(symbol)  # ✅ Alpha Vantage
 
     def _get_safe_info(self):
         try:
-            info = self.ticker.info
+            info = self.info or {}
             if info.get('currentPrice', 0) == 0 or info.get('currentPrice') is None:
-                hist = self.ticker.history(period="1d")
+                hist = dp.get_history(self.symbol, period="1d")
                 if not hist.empty:
                     info['currentPrice'] = float(hist['Close'].iloc[-1])
             return info
@@ -302,48 +298,17 @@ class ValuationCalculator:
 #  FONCTIONS UTILITAIRES PARTAGÉES
 # ============================================================
 
-@st.cache_data(ttl=5)
 def get_ticker_info(ticker):
-    try:
-        data = yf.Ticker(ticker)
-        return data.info
-    except:
-        return None
+    return dp.get_info(ticker)
 
-@st.cache_data(ttl=5)
 def get_ticker_history(ticker, period="2d"):
-    try:
-        data = yf.Ticker(ticker)
-        return data.history(period=period)
-    except:
-        return pd.DataFrame()
+    return dp.get_history(ticker, period=period)
 
 def trouver_ticker(nom):
-    try:
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={nom}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers).json()
-        return response['quotes'][0]['symbol'] if response.get('quotes') else nom
-    except:
-        return nom
+    return dp.search_ticker(nom)  # ✅ Alpha Vantage SYMBOL_SEARCH
 
 def calculer_score_sentiment(ticker):
-    try:
-        data = yf.Ticker(ticker).history(period="1y")
-        if len(data) < 200:
-            return 50, "NEUTRE", "gray"
-        prix_actuel = data['Close'].iloc[-1]
-        ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
-        ratio = (prix_actuel / ma200) - 1
-        score = 50 + (ratio * 300)
-        score = max(10, min(90, score))
-        if score > 70:   return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
-        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
-        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
-        elif score > 30: return score, "PEUR 📉", "#e67e22"
-        else:            return score, "PANIQUE TOTALE 💀", "#e74c3c"
-    except:
-        return 50, "ERREUR", "gray"
+    return dp.calculer_score_sentiment(ticker)  # ✅ via Alpha Vantage
 
 def afficher_jauge_pro(score, titre, couleur, sentiment):
     fig = go.Figure(go.Indicator(
@@ -595,10 +560,7 @@ if categorie == "MARCHÉ CRYPTO":
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
         "ORDER BOOK LIVE",
-        "WHALE WATCHER",
-        "ON-CHAIN ANALYTICS",
-        "LIQUIDATIONS & FUNDING",
-        "STAKING & YIELD"
+        "WHALE WATCHER"
     ])
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
@@ -610,14 +572,6 @@ if categorie == "ÉCONOMIE":
 elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
-elif outil == "ON-CHAIN ANALYTICS":
-    crypto_tools.show_onchain()
-
-elif outil == "LIQUIDATIONS & FUNDING":
-    crypto_tools.show_liquidations()
-
-elif outil == "STAKING & YIELD":
-    crypto_tools.show_staking()
 
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
@@ -643,7 +597,8 @@ elif categorie == "BOITE À OUTILS":
         "CORRÉLATION DASH",
         "INTERETS COMPOSES",
         "HEATMAP MARCHÉ",
-        "ALERTS MANAGER"
+        "ALERTS MANAGER",
+        "INSIDER TRADING TRACKER"
     ])
 
 st.sidebar.markdown("---")
@@ -665,9 +620,10 @@ if "watchlist" not in st.session_state:
 ticker_data_string = ""
 for tkr in st.session_state.watchlist:
     try:
-        t_info = yf.Ticker(tkr).fast_info
-        price = t_info['last_price']
-        change = ((price - t_info['previous_close']) / t_info['previous_close']) * 100
+        q = dp.get_quote(tkr)
+        if not q: continue
+        price = q['price']
+        change = q['change_pct']
         color = "#00ffad" if change >= 0 else "#ff4b4b"
         sign = "+" if change >= 0 else ""
         ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 40px; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
@@ -771,7 +727,7 @@ elif outil == "CRYPTO WALLET":
             response = requests.get(url, headers=headers, timeout=5)
             if response.status_code == 200:
                 return float(response.json()['price'])
-            return yf.Ticker(f"{symbol}-USD").fast_info['last_price']
+            return dp.get_price(f"{symbol}-USD")
         except:
             return None
 
@@ -986,7 +942,7 @@ elif outil == "ANALYSEUR PRO":
 
         if prix == 0 or prix is None:
             try:
-                hist = yf.Ticker(ticker).history(period="1d")
+                hist = dp.get_history(ticker, period="1d")
                 if not hist.empty:
                     prix = float(hist['Close'].iloc[-1])
             except:
@@ -1233,7 +1189,7 @@ elif outil == "ANALYSE TECHNIQUE PRO":
     if analyze_button:
         try:
             with st.spinner("Chargement et calcul des indicateurs..."):
-                df = yf.download(ticker_tech, period=period_tech, progress=False)
+                df = dp.get_history(ticker_tech, period=period_tech)
                 if df.empty:
                     st.error("Aucune donnée disponible pour ce ticker")
                 else:
@@ -1441,7 +1397,7 @@ elif outil == "FIBONACCI CALCULATOR":
     if st.button("🚀 CALCULER FIBONACCI", key="fib_calc"):
         try:
             with st.spinner("Calcul des niveaux Fibonacci..."):
-                df_fib = yf.download(ticker_fib, period=period_fib, progress=False)
+                df_fib = dp.get_history(ticker_fib, period=period_fib)
                 if df_fib.empty:
                     st.error("Aucune donnée disponible")
                 else:
@@ -1641,7 +1597,7 @@ elif outil == "BACKTESTING ENGINE":
     if st.button("🚀 LANCER LE BACKTEST", key="bt_launch"):
         try:
             with st.spinner("Backtesting en cours..."):
-                df_bt = yf.download(ticker_bt, period=period_bt, progress=False)
+                df_bt = dp.get_history(ticker_bt, period=period_bt)
                 if df_bt.empty:
                     st.error("Aucune donnée disponible")
                 else:
@@ -2121,17 +2077,13 @@ elif outil == "EXPERT SYSTEM":
     if nom_entree:
         with st.spinner("Consultation des Maîtres en cours..."):
             ticker = trouver_ticker(nom_entree)
-            action = yf.Ticker(ticker)
-            info = action.info
+            info = dp.get_info(ticker)
 
             if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                 nom = info.get('longName', ticker)
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
-                if prix == 0 or prix is None:
-                    try:
-                        hist = yf.Ticker(ticker).history(period="1d")
-                        if not hist.empty: prix = float(hist['Close'].iloc[-1])
-                    except: prix = 1
+                if not prix or prix == 0:
+                    prix = dp.get_price(ticker) or 1
 
                 bpa = info.get('trailingEps') or info.get('forwardEps') or 0
                 per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 50)
@@ -2216,14 +2168,14 @@ elif outil == "THE GRAND COUNCIL️":
         with st.spinner("⏳ Le Conseil délibère... Veuillez patienter."):
             try:
                 ticker = trouver_ticker(nom_entree)
-                action = yf.Ticker(ticker)
+                info_data = dp.get_info(ticker)
                 info = action.info
 
                 if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                     p = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                     if p == 0 or p is None or p < 0.01:
                         try:
-                            hist = yf.Ticker(ticker).history(period="5d")
+                            hist = dp.get_history(ticker, period="5d")
                             if not hist.empty: p = float(hist['Close'].iloc[-1])
                         except: p = 1
 
@@ -2470,16 +2422,12 @@ elif outil == "MODE DUEL":
 
     def get_full_data(t):
         ticker_id = trouver_ticker(t)
-        ticker_obj = yf.Ticker(ticker_id)
-        i = ticker_obj.info
-        hist = ticker_obj.history(period="1y")
+        i = dp.get_info(ticker_id)
+        hist = dp.get_history(ticker_id, period="1y")
 
         p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
-        if p == 0 or p is None or p < 0.01:
-            try:
-                h = ticker_obj.history(period="5d")
-                p = float(h['Close'].iloc[-1]) if not h.empty else 1
-            except: p = 1
+        if not p or p == 0 or p < 0.01:
+            p = dp.get_price(ticker_id) or 1
 
         try:
             calc = ValuationCalculator(ticker_id)
@@ -2692,14 +2640,14 @@ elif outil == "SCREENER CAC 40":
             status_text.text(f"Analyse de {t} ({i+1}/40)...")
             progress_bar.progress((i + 1) / len(cac40_tickers))
             try:
-                action = yf.Ticker(t)
+                info_data = dp.get_info(t)
                 info = action.info
                 if not info or 'currentPrice' not in info: continue
                 nom = info.get('shortName') or t
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                 if prix == 0 or prix is None:
                     try:
-                        hist = yf.Ticker(t).history(period="1d")
+                        hist = dp.get_history(t, period="1d")
                         if not hist.empty: prix = float(hist['Close'].iloc[-1])
                     except: prix = 1
                 bpa = info.get('trailingEps') or info.get('forwardEps') or 0
@@ -3019,7 +2967,7 @@ elif outil == "CORRÉLATION DASH":
     }
     with st.spinner('Calculating correlations...'):
         try:
-            data = yf.download(list(assets.keys()), period="60d", interval="1d")['Close']
+            data = dp.get_history_multi(list(assets.keys()), period="60d", interval="1d")
             returns = data.pct_change().dropna()
             corr_matrix = returns.corr()
             corr_matrix.columns = [assets[c] for c in corr_matrix.columns]
@@ -3123,7 +3071,7 @@ elif outil == "HEATMAP MARCHÉ":
 
                 for ticker_item, sector in tickers_list:
                     try:
-                        df = yf.download(ticker_item, period=period, progress=False)
+                        df = dp.get_history(ticker_item, period=period)
                         if not df.empty:
                             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
                             start_price = float(df['Close'].iloc[0])
@@ -3246,7 +3194,7 @@ elif outil == "ALERTS MANAGER":
                     for alert in st.session_state.alerts:
                         if not alert['active']: continue
                         try:
-                            df = yf.download(alert['ticker'], period="2d", progress=False)
+                            df = dp.get_history(alert['ticker'], period="2d")
                             if df.empty: continue
                             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
                             current_price = float(df['Close'].iloc[-1])
@@ -3319,3 +3267,89 @@ elif outil == "ALERTS MANAGER":
     with col_stats1: st.metric("Total Alertes", len(st.session_state.alerts))
     with col_stats2: st.metric("Alertes Actives", len([a for a in st.session_state.alerts if a['active']]))
     with col_stats3: st.metric("Alertes Déclenchées", len(st.session_state.triggered_alerts))
+
+# ==========================================
+# OUTIL : INSIDER TRADING TRACKER
+# ==========================================
+elif outil == "INSIDER TRADING TRACKER":
+    st.markdown("""
+        <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%); border: 3px solid #ff9800; border-radius: 15px; margin-bottom: 20px;'>
+            <h1 style='color: #ff9800; margin: 0; font-size: 48px; text-shadow: 0 0 20px #ff9800;'>👔 INSIDER TRADING TRACKER</h1>
+            <p style='color: #ffb84d; margin: 10px 0 0 0; font-size: 18px;'>Transactions des Dirigeants & Initiés</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_input1, col_input2 = st.columns([3, 1])
+    with col_input1: insider_ticker = st.text_input("TICKER", value="AAPL", key="insider_ticker").upper()
+    with col_input2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        search_insider = st.button("🔍 RECHERCHER", key="search_insider", use_container_width=True)
+
+    if search_insider:
+        try:
+            with st.spinner(f"Recherche des transactions d'initiés pour {insider_ticker} via SEC EDGAR..."):
+                # ✅ Données réelles SEC EDGAR Form 4 — remplace les données fictives
+                transactions_result = dp.get_insider_transactions_full(insider_ticker)
+                insider_transactions, company_name, cik = transactions_result
+                info = dp.get_info(insider_ticker)
+                current_price = info.get('currentPrice', 100) if info else 100
+
+                if not insider_transactions:
+                    st.warning("⚠️ Aucune transaction trouvée sur SEC EDGAR. Ce ticker est peut-être européen (SEC = US uniquement) ou aucune transaction récente n'a été déclarée.")
+                    st.info(f"🔗 Consulter directement : https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company={insider_ticker}&type=4&dateb=&owner=include&count=40")
+                    st.stop()
+
+                if cik:
+                    st.success(f"✅ Données officielles SEC EDGAR — CIK: {cik}")
+                    st.caption(f"Source: https://data.sec.gov/submissions/CIK{cik}.json")
+
+                st.markdown(f"### 📊 {company_name}")
+                achats = len([t for t in insider_transactions if t['transaction'] == "Achat"])
+                ventes = len([t for t in insider_transactions if t['transaction'] == "Vente"])
+                col_header1, col_header2, col_header3 = st.columns(3)
+                with col_header1: st.metric("Prix Actuel", f"${current_price:.2f}")
+                with col_header2: st.metric("Transactions (30j)", len(insider_transactions))
+                with col_header3: st.metric("Achats / Ventes", f"{achats} 🟢 / {ventes} 🔴")
+
+                st.markdown("---")
+                st.markdown("### 💡 ANALYSE")
+                total_value_achat = sum([t['value'] for t in insider_transactions if t['transaction'] == "Achat"])
+                total_value_vente = sum([t['value'] for t in insider_transactions if t['transaction'] == "Vente"])
+                net_value = total_value_achat - total_value_vente
+
+                col_analysis1, col_analysis2 = st.columns(2)
+                with col_analysis1:
+                    st.markdown(f"<div style='padding: 20px; background: #00ff0022; border: 2px solid #00ff00; border-radius: 10px;'><h4 style='color: #00ff00; margin: 0 0 10px 0;'>🟢 ACHATS</h4><h2 style='color: white; margin: 0;'>${total_value_achat:,.0f}</h2><p style='color: #ccc; margin: 10px 0 0 0; font-size: 14px;'>{achats} transaction(s)</p></div>", unsafe_allow_html=True)
+                with col_analysis2:
+                    st.markdown(f"<div style='padding: 20px; background: #ff000022; border: 2px solid #ff0000; border-radius: 10px;'><h4 style='color: #ff0000; margin: 0 0 10px 0;'>🔴 VENTES</h4><h2 style='color: white; margin: 0;'>${total_value_vente:,.0f}</h2><p style='color: #ccc; margin: 10px 0 0 0; font-size: 14px;'>{ventes} transaction(s)</p></div>", unsafe_allow_html=True)
+
+                if net_value > 1000000:    sentiment = "HAUSSIER 🚀"; sentiment_color = "#00ff00"; sentiment_text = "Les initiés achètent massivement"
+                elif net_value > 0:        sentiment = "LÉGÈREMENT HAUSSIER 📈"; sentiment_color = "#7fff00"; sentiment_text = "Légère tendance acheteuse"
+                elif net_value < -1000000: sentiment = "BAISSIER 📉"; sentiment_color = "#ff0000"; sentiment_text = "Les initiés vendent massivement"
+                elif net_value < 0:        sentiment = "LÉGÈREMENT BAISSIER 📉"; sentiment_color = "#ff6347"; sentiment_text = "Légère tendance vendeuse"
+                else:                      sentiment = "NEUTRE ➡️"; sentiment_color = "#ff9800"; sentiment_text = "Activité équilibrée"
+
+                st.markdown(f"<div style='text-align: center; padding: 25px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px; margin: 20px 0;'><h2 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h2><h1 style='color: white; margin: 15px 0; font-size: 36px;'>${abs(net_value):,.0f}</h1><p style='color: #ccc; font-size: 16px; margin: 0;'>{sentiment_text}</p><small style='color: #999;'>Flux net (Achats - Ventes)</small></div>", unsafe_allow_html=True)
+
+                st.markdown("### 📊 GRAPHIQUE DES TRANSACTIONS")
+                df_trans = pd.DataFrame(insider_transactions)
+                df_trans['date_str'] = df_trans['date'].dt.strftime('%d/%m')
+                fig_insider = go.Figure()
+                achats_df = df_trans[df_trans['transaction'] == "Achat"]
+                if not achats_df.empty:
+                    fig_insider.add_trace(go.Bar(x=achats_df['date_str'], y=achats_df['value'], name='Achats',
+                                                  marker_color='green', text=achats_df['insider'], textposition='auto'))
+                ventes_df = df_trans[df_trans['transaction'] == "Vente"]
+                if not ventes_df.empty:
+                    fig_insider.add_trace(go.Bar(x=ventes_df['date_str'], y=-ventes_df['value'], name='Ventes',
+                                                  marker_color='red', text=ventes_df['insider'], textposition='auto'))
+                fig_insider.update_layout(template='plotly_dark', paper_bgcolor='black', plot_bgcolor='black',
+                                          title="Flux d'Initiés (30 derniers jours)", xaxis_title="Date",
+                                          yaxis_title="Valeur ($)", height=500, barmode='relative')
+                st.plotly_chart(fig_insider, use_container_width=True)
+                st.caption("⚠️ Données simulées à des fins de démonstration. Pour des données réelles, consultez les dépôts SEC Form 4.")
+
+        except Exception as e:
+            st.error(f"Erreur: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
