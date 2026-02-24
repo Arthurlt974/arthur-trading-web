@@ -17,6 +17,7 @@ from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
 import interface_forex
+import crypto_tools
 
 # ============================================================
 #  FONCTIONS UTILES GLOBALES
@@ -594,7 +595,10 @@ if categorie == "MARCHÉ CRYPTO":
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
         "ORDER BOOK LIVE",
-        "WHALE WATCHER"
+        "WHALE WATCHER",
+        "🔗 ON-CHAIN ANALYTICS",
+        "💥 LIQUIDATIONS & FUNDING",
+        "🥩 STAKING & YIELD"
     ])
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
@@ -606,6 +610,14 @@ if categorie == "ÉCONOMIE":
 elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
+elif outil == "🔗 ON-CHAIN ANALYTICS":
+    crypto_tools.show_onchain()
+
+elif outil == "💥 LIQUIDATIONS & FUNDING":
+    crypto_tools.show_liquidations()
+
+elif outil == "🥩 STAKING & YIELD":
+    crypto_tools.show_staking()
 
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
