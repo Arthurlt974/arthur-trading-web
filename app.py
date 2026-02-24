@@ -17,6 +17,7 @@ from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
 import interface_forex
+import graphiques_plotly
 
 # ============================================================
 #  FONCTIONS UTILES GLOBALES
@@ -392,60 +393,12 @@ def afficher_horloge_temps_reel():
     components.html(horloge_html, height=120)
 
 def afficher_graphique_pro(symbol, height=600):
-    traduction_symbols = {
-        "^FCHI": "CAC40",
-        "^GSPC": "VANTAGE:SP500",
-        "^IXIC": "NASDAQ",
-        "BTC-USD": "BINANCE:BTCUSDT"
-    }
-    tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
-    if ".PA" in symbol and symbol not in traduction_symbols:
-        tv_symbol = f"EURONEXT:{tv_symbol}"
-    tradingview_html = f"""
-        <div id="tradingview_chart" style="height:{height}px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-        new TradingView.widget({{
-          "autosize": true,
-          "symbol": "{tv_symbol}",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "toolbar_bg": "#000000",
-          "enable_publishing": false,
-          "hide_side_toolbar": false,
-          "allow_symbol_change": true,
-          "details": true,
-          "container_id": "tradingview_chart"
-        }});
-        </script>
-    """
-    components.html(tradingview_html, height=height + 10)
+    # ✅ Remplacé par Plotly (MIT) — TradingView interdit en service payant
+    graphiques_plotly.afficher_graphique_pro(symbol, height=height)
 
 def afficher_mini_graphique(symbol, chart_id):
-    traduction_symbols = {"^FCHI": "CAC40", "^GSPC": "VANTAGE:SP500", "^IXIC": "NASDAQ", "BTC-USD": "BINANCE:BTCUSDT"}
-    tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
-    if ".PA" in symbol and symbol not in traduction_symbols:
-        tv_symbol = f"EURONEXT:{tv_symbol}"
-    tradingview_html = f"""
-        <div id="tv_chart_{chart_id}" style="height:400px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-        new TradingView.widget({{
-          "autosize": true,
-          "symbol": "{tv_symbol}",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "container_id": "tv_chart_{chart_id}"
-        }});
-        </script>
-    """
-    components.html(tradingview_html, height=410)
+    # ✅ Remplacé par Plotly (MIT) — TradingView interdit en service payant
+    graphiques_plotly.afficher_mini_graphique(symbol, chart_id)
 
 
 # ============================================================
@@ -716,27 +669,8 @@ if outil == "BITCOIN DOMINANCE":
 
     st.markdown("---")
 
-    tv_html_dom = """
-        <div id="tv_chart_dom" style="height:600px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script>
-        new TradingView.widget({
-          "autosize": true,
-          "symbol": "CRYPTOCAP:BTC.D",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "toolbar_bg": "#f1f3f6",
-          "enable_publishing": false,
-          "hide_top_toolbar": false,
-          "save_image": false,
-          "container_id": "tv_chart_dom"
-        });
-        </script>
-    """
-    components.html(tv_html_dom, height=600)
+    # ✅ Remplacé par Plotly + CoinGecko API (MIT / commercial OK)
+    graphiques_plotly.afficher_bitcoin_dominance()
 
 # ==========================================
 # OUTIL : CRYPTO WALLET TRACKER
@@ -2038,65 +1972,8 @@ elif outil == "MULTI-CHARTS":
             st.rerun()
 
     if st.session_state.multi_charts:
-        all_windows_html = ""
-        for i, ticker_chart in enumerate(st.session_state.multi_charts):
-            traduction_symbols = {"^FCHI": "CAC40", "^GSPC": "VANTAGE:SP500", "^IXIC": "NASDAQ", "BTC-USD": "BINANCE:BTCUSDT"}
-            tv_symbol = traduction_symbols.get(ticker_chart, ticker_chart.replace(".PA", ""))
-            if ".PA" in ticker_chart and ticker_chart not in traduction_symbols:
-                tv_symbol = f"EURONEXT:{tv_symbol}"
-            all_windows_html += f"""
-            <div id="win_{i}" class="floating-window" style="
-                width: 450px; height: 350px;
-                position: absolute; top: {50 + (i*40)}px; left: {50 + (i*40)}px;
-                background: #0d0d0d; border: 2px solid #ff9800; z-index: {100 + i};
-                display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            ">
-                <div class="window-header" style="
-                    background: #1a1a1a; color: #ff9800; padding: 10px;
-                    cursor: move; font-family: monospace; border-bottom: 1px solid #ff9800;
-                    display: flex; justify-content: space-between; align-items: center;
-                ">
-                    <span>📟 {ticker_chart}</span>
-                    <span style="font-size: 9px; color: #555;">[DRAG HEADER]</span>
-                </div>
-                <div id="tv_chart_{i}" style="flex-grow: 1; width: 100%;"></div>
-            </div>
-            <script>
-            new TradingView.widget({{
-              "autosize": true, "symbol": "{tv_symbol}", "interval": "D",
-              "timezone": "Europe/Paris", "theme": "dark", "style": "1",
-              "locale": "fr", "container_id": "tv_chart_{i}"
-            }});
-            </script>
-            """
-        full_component_code = f"""
-        <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
-        <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <style>
-            body {{ background-color: transparent; overflow: hidden; margin: 0; }}
-            .floating-window {{ border-radius: 4px; overflow: hidden; }}
-            .ui-resizable-se {{ background: #ff9800; width: 12px; height: 12px; bottom: 0; right: 0; }}
-        </style>
-        <div id="desktop" style="width: 100%; height: 100vh; position: relative;">
-            {all_windows_html}
-        </div>
-        <script>
-            $(function() {{
-                $(".floating-window").draggable({{
-                    handle: ".window-header",
-                    containment: "#desktop",
-                    stack: ".floating-window"
-                }});
-                $(".floating-window").resizable({{
-                    minHeight: 250,
-                    minWidth: 350,
-                    handles: "se"
-                }});
-            }});
-        </script>
-        """
-        components.html(full_component_code, height=900, scrolling=False)
+        # ✅ Remplacé par Plotly (MIT) — TradingView interdit en service payant
+        graphiques_plotly.afficher_multi_charts(st.session_state.multi_charts)
 
 # ==========================================
 # OUTIL : EXPERT SYSTEM
@@ -2939,27 +2816,16 @@ elif outil == "CALENDRIER ÉCO":
     importance_str = importance_map[importance]
     periode_str    = periode_map[periode]
 
+    # ✅ Calendrier via iframe investing.com widget officiel (autorisé gratuitement)
     calendrier_html = f"""
-    <div style="background:#000; border:1px solid #ff9800; border-radius:8px; padding:5px;">
-        <div class="tradingview-widget-container" style="height:750px;">
-            <div class="tradingview-widget-container__widget"></div>
-            <script type="text/javascript" 
-                src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
-            {{
-                "colorTheme": "dark",
-                "isMaximized": true,
-                "width": "100%",
-                "height": "750",
-                "locale": "fr",
-                "importanceFilter": "{importance_str}",
-                "countryFilter": "{pays_str}",
-                "dateRange": "{periode_str}"
-            }}
-            </script>
-        </div>
+    <div style="background:#000; border:1px solid #ff9800; border-radius:8px; padding:5px; height:780px;">
+        <iframe
+            src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&importance={importance_str.replace('1','3').replace('-1','1,2,3')}&features=datepicker,timezone&countries={pays_str}&calType={periode_str}&timeZone=18&lang=5"
+            width="100%" height="760" frameborder="0" allowtransparency="true"
+            style="border:none; background:#000;">
+        </iframe>
     </div>
     """
-
     components.html(calendrier_html, height=780, scrolling=True)
 
     st.markdown("""
