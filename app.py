@@ -16,7 +16,7 @@ import json
 from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
-import interface forex
+import interface_forex
 
 # ============================================================
 #  FONCTIONS UTILES GLOBALES
@@ -603,7 +603,7 @@ if categorie == "INTERFACE CRYPTO PRO":
 if categorie == "ÉCONOMIE":
     interface_economie.show_economie()
     st.stop()
-if categorie == "FOREX":
+elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
 
