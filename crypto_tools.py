@@ -680,21 +680,7 @@ def show_liquidations():
                                   yaxis=dict(**_axis(), tickprefix="$"))
                 st.plotly_chart(fig, use_container_width=True)
 
-                col_pie, col_info = st.columns([1, 1])
-                with col_pie:
-                    fig_pie = go.Figure(go.Pie(
-                        labels=df_oi["Crypto"],
-                        values=df_oi["OI"],
-                        marker_colors=COLORS[:len(df_oi)],
-                        hole=0.45,
-                        textinfo="label+percent"
-                    ))
-                    fig_pie.update_layout(**PLOTLY_PIE, height=380,
-                                          title=dict(text="Répartition OI",
-                                                     font=dict(color="#ff9800", size=13)),
-                                          margin=dict(l=10, r=10, t=50, b=10))
-                    st.plotly_chart(fig_pie, use_container_width=True)
-
+                col_info, _ = st.columns([1, 1])
                 with col_info:
                     st.markdown("### 📖 INTERPRÉTATION OI")
                     st.markdown("""
