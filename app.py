@@ -596,9 +596,9 @@ if categorie == "MARCHÉ CRYPTO":
         "HEATMAP LIQUIDATIONS",
         "ORDER BOOK LIVE",
         "WHALE WATCHER",
-        "🔗 ON-CHAIN ANALYTICS",
-        "💥 LIQUIDATIONS & FUNDING",
-        "🥩 STAKING & YIELD"
+        "ON-CHAIN ANALYTICS",
+        "LIQUIDATIONS & FUNDING",
+        "STAKING & YIELD"
     ])
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
@@ -610,13 +610,13 @@ if categorie == "ÉCONOMIE":
 elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
-elif outil == "🔗 ON-CHAIN ANALYTICS":
+elif outil == "ON-CHAIN ANALYTICS":
     crypto_tools.show_onchain()
 
-elif outil == "💥 LIQUIDATIONS & FUNDING":
+elif outil == "LIQUIDATIONS & FUNDING":
     crypto_tools.show_liquidations()
 
-elif outil == "🥩 STAKING & YIELD":
+elif outil == "STAKING & YIELD":
     crypto_tools.show_staking()
 
 elif categorie == "ACTIONS & BOURSE":
