@@ -16,7 +16,7 @@ import json
 from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
-import interface_forex
+import interface forex
 
 # ============================================================
 #  FONCTIONS UTILES GLOBALES
