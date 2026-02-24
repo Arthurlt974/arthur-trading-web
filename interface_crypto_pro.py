@@ -5,7 +5,6 @@ import pandas as pd
 import feedparser
 import requests
 from datetime import datetime
-import graphiques_plotly
 
 # ============================================
 # 1. FONCTIONS UTILITAIRES CRYPTO
@@ -167,32 +166,54 @@ def show_interface_crypto():
         with c_info:
             st.markdown(f"<div style='text-align:right; color:#666; padding-top:10px;'>ACTIVE: <b style='color:#fff'>{tv_symbol}</b></div>", unsafe_allow_html=True)
 
-        # ✅ Remplacé par Plotly + CoinGecko API (MIT / commercial OK)
-        graphiques_plotly.afficher_graphique_crypto(search_input, height=550)
+        # 1. GRAPHIQUE PRINCIPAL (TradingView Crypto)
+        html_chart = f"""
+        <div style="height:550px; border: 1px solid #1A1A1A; border-radius: 4px; overflow: hidden; margin-top: 5px;">
+            <div id="tv_chart_crypto"></div>
+            <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+            <script type="text/javascript">
+            new TradingView.widget({{
+                "width": "100%", "height": "550", "symbol": "{tv_symbol}",
+                "interval": "60", "timezone": "Europe/Paris", "theme": "dark", 
+                "style": "1", "locale": "fr", "toolbar_bg": "#000000", 
+                "enable_publishing": false, "container_id": "tv_chart_crypto",
+                "overrides": {{
+                    "paneProperties.background": "#000000",
+                    "paneProperties.vertGridProperties.color": "#111",
+                    "paneProperties.horzGridProperties.color": "#111"
+                }}
+            }});
+            </script>
+        </div>
+        """
+        components.html(html_chart, height=560)
 
-        # 2. HEATMAP CRYPTO ✅ Remplacé par Plotly Treemap + CoinGecko
+        # 2. HEATMAP CRYPTO (TradingView Widget Spécifique)
         st.markdown('<div class="section-header">🔥 CRYPTO HEATMAP (LIVE)</div>', unsafe_allow_html=True)
-        cryptos = graphiques_plotly.get_top_cryptos(20)
-        if cryptos:
-            import plotly.graph_objects as go
-            names   = [c["symbol"].upper() for c in cryptos]
-            changes = [c.get("price_change_percentage_24h", 0) or 0 for c in cryptos]
-            mcaps   = [c.get("market_cap", 1) or 1 for c in cryptos]
-            fig_heat = go.Figure(go.Treemap(
-                labels=[f"{n}\n{ch:+.1f}%" for n, ch in zip(names, changes)],
-                parents=[""] * len(names), values=mcaps,
-                marker=dict(colors=changes,
-                            colorscale=[[0, "#ff0000"], [0.5, "#1a1a1a"], [1, "#00ff00"]],
-                            cmid=0, showscale=True),
-                hovertemplate="<b>%{label}</b><extra></extra>"
-            ))
-            fig_heat.update_layout(
-                template="plotly_dark", paper_bgcolor="#000000",
-                height=500, margin=dict(l=5, r=5, t=30, b=5),
-                title=dict(text="Heatmap Crypto — CoinGecko Live",
-                           font=dict(color="#00ffad", size=13))
-            )
-            st.plotly_chart(fig_heat, use_container_width=True)
+        
+        html_heatmap = """
+        <div style="height: 500px; border: 1px solid #1A1A1A; border-radius: 4px; overflow: hidden;">
+            <div class="tradingview-widget-container">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js" async>
+                {
+                "dataSource": "Crypto",
+                "blockSize": "market_cap_calc",
+                "blockColor": "change",
+                "locale": "fr",
+                "symbolUrl": "",
+                "colorTheme": "dark",
+                "hasTopBar": true,
+                "isDatasetResizable": false,
+                "isBlockSelectionDisabled": false,
+                "width": "100%",
+                "height": "500"
+                }
+                </script>
+            </div>
+        </div>
+        """
+        components.html(html_heatmap, height=510)
 
     # --- COLONNE DROITE (News Crypto & Movers) ---
     with col_right:
