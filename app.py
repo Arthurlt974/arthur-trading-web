@@ -16,6 +16,7 @@ import json
 from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
+import interface_forex
 
 # ============================================================
 #  FONCTIONS UTILES GLOBALES
@@ -583,7 +584,7 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
+    "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
 ])
 st.sidebar.markdown("---")
 
@@ -601,6 +602,9 @@ if categorie == "INTERFACE CRYPTO PRO":
     outil = interface_crypto_pro.show_interface_crypto()
 if categorie == "ÉCONOMIE":
     interface_economie.show_economie()
+    st.stop()
+elif categorie == "FOREX":
+    interface_forex.show_forex()
     st.stop()
 
 elif categorie == "ACTIONS & BOURSE":
