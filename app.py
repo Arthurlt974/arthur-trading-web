@@ -612,10 +612,8 @@ elif categorie == "FOREX":
     st.stop()
 elif outil == "ON-CHAIN ANALYTICS":
     crypto_tools.show_onchain()
-
 elif outil == "LIQUIDATIONS & FUNDING":
     crypto_tools.show_liquidations()
-
 elif outil == "STAKING & YIELD":
     crypto_tools.show_staking()
 
