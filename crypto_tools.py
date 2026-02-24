@@ -40,6 +40,14 @@ PLOTLY_BASE = dict(
     margin=dict(l=50, r=20, t=50, b=40),
 )
 
+# Version sans xaxis/yaxis — obligatoire pour go.Pie et go.Treemap
+PLOTLY_PIE = dict(
+    template="plotly_dark", paper_bgcolor="#000000",
+    font=dict(color="#cccccc", family="Courier New"),
+    legend=dict(bgcolor="rgba(0,0,0,0.7)", bordercolor="#333", borderwidth=1),
+    margin=dict(l=20, r=20, t=50, b=20),
+)
+
 def _axis():
     return dict(gridcolor="#1a1a1a", showgrid=True, zeroline=False)
 
@@ -337,7 +345,7 @@ def show_onchain():
                 hole=0.6,
                 textinfo="label+percent",
             ))
-            fig_sup.update_layout(**PLOTLY_BASE, height=300,
+            fig_sup.update_layout(**PLOTLY_PIE, height=300,
                                   title=dict(text=f"Supply ({supply_pct:.1f}% émise)",
                                              font=dict(color="#00ffad", size=13)))
             st.plotly_chart(fig_sup, use_container_width=True)
@@ -681,7 +689,7 @@ def show_liquidations():
                         hole=0.45,
                         textinfo="label+percent"
                     ))
-                    fig_pie.update_layout(**PLOTLY_BASE, height=380,
+                    fig_pie.update_layout(**PLOTLY_PIE, height=380,
                                           title=dict(text="Répartition OI",
                                                      font=dict(color="#ff9800", size=13)),
                                           margin=dict(l=10, r=10, t=50, b=10))
