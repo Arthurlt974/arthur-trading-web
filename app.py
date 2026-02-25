@@ -7,6 +7,7 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import numpy as np
 from fpdf import FPDF
 import io
