@@ -4509,3 +4509,48 @@ elif outil == "ALERTS MANAGER":
     with col_stats1: st.metric("Total Alertes", len(st.session_state.alerts))
     with col_stats2: st.metric("Alertes Actives", len([a for a in st.session_state.alerts if a['active']]))
     with col_stats3: st.metric("Alertes Déclenchées", len(st.session_state.triggered_alerts))
+
+# ══════════════════════════════════════════════
+#  FOOTER LÉGAL — À coller tout à la fin de App.py
+# ══════════════════════════════════════════════
+st.markdown("---")
+st.markdown("""
+    <div style='text-align: center; padding: 20px 10px 30px 10px; font-family: monospace;'>
+        <div style='color: #ff9800; font-size: 13px; font-weight: bold; letter-spacing: 2px; margin-bottom: 6px;'>
+            AM TRADING — AM-Trading Terminal
+        </div>
+        <div style='color: #444; font-size: 10px; margin-bottom: 14px;'>
+            © 2026 Tous droits réservés — Les Avirons, La Réunion
+        </div>
+        <div style='margin-bottom: 14px;'>
+            <a href="https://drive.google.com/file/d/1sHnuaaZt01OzgDABlH0CaeOoVI4VUQAe/view?usp=share_link"
+               target="_blank"
+               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
+               📄 CGU
+            </a>
+            <a href="https://drive.google.com/file/d/1IJnPbwKs-5Sv6WTfaGjLDiA7F2VrTR0H/view?usp=share_link"
+               target="_blank"
+               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
+               🛒 CGV
+            </a>
+            <a href="https://drive.google.com/file/d/1YkMCtAJ8V86eSd8tdn1c1wctgDxvN0dX/view?usp=share_link"
+               target="_blank"
+               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
+               🔒 Confidentialité
+            </a>
+            <a href="https://drive.google.com/file/d/15i-pvSdiEbhAs37Mf85QfD7LVdFmgDOX/view?usp=share_link"
+               target="_blank"
+               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
+               ⚖️ Mentions légales
+            </a>
+            <a href="https://drive.google.com/file/d/1AMQd57mR-n84dfMshXfccdeGCee1a8Jk/view?usp=share_link"
+               target="_blank"
+               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
+               ↩️ Rétractation
+            </a>
+        </div>
+        <div style='color: #333; font-size: 10px; font-style: italic;'>
+            Les informations fournies sont à titre informatif uniquement et ne constituent pas un conseil en investissement financier.
+        </div>
+    </div>
+""", unsafe_allow_html=True)
