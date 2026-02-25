@@ -1,7 +1,7 @@
 """
 firebase_auth.py
 Module d'authentification Firebase pour AM-Trading Terminal
-Gère : inscription, connexion, mode invité, sauvegarde/chargement config utilisateur
+Gère : inscription, connexion, mode invité, connexion Google, sauvegarde/chargement config utilisateur
 """
 
 import streamlit as st
@@ -20,7 +20,7 @@ FIRESTORE_URL = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT
 
 
 # ══════════════════════════════════════════════
-#  AUTHENTIFICATION
+#  AUTHENTIFICATION EMAIL / MOT DE PASSE
 # ══════════════════════════════════════════════
 
 def sign_up(email: str, password: str) -> dict:
@@ -40,6 +40,126 @@ def reset_password(email: str) -> dict:
     payload = {"requestType": "PASSWORD_RESET", "email": email}
     r = requests.post(url, json=payload)
     return r.json()
+
+
+# ══════════════════════════════════════════════
+#  AUTHENTIFICATION GOOGLE (OAuth2)
+# ══════════════════════════════════════════════
+
+def get_google_auth_url() -> str:
+    """
+    Génère l'URL de redirection Google OAuth2 via Firebase.
+    L'utilisateur est redirigé vers Google, puis revient sur l'app avec un code.
+    """
+    # Récupère l'URL de l'app pour le callback
+    # En local : http://localhost:8501  |  En prod : ton URL Streamlit Cloud
+    try:
+        redirect_uri = st.secrets.get("REDIRECT_URI", "http://localhost:8501")
+    except Exception:
+        redirect_uri = "http://localhost:8501"
+
+    url = (
+        f"https://accounts.google.com/o/oauth2/v2/auth"
+        f"?client_id={st.secrets['GOOGLE_CLIENT_ID']}"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_type=code"
+        f"&scope=openid%20email%20profile"
+        f"&access_type=offline"
+        f"&prompt=select_account"
+    )
+    return url
+
+
+def sign_in_with_google_token(id_token_google: str) -> dict:
+    """
+    Connecte l'utilisateur Firebase à partir d'un id_token Google.
+    Utilisé après échange du code d'autorisation côté serveur.
+    """
+    url = f"{AUTH_URL}:signInWithIdp?key={FIREBASE_API_KEY}"
+    payload = {
+        "postBody": f"id_token={id_token_google}&providerId=google.com",
+        "requestUri": "http://localhost",
+        "returnSecureToken": True,
+        "returnIdpCredential": True,
+    }
+    r = requests.post(url, json=payload)
+    return r.json()
+
+
+def exchange_google_code(code: str) -> dict:
+    """
+    Échange le code d'autorisation Google contre un id_token.
+    Nécessite GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET dans les secrets.
+    """
+    try:
+        redirect_uri = st.secrets.get("REDIRECT_URI", "http://localhost:8501")
+        r = requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": st.secrets["GOOGLE_CLIENT_ID"],
+                "client_secret": st.secrets["GOOGLE_CLIENT_SECRET"],
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+        )
+        return r.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _handle_google_callback():
+    """
+    Détecte si on revient d'un redirect Google (paramètre ?code= dans l'URL)
+    et finalise la connexion Firebase.
+    """
+    params = st.query_params
+    code = params.get("code")
+
+    if not code:
+        return False
+
+    # Supprimer le code de l'URL immédiatement
+    st.query_params.clear()
+
+    with st.spinner("Connexion Google en cours..."):
+        token_data = exchange_google_code(code)
+
+    if "error" in token_data:
+        st.error(f"Erreur Google : {token_data.get('error_description', token_data['error'])}")
+        return False
+
+    id_token_google = token_data.get("id_token")
+    if not id_token_google:
+        st.error("Impossible de récupérer le token Google.")
+        return False
+
+    res = sign_in_with_google_token(id_token_google)
+
+    if "idToken" in res:
+        st.session_state["user_logged_in"] = True
+        st.session_state["guest_mode"]     = False
+        st.session_state["user_email"]     = res.get("email", "")
+        st.session_state["user_uid"]       = res.get("localId", "")
+        st.session_state["user_id_token"]  = res["idToken"]
+
+        config = load_user_config(res["idToken"], res["localId"])
+        if not config:
+            config = DEFAULT_CONFIG.copy()
+            config["created_at"] = datetime.now().isoformat()
+            save_user_config(res["idToken"], res["localId"], config)
+        else:
+            config["last_login"] = datetime.now().isoformat()
+            save_user_field(res["idToken"], res["localId"], "last_login", config["last_login"])
+
+        _apply_config_to_session(config)
+        st.success(f"✅ Connecté avec Google : {res.get('email', '')}")
+        st.rerun()
+        return True
+    else:
+        error_msg = res.get("error", {}).get("message", "Erreur inconnue")
+        st.error(f"Erreur Firebase : {error_msg}")
+        return False
 
 
 # ══════════════════════════════════════════════
@@ -133,6 +253,10 @@ def render_auth_page() -> bool:
     if st.session_state.get("user_logged_in") or st.session_state.get("guest_mode"):
         return True
 
+    # ── Gérer le retour du redirect Google ──
+    if _handle_google_callback():
+        return True
+
     # ── CSS terminal ──
     st.markdown("""
         <style>
@@ -168,6 +292,17 @@ def render_auth_page() -> bool:
             .guest-btn > button:hover {
                 background-color: #333 !important;
                 color: #fff !important;
+            }
+            .google-btn > button {
+                background-color: #ffffff !important;
+                color: #333333 !important;
+                border: 1px solid #dddddd !important;
+                font-size: 14px !important;
+                font-weight: 600 !important;
+            }
+            .google-btn > button:hover {
+                background-color: #f5f5f5 !important;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -206,10 +341,9 @@ def render_auth_page() -> bool:
     col_guest1, col_guest2, col_guest3 = st.columns([1, 2, 1])
     with col_guest2:
         if st.button("👤 CONTINUER EN MODE INVITÉ", use_container_width=True, key="btn_guest"):
-            st.session_state["guest_mode"]   = True
+            st.session_state["guest_mode"]     = True
             st.session_state["user_logged_in"] = False
-            st.session_state["user_email"]   = "Invité"
-            # Appliquer la config par défaut pour l'invité
+            st.session_state["user_email"]     = "Invité"
             _apply_config_to_session(DEFAULT_CONFIG.copy())
             st.info("✅ Mode invité activé. Vos données ne seront pas sauvegardées.")
             st.rerun()
@@ -220,6 +354,38 @@ def render_auth_page() -> bool:
         </div>
     """, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════
+    #  BOUTON CONNEXION GOOGLE (nouveau)
+    # ══════════════════════════════════════════
+    try:
+        # Vérifie que les secrets Google sont configurés avant d'afficher le bouton
+        _ = st.secrets["GOOGLE_CLIENT_ID"]
+
+        col_g1, col_g2, col_g3 = st.columns([1, 2, 1])
+        with col_g2:
+            st.markdown('<div class="google-btn">', unsafe_allow_html=True)
+            if st.button("🔵  Se connecter avec Google", use_container_width=True, key="btn_google"):
+                google_url = get_google_auth_url()
+                # Redirige l'utilisateur vers Google OAuth
+                st.markdown(
+                    f'<meta http-equiv="refresh" content="0; url={google_url}">',
+                    unsafe_allow_html=True
+                )
+                st.info("Redirection vers Google...")
+                st.stop()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("""
+            <div style='text-align: center; color: #444; font-size: 11px; margin-top: 5px; font-family: monospace;'>
+                ── OU ──
+            </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    except KeyError:
+        # GOOGLE_CLIENT_ID non configuré → on n'affiche pas le bouton Google
+        pass
 
     # ── Onglets Connexion / Inscription / Reset ──
     tab_login, tab_signup, tab_reset = st.tabs(["🔑 CONNEXION", "📝 CRÉER UN COMPTE", "🔄 MOT DE PASSE OUBLIÉ"])
@@ -349,7 +515,6 @@ def render_user_sidebar():
         """, unsafe_allow_html=True)
         st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
-        # Bouton pour se connecter depuis la sidebar
         if st.sidebar.button("🔑 SE CONNECTER / CRÉER UN COMPTE", key="btn_login_from_guest", use_container_width=True):
             _clear_session()
             st.rerun()
@@ -396,7 +561,7 @@ def _apply_config_to_session(config: dict):
 def _save_current_session_config():
     """Sauvegarde seulement si connecté (pas en mode invité)."""
     if st.session_state.get("guest_mode"):
-        return  # On ne sauvegarde pas pour les invités
+        return
 
     uid      = st.session_state.get("user_uid")
     id_token = st.session_state.get("user_id_token")
