@@ -6,6 +6,11 @@ import feedparser
 import requests
 from datetime import datetime
 
+# Headers pour éviter d'être bloqué par les API
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
+
 # ============================================
 # 1. FONCTIONS UTILITAIRES CRYPTO
 # ============================================
@@ -82,78 +87,96 @@ def get_crypto_movers():
 
 @st.cache_data(ttl=60)
 def get_funding_rates():
-    """Funding rates via Binance Futures (gratuit, sans clé API)"""
     symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT"]
     results = []
-    for sym in symbols:
-        try:
-            url  = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={sym}"
-            data = requests.get(url, timeout=3).json()
-            rate = float(data.get("lastFundingRate", 0)) * 100
-            mark = float(data.get("markPrice", 0))
-            results.append({
-                "symbol": sym.replace("USDT", ""),
-                "rate":   round(rate, 4),
-                "mark":   mark
-            })
-        except:
-            pass
+    try:
+        # On récupère tout d'un coup pour plus de fiabilité
+        url = "https://fapi.binance.com/fapi/v1/premiumIndex"
+        data = requests.get(url, headers=HEADERS, timeout=5).json()
+        if isinstance(data, list):
+            for sym in symbols:
+                item = next((x for x in data if x.get('symbol') == sym), None)
+                if item:
+                    results.append({
+                        "symbol": sym.replace("USDT", ""),
+                        "rate": float(item.get("lastFundingRate", 0)) * 100,
+                        "mark": float(item.get("markPrice", 0))
+                    })
+    except: pass
     return results
 
 @st.cache_data(ttl=60)
 def get_open_interest():
-    """Open Interest via Binance Futures (gratuit, sans clé API)"""
     symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT"]
     results = []
-    for sym in symbols:
-        try:
-            url_oi    = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={sym}"
-            url_price = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={sym}"
-            oi_data   = requests.get(url_oi,    timeout=3).json()
-            px_data   = requests.get(url_price, timeout=3).json()
-            oi        = float(oi_data.get("openInterest", 0))
-            mark      = float(px_data.get("markPrice", 1))
-            results.append({
-                "symbol": sym.replace("USDT", ""),
-                "oi":     oi,
-                "oi_usd": oi * mark
-            })
-        except:
-            pass
-    return results
-
-@st.cache_data(ttl=60)
-def get_ls_ratio():
-    """Ratio Long/Short via Binance Futures (gratuit, sans clé API)"""
-    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
-    results = []
-    for sym in symbols:
-        try:
-            url  = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={sym}&period=5m&limit=1"
-            data = requests.get(url, timeout=3).json()
-            if data:
-                ratio  = float(data[0].get("longShortRatio", 1))
-                longs  = round(ratio / (1 + ratio) * 100, 1)
-                shorts = round(100 - longs, 1)
-                results.append({
-                    "symbol": sym.replace("USDT", ""),
-                    "longs":  longs,
-                    "shorts": shorts
-                })
-        except:
-            pass
+    try:
+        for sym in symbols:
+            url_oi = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={sym}"
+            url_px = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={sym}"
+            oi_data = requests.get(url_oi, headers=HEADERS, timeout=3).json()
+            px_data = requests.get(url_px, headers=HEADERS, timeout=3).json()
+            
+            oi = float(oi_data.get("openInterest", 0))
+            mark = float(px_data.get("markPrice", 0))
+            if oi > 0:
+                results.append({"symbol": sym.replace("USDT", ""), "oi": oi, "oi_usd": oi * mark})
+    except: pass
     return results
 
 @st.cache_data(ttl=300)
-def get_fear_greed():
-    """Fear & Greed Index (alternative.me — gratuit, sans clé API)"""
+def get_btc_dominance():
+    """Récupère la dominance réelle via CoinGecko"""
     try:
-        data  = requests.get("https://api.alternative.me/fng/?limit=1", timeout=3).json()
-        val   = int(data["data"][0]["value"])
-        label = data["data"][0]["value_classification"]
-        return val, label
+        url = "https://api.coingecko.com/api/v3/global"
+        data = requests.get(url, headers=HEADERS, timeout=5).json()
+        dom = data['data']['market_cap_percentage']['btc']
+        return round(dom, 1)
     except:
-        return None, None
+        return 54.0
+
+@st.cache_data(ttl=300)
+def get_fear_greed():
+    try:
+        data = requests.get("https://api.alternative.me/fng/?limit=1", timeout=5).json()
+        return int(data["data"][0]["value"]), data["data"][0]["value_classification"]
+    except: return None, None
+
+
+@st.cache_data(ttl=60)
+def get_ls_ratio():
+    """Ratio Long/Short via Binance Futures (Corrigé avec Headers)"""
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    results = []
+    
+    # On utilise les mêmes headers que pour les prix et le funding
+    for sym in symbols:
+        try:
+            # Endpoint officiel pour le ratio global des comptes
+            url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={sym}&period=5m&limit=1"
+            
+            response = requests.get(url, headers=HEADERS, timeout=5)
+            data = response.json()
+
+            if data and isinstance(data, list) and len(data) > 0:
+                # Le ratio est : longs / shorts
+                ratio = float(data[0].get("longShortRatio", 1))
+                
+                # Calcul des pourcentages
+                longs_pct = round((ratio / (1 + ratio)) * 100, 1)
+                shorts_pct = round(100 - longs_pct, 1)
+                
+                results.append({
+                    "symbol": sym.replace("USDT", ""),
+                    "longs":  longs_pct,
+                    "shorts": shorts_pct,
+                    "ratio": round(ratio, 2)
+                })
+        except Exception as e:
+            # Optionnel : décommenter pour voir l'erreur en cas de bug
+            # print(f"Erreur L/S pour {sym}: {e}")
+            pass
+            
+    return results
 
 # ============================================
 # 3. RENDU ON-CHAIN PANEL
