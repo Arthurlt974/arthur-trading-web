@@ -1513,33 +1513,25 @@ elif categorie == "BOITE À OUTILS":
 st.sidebar.markdown("---")
 st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
 
-# Bouton plein écran
-st.sidebar.markdown("""
-<div style="padding: 8px 10px;">
-    <button onclick="
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen();
-            this.innerHTML = '⛶ QUITTER PLEIN ÉCRAN';
-        } else {
-            document.exitFullscreen();
-            this.innerHTML = '⛶ PLEIN ÉCRAN';
-        }
-    "
-    style="
-        width:100%;
-        background:#1a1a1a;
-        color:#ff9800;
-        border:1px solid #ff9800;
-        border-radius:4px;
-        padding:8px;
-        font-family:monospace;
-        font-size:12px;
-        font-weight:bold;
-        cursor:pointer;
-        letter-spacing:1px;
-    ">⛶ PLEIN ÉCRAN</button>
-</div>
-""", unsafe_allow_html=True)
+# Bouton plein écran (components.html pour sortir de l'iframe Streamlit)
+st.sidebar.markdown("<div style='padding:2px 0;'></div>", unsafe_allow_html=True)
+components.html("""
+<button id="fsBtn" onclick="
+    var el = window.parent.document.documentElement;
+    if (!window.parent.document.fullscreenElement) {
+        el.requestFullscreen().then(function() {
+            document.getElementById('fsBtn').innerHTML = '⛶ QUITTER PLEIN ÉCRAN';
+        }).catch(function(e) { alert('Erreur : ' + e.message); });
+    } else {
+        window.parent.document.exitFullscreen();
+        document.getElementById('fsBtn').innerHTML = '⛶ PLEIN ÉCRAN';
+    }
+" style="width:100%;background:#1a1a1a;color:#ff9800;border:1px solid #ff9800;
+         border-radius:4px;padding:8px;font-family:monospace;font-size:12px;
+         font-weight:bold;cursor:pointer;letter-spacing:1px;">
+    ⛶ PLEIN ÉCRAN
+</button>
+""", height=45)
 
 # Barre utilisateur (compte + déconnexion)
 render_user_sidebar()
