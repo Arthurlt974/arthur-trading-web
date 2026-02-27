@@ -1545,6 +1545,17 @@ marquee_html = f"""
     0% {{ transform: translateX(0); }}
     100% {{ transform: translateX(-33.33%); }}
 }}
+/* Cache le header Streamlit en plein écran */
+:fullscreen header[data-testid="stHeader"],
+:-webkit-full-screen header[data-testid="stHeader"],
+:-moz-full-screen header[data-testid="stHeader"] {{
+    display: none !important;
+}}
+:fullscreen .stApp > header,
+:-webkit-full-screen .stApp > header,
+:-moz-full-screen .stApp > header {{
+    display: none !important;
+}}
 </style>
 <div style="display:flex;align-items:center;background:#000;border-top:2px solid #333;border-bottom:2px solid #333;margin-bottom:20px;">
     <div style="flex:1;overflow:hidden;white-space:nowrap;padding:12px 0;">
@@ -1555,13 +1566,25 @@ marquee_html = f"""
     <div style="flex-shrink:0;padding:0 12px;">
         <button id="fsBtn" onclick="
             var el = window.parent.document.documentElement;
-            if (!window.parent.document.fullscreenElement) {{
+            var parentDoc = window.parent.document;
+            if (!parentDoc.fullscreenElement) {{
                 el.requestFullscreen().then(function() {{
                     document.getElementById('fsBtn').innerHTML = '⛶ EXIT';
+                    /* Injecte le CSS dans la page parent pour cacher le header */
+                    var style = parentDoc.getElementById('fs-style');
+                    if (!style) {{
+                        style = parentDoc.createElement('style');
+                        style.id = 'fs-style';
+                        style.innerHTML = 'header[data-testid=stHeader]{{display:none!important;}} .stApp>header{{display:none!important;}}';
+                        parentDoc.head.appendChild(style);
+                    }}
                 }});
             }} else {{
-                window.parent.document.exitFullscreen();
+                parentDoc.exitFullscreen();
                 document.getElementById('fsBtn').innerHTML = '⛶ PLEIN ÉCRAN';
+                /* Retire le CSS */
+                var style = parentDoc.getElementById('fs-style');
+                if (style) style.remove();
             }}
         " style="background:#1a1a1a;color:#ff9800;border:1px solid #ff9800;border-radius:4px;
                  padding:5px 10px;font-family:monospace;font-size:11px;font-weight:bold;
