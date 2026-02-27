@@ -318,7 +318,7 @@ def render_auth_page() -> bool:
     with st.expander("🔐 CODE D'ACCÈS TERMINAL", expanded=True):
         access_code = st.text_input("CODE D'ACCÈS GLOBAL", type="password", key="access_code_input",
                                     placeholder="Code fourni par l'administrateur")
-        if access_code and access_code != "1234":
+        if access_code and access_code != "AM2026":
             st.error("!! CODE INVALIDE")
             return False
         if not access_code:
