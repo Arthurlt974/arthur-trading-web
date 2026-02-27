@@ -1388,7 +1388,7 @@ if "whale_logs" not in st.session_state:
 #  CONFIGURATION GLOBALE
 # ============================================================
 
-st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
@@ -1400,115 +1400,45 @@ if "multi_charts" not in st.session_state:
 # ============================================================
 
 st.markdown("""
-<style>
-    /* Fond général */
-    .stApp { background-color: #000000 !important; }
-
-    /* Supprime header/footer Streamlit */
-    header[data-testid="stHeader"]      { display: none !important; }
-    .stApp [data-testid="stDecoration"] { display: none !important; }
-    footer   { display: none !important; }
-    #MainMenu { display: none !important; }
-
-    /* Plein écran — zéro padding inutile */
-    .main .block-container {
-        padding-top: 0.3rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        padding-bottom: 0.5rem !important;
-        max-width: 100% !important;
-    }
-
-    /* Sidebar Bloomberg */
-    [data-testid="stSidebar"] {
-        background-color: #060606 !important;
-        border-right: 1px solid #1f1f1f !important;
-    }
-    [data-testid="stSidebar"] > div:first-child {
-        padding-top: 0 !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-    }
-
-    /* Tous les boutons sidebar : style terminal */
-    [data-testid="stSidebar"] .stButton > button {
-        background: transparent !important;
-        color: #555 !important;
-        border: none !important;
-        border-left: 3px solid transparent !important;
-        border-radius: 0 !important;
-        text-align: left !important;
-        font-family: 'Courier New', monospace !important;
-        font-size: 11px !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.8px !important;
-        padding: 8px 14px !important;
-        width: 100% !important;
-        transition: all 0.1s !important;
-    }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        background: #0f0f0f !important;
-        color: #ff9800 !important;
-        border-left: 3px solid #ff9800 !important;
-    }
-
-    /* Bouton catégorie ACTIF */
-    [data-testid="stSidebar"] .stButton > button[data-active="true"],
-    [data-testid="stSidebar"] .cat-active .stButton > button {
-        color: #ff9800 !important;
-        border-left: 3px solid #ff9800 !important;
-        background: #0f0f0f !important;
-    }
-
-    /* Bouton outil ACTIF */
-    [data-testid="stSidebar"] .tool-active .stButton > button {
-        color: #ff9800 !important;
-        border-left: 3px solid #ff9800 !important;
-        background: #0a0a0a !important;
-    }
-
-    /* Titres sections sidebar */
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3 {
-        color: #ff9800 !important;
-        font-family: 'Courier New', monospace !important;
-    }
-
-    /* Textes généraux */
-    h1, h2, h3 {
-        color: #ff9800 !important;
-        font-family: 'Courier New', monospace !important;
-        text-transform: uppercase !important;
-    }
-    [data-testid="stMetricLabel"] { color: #888 !important; }
-    [data-testid="stMetricValue"] { color: #ff9800 !important; }
-    button[data-baseweb="tab"] p  { color: #ff9800 !important; }
-
-    /* Boutons contenu principal */
-    .main .stButton > button {
-        background-color: #0d0d0d !important;
-        color: #ff9800 !important;
-        border: 1px solid #333 !important;
-        border-radius: 3px !important;
-        font-family: 'Courier New', monospace !important;
-        font-size: 11px !important;
-        font-weight: bold !important;
-        letter-spacing: 1px !important;
-        width: 100% !important;
-    }
-    .main .stButton > button:hover {
-        background-color: #ff9800 !important;
-        color: #000 !important;
-        border-color: #ff9800 !important;
-    }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar       { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: #000; }
-    ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: #ff9800; }
-</style>
+    <style>
+        header[data-testid="stHeader"] {
+            background-color: rgba(0,0,0,0) !important;
+            color: #ff9800 !important;
+        }
+        .stApp [data-testid="stDecoration"] {
+            display: none;
+        }
+        .stApp {
+            background-color: #0d0d0d;
+            color: #ff9800 !important;
+        }
+        [data-testid="stSidebar"] {
+            background-color: #161616;
+            border-right: 1px solid #333;
+        }
+        h1, h2, h3, p, span, label, div, .stMarkdown {
+            color: #ff9800 !important;
+            text-transform: uppercase;
+        }
+        [data-testid="stMetricLabel"] {
+            color: #ff9800 !important;
+        }
+        button[data-baseweb="tab"] p {
+            color: #ff9800 !important;
+        }
+        .stButton>button {
+            background-color: #1a1a1a;
+            color: #ff9800;
+            border: 1px solid #ff9800;
+            border-radius: 4px;
+            font-weight: bold;
+            width: 100%;
+        }
+        .stButton>button:hover {
+            background-color: #ff9800;
+            color: #000;
+        }
+    </style>
 """, unsafe_allow_html=True)
 
 
@@ -1523,112 +1453,68 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 
 # ============================================================
-#  NAVIGATION SIDEBAR — CATÉGORIES EN HAUT, OUTILS DESSOUS
+#  NAVIGATION SIDEBAR
 # ============================================================
 
-MODULES = {
-    "₿ CRYPTO":     ["BITCOIN DOMINANCE","CRYPTO WALLET","HEATMAP LIQUIDATIONS",
-                     "ORDER BOOK LIVE","WHALE WATCHER","ON-CHAIN ANALYTICS",
-                     "LIQUIDATIONS & FUNDING","STAKING & YIELD"],
-    "📈 ACTIONS":   ["ANALYSEUR PRO","ANALYSE TECHNIQUE PRO","FIBONACCI CALCULATOR",
-                     "BACKTESTING ENGINE","VALORISATION FONDAMENTALE","MULTI-CHARTS",
-                     "EXPERT SYSTEM","THE GRAND COUNCIL️","MODE DUEL",
-                     "MARKET MONITOR","SCREENER CAC 40","DIVIDEND CALENDAR"],
-    "🛠 OUTILS":    ["DAILY BRIEF","CALENDRIER ÉCO","Fear and Gread Index",
-                     "CORRÉLATION DASH","INTERETS COMPOSES","HEATMAP MARCHÉ","ALERTS MANAGER"],
-    "🌍 ÉCONOMIE":  [],
-    "💱 FOREX":     [],
-    "⚡ PRO":       [],
-    "🔷 CRYPTO PRO":[],
-}
+st.sidebar.markdown("### 🗂️ NAVIGATION")
+categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
+    "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
+])
+st.sidebar.markdown("---")
 
-CAT_MAP = {
-    "₿ CRYPTO":      "MARCHÉ CRYPTO",
-    "📈 ACTIONS":     "ACTIONS & BOURSE",
-    "🛠 OUTILS":      "BOITE À OUTILS",
-    "🌍 ÉCONOMIE":    "ÉCONOMIE",
-    "💱 FOREX":       "FOREX",
-    "⚡ PRO":         "INTERFACE PRO",
-    "🔷 CRYPTO PRO":  "INTERFACE CRYPTO PRO",
-}
-
-# Init session
-if "categorie" not in st.session_state:
-    st.session_state.categorie = "₿ CRYPTO"
-if "outil" not in st.session_state:
-    st.session_state.outil = "BITCOIN DOMINANCE"
-
-# ── LOGO ──
-st.sidebar.markdown("""
-<div style="background:#000;border-bottom:2px solid #ff9800;padding:12px;text-align:center;margin-bottom:4px;">
-    <div style="color:#ff9800;font-size:16px;font-weight:900;font-family:'Courier New',monospace;letter-spacing:3px;">AM·TRADING</div>
-    <div style="color:#333;font-size:8px;font-family:monospace;letter-spacing:2px;margin-top:2px;">BLOOMBERG TERMINAL</div>
-</div>
-""", unsafe_allow_html=True)
-
-# ── CATÉGORIES (boutons Streamlit en grille 4 colonnes) ──
-st.sidebar.markdown("<div style='padding:6px 8px 2px;color:#333;font-size:9px;font-family:monospace;letter-spacing:2px;'>▸ SECTEURS</div>", unsafe_allow_html=True)
-
-cat_keys = list(MODULES.keys())
-# Ligne 1 : 4 catégories
-row1 = st.sidebar.columns(4)
-# Ligne 2 : 3 catégories
-row2 = st.sidebar.columns(4)
-
-for i, cat in enumerate(cat_keys):
-    col = row1[i] if i < 4 else row2[i - 4]
-    is_active = st.session_state.categorie == cat
-    label = cat if not is_active else f"**{cat}**"
-    with col:
-        if st.button(cat, key=f"cat_{cat}", help=CAT_MAP[cat]):
-            st.session_state.categorie = cat
-            outils = MODULES[cat]
-            if outils:
-                st.session_state.outil = outils[0]
-            st.rerun()
-
-# ── SÉPARATEUR ──
-st.sidebar.markdown("<div style='border-top:1px solid #1a1a1a;margin:6px 0 2px;'></div>", unsafe_allow_html=True)
-
-# ── OUTILS (boutons pleine largeur) ──
-cat_courante = st.session_state.categorie
-outils_courants = MODULES.get(cat_courante, [])
-
-if outils_courants:
-    st.sidebar.markdown(f"<div style='padding:4px 8px 2px;color:#333;font-size:9px;font-family:monospace;letter-spacing:2px;'>▸ MODULES</div>", unsafe_allow_html=True)
-    for tool in outils_courants:
-        is_active = st.session_state.outil == tool
-        prefix = "▶ " if is_active else "  "
-        btn_label = f"{prefix}{tool}"
-        clicked = st.sidebar.button(btn_label, key=f"tool_{tool}")
-        if clicked:
-            st.session_state.outil = tool
-            st.rerun()
-
-# ── SÉPARATEUR BAS ──
-st.sidebar.markdown("<div style='border-top:1px solid #1a1a1a;margin-top:8px;'></div>", unsafe_allow_html=True)
-
-# Barre utilisateur Firebase
-render_user_sidebar()
-
-# Lecture des variables pour le reste du code
-categorie_interne = CAT_MAP.get(st.session_state.categorie, st.session_state.categorie)
-categorie = categorie_interne
-outil = st.session_state.outil
-
-# Gestion modules spéciaux (sans liste d'outils)
+if categorie == "MARCHÉ CRYPTO":
+    outil = st.sidebar.radio("MODULES CRYPTO :", [
+        "BITCOIN DOMINANCE",
+        "CRYPTO WALLET",
+        "HEATMAP LIQUIDATIONS",
+        "ORDER BOOK LIVE",
+        "WHALE WATCHER",
+        "ON-CHAIN ANALYTICS",
+        "LIQUIDATIONS & FUNDING",
+        "STAKING & YIELD"
+    ])
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
-    st.session_state.outil = outil
-elif categorie == "INTERFACE CRYPTO PRO":
+if categorie == "INTERFACE CRYPTO PRO":
     outil = interface_crypto_pro.show_interface_crypto()
-    st.session_state.outil = outil
-elif categorie == "ÉCONOMIE":
+if categorie == "ÉCONOMIE":
     interface_economie.show_economie()
     st.stop()
 elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
+elif categorie == "ACTIONS & BOURSE":
+    outil = st.sidebar.radio("MODULES ACTIONS :", [
+        "ANALYSEUR PRO",
+        "ANALYSE TECHNIQUE PRO",
+        "FIBONACCI CALCULATOR",
+        "BACKTESTING ENGINE",
+        "VALORISATION FONDAMENTALE",
+        "MULTI-CHARTS",
+        "EXPERT SYSTEM",
+        "THE GRAND COUNCIL️",
+        "MODE DUEL",
+        "MARKET MONITOR",
+        "SCREENER CAC 40",
+        "DIVIDEND CALENDAR"
+    ])
+
+elif categorie == "BOITE À OUTILS":
+    outil = st.sidebar.radio("MES OUTILS :", [
+        "DAILY BRIEF",
+        "CALENDRIER ÉCO",
+        "Fear and Gread Index",
+        "CORRÉLATION DASH",
+        "INTERETS COMPOSES",
+        "HEATMAP MARCHÉ",
+        "ALERTS MANAGER"
+    ])
+
+st.sidebar.markdown("---")
+st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
+
+# Barre utilisateur (compte + déconnexion)
+render_user_sidebar()
 
 
 # ============================================================
