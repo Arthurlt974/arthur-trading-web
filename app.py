@@ -1496,13 +1496,10 @@ for tkr in st.session_state.watchlist:
         color = "#00ff41" if change >= 0 else "#ff2222"
         sign = "+" if change >= 0 else ""
         ticker_data_string += (
-            f'<span style="color:#333; margin-left:20px;">|</span>'
-            f'<span style="color:#888; font-size:11px; margin-left:10px; font-family:\'Share Tech Mono\',monospace;">'
-            f'{tkr.replace("-USD","").replace(".PA","")}</span>'
-            f'<span style="color:#e8e8e8; font-size:11px; margin-left:5px; font-family:\'Share Tech Mono\',monospace;">'
-            f'{price:,.2f}</span>'
-            f'<span style="color:{color}; font-size:11px; margin-left:4px; font-family:\'Share Tech Mono\',monospace;">'
-            f'({sign}{change:.2f}%)</span>'
+            f'<span style="color:#333;font-family:\'Share Tech Mono\',monospace;font-size:11px;margin:0 8px;">|</span>'
+            f'<span style="color:#777;font-family:\'Share Tech Mono\',monospace;font-size:11px;letter-spacing:1px;">{tkr.replace("-USD","").replace(".PA","")}</span>'
+            f'<span style="color:#e8e8e8;font-family:\'Share Tech Mono\',monospace;font-size:11px;margin-left:5px;">{price:,.2f}</span>'
+            f'<span style="color:{color};font-family:\'Share Tech Mono\',monospace;font-size:11px;margin-left:4px;">({sign}{change:.2f}%)</span>'
         )
     except:
         continue
