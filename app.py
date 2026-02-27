@@ -1388,7 +1388,7 @@ if "whale_logs" not in st.session_state:
 #  CONFIGURATION GLOBALE
 # ============================================================
 
-st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
+st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide", initial_sidebar_state="expanded")
 
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
@@ -1396,47 +1396,186 @@ if "multi_charts" not in st.session_state:
     st.session_state.multi_charts = []
 
 # ============================================================
-#  STYLE BLOOMBERG TERMINAL
+#  STYLE BLOOMBERG TERMINAL — PLEIN ÉCRAN
 # ============================================================
 
 st.markdown("""
     <style>
+        /* ── PLEIN ÉCRAN : suppression marges Streamlit ── */
+        .stApp {
+            background-color: #000000 !important;
+        }
+        #root > div:first-child {
+            padding: 0 !important;
+        }
+        .main .block-container {
+            padding-top: 0.5rem !important;
+            padding-left: 1.2rem !important;
+            padding-right: 1.2rem !important;
+            padding-bottom: 0.5rem !important;
+            max-width: 100% !important;
+        }
         header[data-testid="stHeader"] {
-            background-color: rgba(0,0,0,0) !important;
-            color: #ff9800 !important;
+            display: none !important;
         }
         .stApp [data-testid="stDecoration"] {
-            display: none;
+            display: none !important;
         }
-        .stApp {
-            background-color: #0d0d0d;
-            color: #ff9800 !important;
-        }
+        footer { display: none !important; }
+        #MainMenu { display: none !important; }
+
+        /* ── SIDEBAR BLOOMBERG ── */
         [data-testid="stSidebar"] {
-            background-color: #161616;
-            border-right: 1px solid #333;
+            background-color: #0a0a0a !important;
+            border-right: 2px solid #1a1a1a !important;
+            min-width: 220px !important;
+            max-width: 220px !important;
         }
-        h1, h2, h3, p, span, label, div, .stMarkdown {
-            color: #ff9800 !important;
-            text-transform: uppercase;
+        [data-testid="stSidebar"] > div:first-child {
+            padding: 0 !important;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
-        [data-testid="stMetricLabel"] {
-            color: #ff9800 !important;
+
+        /* ── LOGO HEADER SIDEBAR ── */
+        .bb-logo {
+            background: #000;
+            border-bottom: 2px solid #ff9800;
+            padding: 14px 12px 10px;
+            text-align: center;
         }
-        button[data-baseweb="tab"] p {
-            color: #ff9800 !important;
-        }
-        .stButton>button {
-            background-color: #1a1a1a;
+        .bb-logo .title {
             color: #ff9800;
-            border: 1px solid #ff9800;
-            border-radius: 4px;
-            font-weight: bold;
-            width: 100%;
+            font-size: 17px;
+            font-weight: 900;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 3px;
         }
-        .stButton>button:hover {
-            background-color: #ff9800;
-            color: #000;
+        .bb-logo .subtitle {
+            color: #555;
+            font-size: 9px;
+            font-family: monospace;
+            letter-spacing: 2px;
+            margin-top: 2px;
+        }
+
+        /* ── SECTION CATÉGORIES (milieu) ── */
+        .bb-section-title {
+            color: #444 !important;
+            font-size: 9px !important;
+            font-family: monospace !important;
+            letter-spacing: 2px !important;
+            padding: 10px 12px 4px !important;
+            text-transform: uppercase !important;
+            border-bottom: 1px solid #1a1a1a !important;
+        }
+        .bb-cat-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.15s;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: #666;
+            white-space: nowrap;
+        }
+        .bb-cat-btn:hover { background: #111; color: #ccc; border-left-color: #333; }
+        .bb-cat-btn.active { background: #111; color: #ff9800; border-left-color: #ff9800; }
+        .bb-cat-btn .icon { font-size: 14px; min-width: 18px; }
+
+        /* ── SECTION OUTILS (bas) ── */
+        .bb-tools-header {
+            color: #333 !important;
+            font-size: 9px !important;
+            font-family: monospace !important;
+            letter-spacing: 2px !important;
+            padding: 8px 12px 4px !important;
+            text-transform: uppercase !important;
+            border-top: 2px solid #1a1a1a !important;
+            border-bottom: 1px solid #1a1a1a !important;
+            margin-top: auto !important;
+        }
+        .bb-tool-btn {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 14px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            color: #555;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .bb-tool-btn:hover { background: #0d0d0d; color: #ff9800; border-left-color: #ff9800; }
+        .bb-tool-btn.active { background: #0d0d0d; color: #ff9800; border-left-color: #ff9800; font-weight: bold; }
+        .bb-tool-btn .dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: #333;
+            min-width: 5px;
+        }
+        .bb-tool-btn.active .dot { background: #ff9800; }
+
+        /* ── USER ZONE (tout en bas) ── */
+        .bb-user-zone {
+            background: #050505;
+            border-top: 1px solid #1a1a1a;
+            padding: 8px 12px;
+            font-family: monospace;
+            font-size: 10px;
+            color: #444;
+        }
+
+        /* ── CONTENU PRINCIPAL ── */
+        h1, h2, h3 {
+            color: #ff9800 !important;
+            font-family: 'Courier New', monospace !important;
+            text-transform: uppercase !important;
+        }
+        p, span, label, div, .stMarkdown {
+            color: #cccccc !important;
+        }
+        [data-testid="stMetricLabel"] { color: #888 !important; }
+        [data-testid="stMetricValue"] { color: #ff9800 !important; }
+        button[data-baseweb="tab"] p { color: #ff9800 !important; }
+        .stButton > button {
+            background-color: #0d0d0d !important;
+            color: #ff9800 !important;
+            border: 1px solid #333 !important;
+            border-radius: 3px !important;
+            font-family: monospace !important;
+            font-size: 11px !important;
+            font-weight: bold !important;
+            letter-spacing: 1px !important;
+        }
+        .stButton > button:hover {
+            background-color: #ff9800 !important;
+            color: #000 !important;
+            border-color: #ff9800 !important;
+        }
+
+        /* ── SCROLLBAR BLOOMBERG ── */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff9800; }
+
+        /* ── MASQUER les widgets Streamlit dans la sidebar ── */
+        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div > div > div[data-testid="stMarkdownContainer"],
+        [data-testid="stSidebar"] .stSelectbox,
+        [data-testid="stSidebar"] .stRadio,
+        [data-testid="stSidebar"] hr {
+            display: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -1453,67 +1592,145 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 
 # ============================================================
-#  NAVIGATION SIDEBAR
+#  NAVIGATION BLOOMBERG — SIDEBAR HTML
 # ============================================================
 
-st.sidebar.markdown("### 🗂️ NAVIGATION")
-categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
-])
-st.sidebar.markdown("---")
+# Définition des catégories avec icônes
+CATEGORIES = {
+    "MARCHÉ CRYPTO":      {"icon": "₿",  "key": "crypto"},
+    "ACTIONS & BOURSE":   {"icon": "📈", "key": "actions"},
+    "BOITE À OUTILS":     {"icon": "🛠", "key": "outils"},
+    "ÉCONOMIE":           {"icon": "🌍", "key": "eco"},
+    "FOREX":              {"icon": "💱", "key": "forex"},
+    "INTERFACE PRO":      {"icon": "⚡", "key": "pro"},
+    "INTERFACE CRYPTO PRO":{"icon":"🔷", "key": "cryptopro"},
+}
 
-if categorie == "MARCHÉ CRYPTO":
-    outil = st.sidebar.radio("MODULES CRYPTO :", [
-        "BITCOIN DOMINANCE",
-        "CRYPTO WALLET",
-        "HEATMAP LIQUIDATIONS",
-        "ORDER BOOK LIVE",
-        "WHALE WATCHER",
-        "ON-CHAIN ANALYTICS",
-        "LIQUIDATIONS & FUNDING",
-        "STAKING & YIELD"
-    ])
+MODULES = {
+    "MARCHÉ CRYPTO": [
+        ("₿", "BITCOIN DOMINANCE"),
+        ("💼", "CRYPTO WALLET"),
+        ("🔥", "HEATMAP LIQUIDATIONS"),
+        ("📖", "ORDER BOOK LIVE"),
+        ("🐋", "WHALE WATCHER"),
+        ("🔗", "ON-CHAIN ANALYTICS"),
+        ("💥", "LIQUIDATIONS & FUNDING"),
+        ("🔒", "STAKING & YIELD"),
+    ],
+    "ACTIONS & BOURSE": [
+        ("🔍", "ANALYSEUR PRO"),
+        ("📐", "ANALYSE TECHNIQUE PRO"),
+        ("🌀", "FIBONACCI CALCULATOR"),
+        ("⚙️", "BACKTESTING ENGINE"),
+        ("💎", "VALORISATION FONDAMENTALE"),
+        ("🖥", "MULTI-CHARTS"),
+        ("🤖", "EXPERT SYSTEM"),
+        ("⚖️", "THE GRAND COUNCIL️"),
+        ("🥊", "MODE DUEL"),
+        ("📡", "MARKET MONITOR"),
+        ("🔎", "SCREENER CAC 40"),
+        ("📅", "DIVIDEND CALENDAR"),
+    ],
+    "BOITE À OUTILS": [
+        ("📰", "DAILY BRIEF"),
+        ("🗓", "CALENDRIER ÉCO"),
+        ("🌡️", "Fear and Gread Index"),
+        ("🔗", "CORRÉLATION DASH"),
+        ("💰", "INTERETS COMPOSES"),
+        ("🌊", "HEATMAP MARCHÉ"),
+        ("🔔", "ALERTS MANAGER"),
+    ],
+}
+
+# Lecture / init de la session
+if "categorie" not in st.session_state:
+    st.session_state.categorie = "MARCHÉ CRYPTO"
+if "outil" not in st.session_state:
+    st.session_state.outil = "BITCOIN DOMINANCE"
+
+# Gestion clics via query_params (Streamlit hack pour boutons HTML sidebar)
+params = st.query_params
+if "cat" in params:
+    new_cat = params["cat"]
+    if new_cat in CATEGORIES:
+        st.session_state.categorie = new_cat
+        if new_cat in MODULES:
+            st.session_state.outil = MODULES[new_cat][0][1]
+    st.query_params.clear()
+if "tool" in params:
+    st.session_state.outil = params["tool"]
+    st.query_params.clear()
+
+categorie = st.session_state.categorie
+outil     = st.session_state.outil
+
+# ── Sidebar HTML Bloomberg ──
+cat_buttons_html = ""
+for cat_name, cat_info in CATEGORIES.items():
+    is_active = "active" if cat_name == categorie else ""
+    cat_buttons_html += f"""
+        <a href="?cat={cat_name}" style="text-decoration:none;">
+            <div class="bb-cat-btn {is_active}">
+                <span class="icon">{cat_info['icon']}</span>
+                <span>{cat_name}</span>
+            </div>
+        </a>
+    """
+
+tool_buttons_html = ""
+current_modules = MODULES.get(categorie, [])
+for icon, tool_name in current_modules:
+    is_active = "active" if tool_name == outil else ""
+    tool_buttons_html += f"""
+        <a href="?tool={tool_name}" style="text-decoration:none;">
+            <div class="bb-tool-btn {is_active}">
+                <span class="dot"></span>
+                <span>{icon} {tool_name}</span>
+            </div>
+        </a>
+    """
+
+if not tool_buttons_html:
+    tool_buttons_html = f"""
+        <div class="bb-tool-btn active">
+            <span class="dot" style="background:#ff9800;"></span>
+            <span>{categorie}</span>
+        </div>
+    """
+
+st.sidebar.markdown(f"""
+    <div class="bb-logo">
+        <div class="title">AM·TRADING</div>
+        <div class="subtitle">BLOOMBERG TERMINAL</div>
+    </div>
+
+    <div class="bb-section-title">▸ SECTEURS</div>
+    {cat_buttons_html}
+
+    <div class="bb-tools-header">▸ MODULES — {categorie}</div>
+    {tool_buttons_html}
+
+    <div class="bb-user-zone" id="bb-user-zone">
+        &nbsp;
+    </div>
+""", unsafe_allow_html=True)
+
+# Widgets Streamlit cachés pour compatibilité avec le reste du code
+# (certains modules les lisent via st.session_state)
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
+    st.session_state.outil = outil
 if categorie == "INTERFACE CRYPTO PRO":
     outil = interface_crypto_pro.show_interface_crypto()
+    st.session_state.outil = outil
 if categorie == "ÉCONOMIE":
     interface_economie.show_economie()
     st.stop()
 elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
-elif categorie == "ACTIONS & BOURSE":
-    outil = st.sidebar.radio("MODULES ACTIONS :", [
-        "ANALYSEUR PRO",
-        "ANALYSE TECHNIQUE PRO",
-        "FIBONACCI CALCULATOR",
-        "BACKTESTING ENGINE",
-        "VALORISATION FONDAMENTALE",
-        "MULTI-CHARTS",
-        "EXPERT SYSTEM",
-        "THE GRAND COUNCIL️",
-        "MODE DUEL",
-        "MARKET MONITOR",
-        "SCREENER CAC 40",
-        "DIVIDEND CALENDAR"
-    ])
 
-elif categorie == "BOITE À OUTILS":
-    outil = st.sidebar.radio("MES OUTILS :", [
-        "DAILY BRIEF",
-        "CALENDRIER ÉCO",
-        "Fear and Gread Index",
-        "CORRÉLATION DASH",
-        "INTERETS COMPOSES",
-        "HEATMAP MARCHÉ",
-        "ALERTS MANAGER"
-    ])
-
-st.sidebar.markdown("---")
-st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
-
-# Barre utilisateur (compte + déconnexion)
+# Barre utilisateur Firebase (rendu discret en bas sidebar)
 render_user_sidebar()
 
 
@@ -1540,19 +1757,24 @@ for tkr in st.session_state.watchlist:
         continue
 
 marquee_html = f"""
-<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
-    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
-        {ticker_data_string} {ticker_data_string} {ticker_data_string}
-    </div>
-</div>
 <style>
 @keyframes marquee {{
     0% {{ transform: translateX(0); }}
     100% {{ transform: translateX(-33.33%); }}
 }}
 </style>
+<div style="background:#000;border-top:1px solid #ff9800;border-bottom:1px solid #1a1a1a;
+            overflow:hidden;white-space:nowrap;padding:6px 0;margin-bottom:12px;">
+    <span style="color:#ff9800;font-family:monospace;font-size:10px;font-weight:bold;
+                 padding:0 16px;letter-spacing:2px;border-right:1px solid #333;">
+        AM·TRADING
+    </span>
+    <div style="display:inline-block;white-space:nowrap;animation:marquee 35s linear infinite;vertical-align:middle;">
+        {ticker_data_string} &nbsp;&nbsp;&nbsp; {ticker_data_string} &nbsp;&nbsp;&nbsp; {ticker_data_string}
+    </div>
+</div>
 """
-components.html(marquee_html, height=60)
+components.html(marquee_html, height=38)
 
 
 # ════════════════════════════════════════════════════════════
