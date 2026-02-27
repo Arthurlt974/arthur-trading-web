@@ -1396,81 +1396,119 @@ if "multi_charts" not in st.session_state:
     st.session_state.multi_charts = []
 
 # ============================================================
-#  STYLE BLOOMBERG TERMINAL — PLEIN ÉCRAN
+#  STYLE BLOOMBERG TERMINAL
 # ============================================================
 
 st.markdown("""
-    <style>
-        /* ── PLEIN ÉCRAN ── */
-        .stApp { background-color: #000000 !important; }
-        #root > div:first-child { padding: 0 !important; }
-        .main .block-container {
-            padding-top: 0.5rem !important;
-            padding-left: 1.2rem !important;
-            padding-right: 1.2rem !important;
-            padding-bottom: 0.5rem !important;
-            max-width: 100% !important;
-        }
-        header[data-testid="stHeader"]    { display: none !important; }
-        .stApp [data-testid="stDecoration"] { display: none !important; }
-        footer   { display: none !important; }
-        #MainMenu { display: none !important; }
+<style>
+    /* Fond général */
+    .stApp { background-color: #000000 !important; }
 
-        /* ── SIDEBAR ── */
-        [data-testid="stSidebar"] {
-            background-color: #000000 !important;
-            border-right: 1px solid #1a1a1a !important;
-            min-width: 230px !important;
-            max-width: 230px !important;
-        }
-        [data-testid="stSidebar"] > div:first-child {
-            padding: 0 !important;
-        }
-        /* Force tous les textes sidebar en noir pour ne pas interférer */
-        [data-testid="stSidebar"] p,
-        [data-testid="stSidebar"] span,
-        [data-testid="stSidebar"] div,
-        [data-testid="stSidebar"] label {
-            color: inherit !important;
-            text-transform: none !important;
-        }
-        /* Masquer widgets Streamlit natifs dans sidebar */
-        [data-testid="stSidebar"] .stSelectbox,
-        [data-testid="stSidebar"] .stRadio,
-        [data-testid="stSidebar"] hr,
-        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] > p { display: none !important; }
+    /* Supprime header/footer Streamlit */
+    header[data-testid="stHeader"]      { display: none !important; }
+    .stApp [data-testid="stDecoration"] { display: none !important; }
+    footer   { display: none !important; }
+    #MainMenu { display: none !important; }
 
-        /* ── CONTENU PRINCIPAL ── */
-        h1, h2, h3 {
-            color: #ff9800 !important;
-            font-family: 'Courier New', monospace !important;
-            text-transform: uppercase !important;
-        }
-        [data-testid="stMetricLabel"] { color: #888888 !important; font-family: monospace !important; }
-        [data-testid="stMetricValue"] { color: #ff9800 !important; }
-        button[data-baseweb="tab"] p  { color: #ff9800 !important; }
-        .stButton > button {
-            background-color: #0d0d0d !important;
-            color: #ff9800 !important;
-            border: 1px solid #333333 !important;
-            border-radius: 3px !important;
-            font-family: 'Courier New', monospace !important;
-            font-size: 11px !important;
-            font-weight: bold !important;
-            letter-spacing: 1px !important;
-        }
-        .stButton > button:hover {
-            background-color: #ff9800 !important;
-            color: #000000 !important;
-            border-color: #ff9800 !important;
-        }
+    /* Plein écran — zéro padding inutile */
+    .main .block-container {
+        padding-top: 0.3rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-bottom: 0.5rem !important;
+        max-width: 100% !important;
+    }
 
-        /* ── SCROLLBAR ── */
-        ::-webkit-scrollbar       { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
-        ::-webkit-scrollbar-thumb:hover { background: #ff9800; }
-    </style>
+    /* Sidebar Bloomberg */
+    [data-testid="stSidebar"] {
+        background-color: #060606 !important;
+        border-right: 1px solid #1f1f1f !important;
+    }
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Tous les boutons sidebar : style terminal */
+    [data-testid="stSidebar"] .stButton > button {
+        background: transparent !important;
+        color: #555 !important;
+        border: none !important;
+        border-left: 3px solid transparent !important;
+        border-radius: 0 !important;
+        text-align: left !important;
+        font-family: 'Courier New', monospace !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.8px !important;
+        padding: 8px 14px !important;
+        width: 100% !important;
+        transition: all 0.1s !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: #0f0f0f !important;
+        color: #ff9800 !important;
+        border-left: 3px solid #ff9800 !important;
+    }
+
+    /* Bouton catégorie ACTIF */
+    [data-testid="stSidebar"] .stButton > button[data-active="true"],
+    [data-testid="stSidebar"] .cat-active .stButton > button {
+        color: #ff9800 !important;
+        border-left: 3px solid #ff9800 !important;
+        background: #0f0f0f !important;
+    }
+
+    /* Bouton outil ACTIF */
+    [data-testid="stSidebar"] .tool-active .stButton > button {
+        color: #ff9800 !important;
+        border-left: 3px solid #ff9800 !important;
+        background: #0a0a0a !important;
+    }
+
+    /* Titres sections sidebar */
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        color: #ff9800 !important;
+        font-family: 'Courier New', monospace !important;
+    }
+
+    /* Textes généraux */
+    h1, h2, h3 {
+        color: #ff9800 !important;
+        font-family: 'Courier New', monospace !important;
+        text-transform: uppercase !important;
+    }
+    [data-testid="stMetricLabel"] { color: #888 !important; }
+    [data-testid="stMetricValue"] { color: #ff9800 !important; }
+    button[data-baseweb="tab"] p  { color: #ff9800 !important; }
+
+    /* Boutons contenu principal */
+    .main .stButton > button {
+        background-color: #0d0d0d !important;
+        color: #ff9800 !important;
+        border: 1px solid #333 !important;
+        border-radius: 3px !important;
+        font-family: 'Courier New', monospace !important;
+        font-size: 11px !important;
+        font-weight: bold !important;
+        letter-spacing: 1px !important;
+        width: 100% !important;
+    }
+    .main .stButton > button:hover {
+        background-color: #ff9800 !important;
+        color: #000 !important;
+        border-color: #ff9800 !important;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar       { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #000; }
+    ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #ff9800; }
+</style>
 """, unsafe_allow_html=True)
 
 
@@ -1485,179 +1523,112 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 
 # ============================================================
-#  NAVIGATION BLOOMBERG — SIDEBAR HTML
+#  NAVIGATION SIDEBAR — CATÉGORIES EN HAUT, OUTILS DESSOUS
 # ============================================================
 
-# Définition des catégories avec icônes
-CATEGORIES = {
-    "MARCHÉ CRYPTO":      {"icon": "₿",  "key": "crypto"},
-    "ACTIONS & BOURSE":   {"icon": "📈", "key": "actions"},
-    "BOITE À OUTILS":     {"icon": "🛠", "key": "outils"},
-    "ÉCONOMIE":           {"icon": "🌍", "key": "eco"},
-    "FOREX":              {"icon": "💱", "key": "forex"},
-    "INTERFACE PRO":      {"icon": "⚡", "key": "pro"},
-    "INTERFACE CRYPTO PRO":{"icon":"🔷", "key": "cryptopro"},
-}
-
 MODULES = {
-    "MARCHÉ CRYPTO": [
-        ("₿", "BITCOIN DOMINANCE"),
-        ("💼", "CRYPTO WALLET"),
-        ("🔥", "HEATMAP LIQUIDATIONS"),
-        ("📖", "ORDER BOOK LIVE"),
-        ("🐋", "WHALE WATCHER"),
-        ("🔗", "ON-CHAIN ANALYTICS"),
-        ("💥", "LIQUIDATIONS & FUNDING"),
-        ("🔒", "STAKING & YIELD"),
-    ],
-    "ACTIONS & BOURSE": [
-        ("🔍", "ANALYSEUR PRO"),
-        ("📐", "ANALYSE TECHNIQUE PRO"),
-        ("🌀", "FIBONACCI CALCULATOR"),
-        ("⚙️", "BACKTESTING ENGINE"),
-        ("💎", "VALORISATION FONDAMENTALE"),
-        ("🖥", "MULTI-CHARTS"),
-        ("🤖", "EXPERT SYSTEM"),
-        ("⚖️", "THE GRAND COUNCIL️"),
-        ("🥊", "MODE DUEL"),
-        ("📡", "MARKET MONITOR"),
-        ("🔎", "SCREENER CAC 40"),
-        ("📅", "DIVIDEND CALENDAR"),
-    ],
-    "BOITE À OUTILS": [
-        ("📰", "DAILY BRIEF"),
-        ("🗓", "CALENDRIER ÉCO"),
-        ("🌡️", "Fear and Gread Index"),
-        ("🔗", "CORRÉLATION DASH"),
-        ("💰", "INTERETS COMPOSES"),
-        ("🌊", "HEATMAP MARCHÉ"),
-        ("🔔", "ALERTS MANAGER"),
-    ],
+    "₿ CRYPTO":     ["BITCOIN DOMINANCE","CRYPTO WALLET","HEATMAP LIQUIDATIONS",
+                     "ORDER BOOK LIVE","WHALE WATCHER","ON-CHAIN ANALYTICS",
+                     "LIQUIDATIONS & FUNDING","STAKING & YIELD"],
+    "📈 ACTIONS":   ["ANALYSEUR PRO","ANALYSE TECHNIQUE PRO","FIBONACCI CALCULATOR",
+                     "BACKTESTING ENGINE","VALORISATION FONDAMENTALE","MULTI-CHARTS",
+                     "EXPERT SYSTEM","THE GRAND COUNCIL️","MODE DUEL",
+                     "MARKET MONITOR","SCREENER CAC 40","DIVIDEND CALENDAR"],
+    "🛠 OUTILS":    ["DAILY BRIEF","CALENDRIER ÉCO","Fear and Gread Index",
+                     "CORRÉLATION DASH","INTERETS COMPOSES","HEATMAP MARCHÉ","ALERTS MANAGER"],
+    "🌍 ÉCONOMIE":  [],
+    "💱 FOREX":     [],
+    "⚡ PRO":       [],
+    "🔷 CRYPTO PRO":[],
 }
 
-# Lecture / init de la session
+CAT_MAP = {
+    "₿ CRYPTO":      "MARCHÉ CRYPTO",
+    "📈 ACTIONS":     "ACTIONS & BOURSE",
+    "🛠 OUTILS":      "BOITE À OUTILS",
+    "🌍 ÉCONOMIE":    "ÉCONOMIE",
+    "💱 FOREX":       "FOREX",
+    "⚡ PRO":         "INTERFACE PRO",
+    "🔷 CRYPTO PRO":  "INTERFACE CRYPTO PRO",
+}
+
+# Init session
 if "categorie" not in st.session_state:
-    st.session_state.categorie = "MARCHÉ CRYPTO"
+    st.session_state.categorie = "₿ CRYPTO"
 if "outil" not in st.session_state:
     st.session_state.outil = "BITCOIN DOMINANCE"
 
-# Gestion clics via query_params
-params = st.query_params
-if "cat" in params:
-    new_cat = params["cat"]
-    if new_cat in CATEGORIES:
-        st.session_state.categorie = new_cat
-        if new_cat in MODULES:
-            st.session_state.outil = MODULES[new_cat][0][1]
-    st.query_params.clear()
-if "tool" in params:
-    st.session_state.outil = params["tool"]
-    st.query_params.clear()
-
-categorie = st.session_state.categorie
-outil     = st.session_state.outil
-
-# ── Sidebar HTML Bloomberg — tout en inline styles ──
-
-# Styles de base réutilisés
-_s_logo_wrap  = "background:#000000;border-bottom:2px solid #ff9800;padding:14px 12px 10px;text-align:center;margin:-1rem -1rem 0 -1rem;"
-_s_logo_title = "color:#ff9800 !important;font-size:17px;font-weight:900;font-family:'Courier New',monospace;letter-spacing:3px;display:block;"
-_s_logo_sub   = "color:#444444 !important;font-size:9px;font-family:monospace;letter-spacing:2px;margin-top:3px;display:block;"
-_s_sep        = "color:#333333 !important;font-size:9px;font-family:monospace;letter-spacing:2px;padding:10px 12px 4px;display:block;border-bottom:1px solid #1a1a1a;"
-_s_sep_tools  = "color:#333333 !important;font-size:9px;font-family:monospace;letter-spacing:2px;padding:10px 12px 4px;display:block;border-top:2px solid #1a1a1a;border-bottom:1px solid #1a1a1a;margin-top:6px;"
-
-def _cat_style(active):
-    if active:
-        return ("display:flex;align-items:center;gap:8px;padding:9px 14px;"
-                "border-left:3px solid #ff9800;background:#111111;"
-                "font-family:'Courier New',monospace;font-size:11px;font-weight:bold;"
-                "letter-spacing:1px;white-space:nowrap;")
-    return ("display:flex;align-items:center;gap:8px;padding:9px 14px;"
-            "border-left:3px solid transparent;background:transparent;"
-            "font-family:'Courier New',monospace;font-size:11px;font-weight:bold;"
-            "letter-spacing:1px;white-space:nowrap;")
-
-def _cat_text_style(active):
-    return "color:#ff9800 !important;" if active else "color:#555555 !important;"
-
-def _tool_style(active):
-    if active:
-        return ("display:flex;align-items:center;gap:8px;padding:7px 14px;"
-                "border-left:3px solid #ff9800;background:#0d0d0d;"
-                "font-family:'Courier New',monospace;font-size:10px;font-weight:bold;"
-                "letter-spacing:0.5px;white-space:nowrap;overflow:hidden;")
-    return ("display:flex;align-items:center;gap:8px;padding:7px 14px;"
-            "border-left:3px solid transparent;background:transparent;"
-            "font-family:'Courier New',monospace;font-size:10px;"
-            "letter-spacing:0.5px;white-space:nowrap;overflow:hidden;")
-
-def _tool_text_style(active):
-    return "color:#ff9800 !important;" if active else "color:#444444 !important;"
-
-def _dot_style(active):
-    col = "#ff9800" if active else "#2a2a2a"
-    return f"width:5px;height:5px;border-radius:50%;background:{col};min-width:5px;display:inline-block;"
-
-# Génération catégories
-cat_buttons_html = ""
-for cat_name, cat_info in CATEGORIES.items():
-    active = cat_name == categorie
-    cat_buttons_html += (
-        f'<a href="?cat={cat_name}" style="text-decoration:none;display:block;">'
-        f'<div style="{_cat_style(active)}">'
-        f'<span style="font-size:14px;min-width:18px;">{cat_info["icon"]}</span>'
-        f'<span style="{_cat_text_style(active)}">{cat_name}</span>'
-        f'</div></a>'
-    )
-
-# Génération outils
-tool_buttons_html = ""
-for icon, tool_name in MODULES.get(categorie, []):
-    active = tool_name == outil
-    tool_buttons_html += (
-        f'<a href="?tool={tool_name}" style="text-decoration:none;display:block;">'
-        f'<div style="{_tool_style(active)}">'
-        f'<span style="{_dot_style(active)}"></span>'
-        f'<span style="{_tool_text_style(active)}">{icon} {tool_name}</span>'
-        f'</div></a>'
-    )
-
-if not tool_buttons_html:
-    tool_buttons_html = (
-        f'<div style="{_tool_style(True)}">'
-        f'<span style="{_dot_style(True)}"></span>'
-        f'<span style="{_tool_text_style(True)}">{categorie}</span>'
-        f'</div>'
-    )
-
-st.sidebar.markdown(f"""
-<div style="{_s_logo_wrap}">
-    <span style="{_s_logo_title}">AM·TRADING</span>
-    <span style="{_s_logo_sub}">BLOOMBERG TERMINAL</span>
+# ── LOGO ──
+st.sidebar.markdown("""
+<div style="background:#000;border-bottom:2px solid #ff9800;padding:12px;text-align:center;margin-bottom:4px;">
+    <div style="color:#ff9800;font-size:16px;font-weight:900;font-family:'Courier New',monospace;letter-spacing:3px;">AM·TRADING</div>
+    <div style="color:#333;font-size:8px;font-family:monospace;letter-spacing:2px;margin-top:2px;">BLOOMBERG TERMINAL</div>
 </div>
-<span style="{_s_sep}">▸ SECTEURS</span>
-{cat_buttons_html}
-<span style="{_s_sep_tools}">▸ MODULES — {categorie}</span>
-{tool_buttons_html}
 """, unsafe_allow_html=True)
 
-# Widgets Streamlit cachés pour compatibilité avec le reste du code
-# (certains modules les lisent via st.session_state)
+# ── CATÉGORIES (boutons Streamlit en grille 4 colonnes) ──
+st.sidebar.markdown("<div style='padding:6px 8px 2px;color:#333;font-size:9px;font-family:monospace;letter-spacing:2px;'>▸ SECTEURS</div>", unsafe_allow_html=True)
+
+cat_keys = list(MODULES.keys())
+# Ligne 1 : 4 catégories
+row1 = st.sidebar.columns(4)
+# Ligne 2 : 3 catégories
+row2 = st.sidebar.columns(4)
+
+for i, cat in enumerate(cat_keys):
+    col = row1[i] if i < 4 else row2[i - 4]
+    is_active = st.session_state.categorie == cat
+    label = cat if not is_active else f"**{cat}**"
+    with col:
+        if st.button(cat, key=f"cat_{cat}", help=CAT_MAP[cat]):
+            st.session_state.categorie = cat
+            outils = MODULES[cat]
+            if outils:
+                st.session_state.outil = outils[0]
+            st.rerun()
+
+# ── SÉPARATEUR ──
+st.sidebar.markdown("<div style='border-top:1px solid #1a1a1a;margin:6px 0 2px;'></div>", unsafe_allow_html=True)
+
+# ── OUTILS (boutons pleine largeur) ──
+cat_courante = st.session_state.categorie
+outils_courants = MODULES.get(cat_courante, [])
+
+if outils_courants:
+    st.sidebar.markdown(f"<div style='padding:4px 8px 2px;color:#333;font-size:9px;font-family:monospace;letter-spacing:2px;'>▸ MODULES</div>", unsafe_allow_html=True)
+    for tool in outils_courants:
+        is_active = st.session_state.outil == tool
+        prefix = "▶ " if is_active else "  "
+        btn_label = f"{prefix}{tool}"
+        clicked = st.sidebar.button(btn_label, key=f"tool_{tool}")
+        if clicked:
+            st.session_state.outil = tool
+            st.rerun()
+
+# ── SÉPARATEUR BAS ──
+st.sidebar.markdown("<div style='border-top:1px solid #1a1a1a;margin-top:8px;'></div>", unsafe_allow_html=True)
+
+# Barre utilisateur Firebase
+render_user_sidebar()
+
+# Lecture des variables pour le reste du code
+categorie_interne = CAT_MAP.get(st.session_state.categorie, st.session_state.categorie)
+categorie = categorie_interne
+outil = st.session_state.outil
+
+# Gestion modules spéciaux (sans liste d'outils)
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
     st.session_state.outil = outil
-if categorie == "INTERFACE CRYPTO PRO":
+elif categorie == "INTERFACE CRYPTO PRO":
     outil = interface_crypto_pro.show_interface_crypto()
     st.session_state.outil = outil
-if categorie == "ÉCONOMIE":
+elif categorie == "ÉCONOMIE":
     interface_economie.show_economie()
     st.stop()
 elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
-
-# Barre utilisateur Firebase (rendu discret en bas sidebar)
-render_user_sidebar()
 
 
 # ============================================================
@@ -1683,24 +1654,19 @@ for tkr in st.session_state.watchlist:
         continue
 
 marquee_html = f"""
+<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
+    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
+        {ticker_data_string} {ticker_data_string} {ticker_data_string}
+    </div>
+</div>
 <style>
 @keyframes marquee {{
     0% {{ transform: translateX(0); }}
     100% {{ transform: translateX(-33.33%); }}
 }}
 </style>
-<div style="background:#000;border-top:1px solid #ff9800;border-bottom:1px solid #1a1a1a;
-            overflow:hidden;white-space:nowrap;padding:6px 0;margin-bottom:12px;">
-    <span style="color:#ff9800;font-family:monospace;font-size:10px;font-weight:bold;
-                 padding:0 16px;letter-spacing:2px;border-right:1px solid #333;">
-        AM·TRADING
-    </span>
-    <div style="display:inline-block;white-space:nowrap;animation:marquee 35s linear infinite;vertical-align:middle;">
-        {ticker_data_string} &nbsp;&nbsp;&nbsp; {ticker_data_string} &nbsp;&nbsp;&nbsp; {ticker_data_string}
-    </div>
-</div>
 """
-components.html(marquee_html, height=38)
+components.html(marquee_html, height=60)
 
 
 # ════════════════════════════════════════════════════════════
