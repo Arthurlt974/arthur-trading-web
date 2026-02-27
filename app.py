@@ -17,7 +17,6 @@ from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
 import interface_forex
-from bloomberg_style import apply_bloomberg_style, bloomberg_header
 
 
 # ══════════════════════════════════════════════
@@ -1400,7 +1399,47 @@ if "multi_charts" not in st.session_state:
 #  STYLE BLOOMBERG TERMINAL
 # ============================================================
 
-apply_bloomberg_style()
+st.markdown("""
+    <style>
+        header[data-testid="stHeader"] {
+            background-color: rgba(0,0,0,0) !important;
+            color: #ff9800 !important;
+        }
+        .stApp [data-testid="stDecoration"] {
+            display: none;
+        }
+        .stApp {
+            background-color: #0d0d0d;
+            color: #ff9800 !important;
+        }
+        [data-testid="stSidebar"] {
+            background-color: #161616;
+            border-right: 1px solid #333;
+        }
+        h1, h2, h3, p, span, label, div, .stMarkdown {
+            color: #ff9800 !important;
+            text-transform: uppercase;
+        }
+        [data-testid="stMetricLabel"] {
+            color: #ff9800 !important;
+        }
+        button[data-baseweb="tab"] p {
+            color: #ff9800 !important;
+        }
+        .stButton>button {
+            background-color: #1a1a1a;
+            color: #ff9800;
+            border: 1px solid #ff9800;
+            border-radius: 4px;
+            font-weight: bold;
+            width: 100%;
+        }
+        .stButton>button:hover {
+            background-color: #ff9800;
+            color: #000;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1493,18 +1532,27 @@ for tkr in st.session_state.watchlist:
         t_info = yf.Ticker(tkr).fast_info
         price = t_info['last_price']
         change = ((price - t_info['previous_close']) / t_info['previous_close']) * 100
-        color = "#00ff41" if change >= 0 else "#ff2222"
+        color = "#00ffad" if change >= 0 else "#ff4b4b"
         sign = "+" if change >= 0 else ""
-        ticker_data_string += (
-            f'<span style="color:#333;font-family:\'Share Tech Mono\',monospace;font-size:11px;margin:0 8px;">|</span>'
-            f'<span style="color:#777;font-family:\'Share Tech Mono\',monospace;font-size:11px;letter-spacing:1px;">{tkr.replace("-USD","").replace(".PA","")}</span>'
-            f'<span style="color:#e8e8e8;font-family:\'Share Tech Mono\',monospace;font-size:11px;margin-left:5px;">{price:,.2f}</span>'
-            f'<span style="color:{color};font-family:\'Share Tech Mono\',monospace;font-size:11px;margin-left:4px;">({sign}{change:.2f}%)</span>'
-        )
+        ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 40px; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
+        ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px; font-family: monospace;">{price:,.2f} ({sign}{change:.2f}%)</span>'
     except:
         continue
 
-bloomberg_header(ticker_data_string)
+marquee_html = f"""
+<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
+    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
+        {ticker_data_string} {ticker_data_string} {ticker_data_string}
+    </div>
+</div>
+<style>
+@keyframes marquee {{
+    0% {{ transform: translateX(0); }}
+    100% {{ transform: translateX(-33.33%); }}
+}}
+</style>
+"""
+components.html(marquee_html, height=60)
 
 
 # ════════════════════════════════════════════════════════════
