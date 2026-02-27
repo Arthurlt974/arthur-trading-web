@@ -1513,26 +1513,6 @@ elif categorie == "BOITE À OUTILS":
 st.sidebar.markdown("---")
 st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
 
-# Bouton plein écran (components.html pour sortir de l'iframe Streamlit)
-st.sidebar.markdown("<div style='padding:2px 0;'></div>", unsafe_allow_html=True)
-components.html("""
-<button id="fsBtn" onclick="
-    var el = window.parent.document.documentElement;
-    if (!window.parent.document.fullscreenElement) {
-        el.requestFullscreen().then(function() {
-            document.getElementById('fsBtn').innerHTML = '⛶ QUITTER PLEIN ÉCRAN';
-        }).catch(function(e) { alert('Erreur : ' + e.message); });
-    } else {
-        window.parent.document.exitFullscreen();
-        document.getElementById('fsBtn').innerHTML = '⛶ PLEIN ÉCRAN';
-    }
-" style="width:100%;background:#1a1a1a;color:#ff9800;border:1px solid #ff9800;
-         border-radius:4px;padding:8px;font-family:monospace;font-size:12px;
-         font-weight:bold;cursor:pointer;letter-spacing:1px;">
-    ⛶ PLEIN ÉCRAN
-</button>
-""", height=45)
-
 # Barre utilisateur (compte + déconnexion)
 render_user_sidebar()
 
@@ -1560,17 +1540,36 @@ for tkr in st.session_state.watchlist:
         continue
 
 marquee_html = f"""
-<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
-    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
-        {ticker_data_string} {ticker_data_string} {ticker_data_string}
-    </div>
-</div>
 <style>
 @keyframes marquee {{
     0% {{ transform: translateX(0); }}
     100% {{ transform: translateX(-33.33%); }}
 }}
 </style>
+<div style="display:flex;align-items:center;background:#000;border-top:2px solid #333;border-bottom:2px solid #333;margin-bottom:20px;">
+    <div style="flex:1;overflow:hidden;white-space:nowrap;padding:12px 0;">
+        <div style="display:inline-block;white-space:nowrap;animation:marquee 30s linear infinite;">
+            {ticker_data_string} {ticker_data_string} {ticker_data_string}
+        </div>
+    </div>
+    <div style="flex-shrink:0;padding:0 12px;">
+        <button id="fsBtn" onclick="
+            var el = window.parent.document.documentElement;
+            if (!window.parent.document.fullscreenElement) {{
+                el.requestFullscreen().then(function() {{
+                    document.getElementById('fsBtn').innerHTML = '⛶ EXIT';
+                }});
+            }} else {{
+                window.parent.document.exitFullscreen();
+                document.getElementById('fsBtn').innerHTML = '⛶ PLEIN ÉCRAN';
+            }}
+        " style="background:#1a1a1a;color:#ff9800;border:1px solid #ff9800;border-radius:4px;
+                 padding:5px 10px;font-family:monospace;font-size:11px;font-weight:bold;
+                 cursor:pointer;letter-spacing:1px;white-space:nowrap;">
+            ⛶ PLEIN ÉCRAN
+        </button>
+    </div>
+</div>
 """
 components.html(marquee_html, height=60)
 
