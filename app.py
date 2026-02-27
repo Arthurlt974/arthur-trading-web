@@ -1453,84 +1453,93 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 
 # ============================================================
-#  NAVIGATION — BARRE EN HAUT
+#  NAVIGATION SIDEBAR
 # ============================================================
 
-MODULES = {
-    "MARCHÉ CRYPTO": [
-        "BITCOIN DOMINANCE", "CRYPTO WALLET", "HEATMAP LIQUIDATIONS",
-        "ORDER BOOK LIVE", "WHALE WATCHER", "ON-CHAIN ANALYTICS",
-        "LIQUIDATIONS & FUNDING", "STAKING & YIELD"
-    ],
-    "ACTIONS & BOURSE": [
-        "ANALYSEUR PRO", "ANALYSE TECHNIQUE PRO", "FIBONACCI CALCULATOR",
-        "BACKTESTING ENGINE", "VALORISATION FONDAMENTALE", "MULTI-CHARTS",
-        "EXPERT SYSTEM", "THE GRAND COUNCIL️", "MODE DUEL",
-        "MARKET MONITOR", "SCREENER CAC 40", "DIVIDEND CALENDAR"
-    ],
-    "BOITE À OUTILS": [
-        "DAILY BRIEF", "CALENDRIER ÉCO", "Fear and Gread Index",
-        "CORRÉLATION DASH", "INTERETS COMPOSES", "HEATMAP MARCHÉ", "ALERTS MANAGER"
-    ],
-    "ÉCONOMIE":           [],
-    "FOREX":              [],
-    "INTERFACE PRO":      [],
-    "INTERFACE CRYPTO PRO": [],
-}
+st.sidebar.markdown("### 🗂️ NAVIGATION")
+categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
+    "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
+])
+st.sidebar.markdown("---")
 
-# Init session state
-if "categorie" not in st.session_state:
-    st.session_state.categorie = "MARCHÉ CRYPTO"
-if "outil" not in st.session_state:
-    st.session_state.outil = "BITCOIN DOMINANCE"
-
-# ── LIGNE 1 : Catégories ──
-st.markdown("---")
-cats = list(MODULES.keys())
-cols_cat = st.columns(len(cats))
-for i, cat in enumerate(cats):
-    with cols_cat[i]:
-        is_active = st.session_state.categorie == cat
-        label = f"**{cat}**" if is_active else cat
-        if st.button(label, key=f"cat_{cat}", use_container_width=True):
-            st.session_state.categorie = cat
-            outils = MODULES[cat]
-            if outils:
-                st.session_state.outil = outils[0]
-            st.rerun()
-
-# ── LIGNE 2 : Outils de la catégorie active ──
-categorie = st.session_state.categorie
-outils_actifs = MODULES.get(categorie, [])
-
-if outils_actifs:
-    st.markdown("<div style='margin-top:4px;'></div>", unsafe_allow_html=True)
-    cols_tools = st.columns(len(outils_actifs))
-    for i, tool in enumerate(outils_actifs):
-        with cols_tools[i]:
-            is_active = st.session_state.outil == tool
-            label = f"**{tool}**" if is_active else tool
-            if st.button(label, key=f"tool_{tool}", use_container_width=True):
-                st.session_state.outil = tool
-                st.rerun()
-
-st.markdown("---")
-
-# Lecture finale
-categorie = st.session_state.categorie
-outil = st.session_state.outil
-
-# Modules spéciaux sans liste d'outils
+if categorie == "MARCHÉ CRYPTO":
+    outil = st.sidebar.radio("MODULES CRYPTO :", [
+        "BITCOIN DOMINANCE",
+        "CRYPTO WALLET",
+        "HEATMAP LIQUIDATIONS",
+        "ORDER BOOK LIVE",
+        "WHALE WATCHER",
+        "ON-CHAIN ANALYTICS",
+        "LIQUIDATIONS & FUNDING",
+        "STAKING & YIELD"
+    ])
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
-elif categorie == "INTERFACE CRYPTO PRO":
+if categorie == "INTERFACE CRYPTO PRO":
     outil = interface_crypto_pro.show_interface_crypto()
-elif categorie == "ÉCONOMIE":
+if categorie == "ÉCONOMIE":
     interface_economie.show_economie()
     st.stop()
 elif categorie == "FOREX":
     interface_forex.show_forex()
     st.stop()
+elif categorie == "ACTIONS & BOURSE":
+    outil = st.sidebar.radio("MODULES ACTIONS :", [
+        "ANALYSEUR PRO",
+        "ANALYSE TECHNIQUE PRO",
+        "FIBONACCI CALCULATOR",
+        "BACKTESTING ENGINE",
+        "VALORISATION FONDAMENTALE",
+        "MULTI-CHARTS",
+        "EXPERT SYSTEM",
+        "THE GRAND COUNCIL️",
+        "MODE DUEL",
+        "MARKET MONITOR",
+        "SCREENER CAC 40",
+        "DIVIDEND CALENDAR"
+    ])
+
+elif categorie == "BOITE À OUTILS":
+    outil = st.sidebar.radio("MES OUTILS :", [
+        "DAILY BRIEF",
+        "CALENDRIER ÉCO",
+        "Fear and Gread Index",
+        "CORRÉLATION DASH",
+        "INTERETS COMPOSES",
+        "HEATMAP MARCHÉ",
+        "ALERTS MANAGER"
+    ])
+
+st.sidebar.markdown("---")
+st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
+
+# Bouton plein écran
+st.sidebar.markdown("""
+<div style="padding: 8px 10px;">
+    <button onclick="
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+            this.innerHTML = '⛶ QUITTER PLEIN ÉCRAN';
+        } else {
+            document.exitFullscreen();
+            this.innerHTML = '⛶ PLEIN ÉCRAN';
+        }
+    "
+    style="
+        width:100%;
+        background:#1a1a1a;
+        color:#ff9800;
+        border:1px solid #ff9800;
+        border-radius:4px;
+        padding:8px;
+        font-family:monospace;
+        font-size:12px;
+        font-weight:bold;
+        cursor:pointer;
+        letter-spacing:1px;
+    ">⛶ PLEIN ÉCRAN</button>
+</div>
+""", unsafe_allow_html=True)
 
 # Barre utilisateur (compte + déconnexion)
 render_user_sidebar()
