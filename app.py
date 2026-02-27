@@ -7,7 +7,6 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import numpy as np
 from fpdf import FPDF
 import io
@@ -18,6 +17,7 @@ from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
 import interface_forex
+from bloomberg_style import apply_bloomberg_style, bloomberg_header
 
 
 # ══════════════════════════════════════════════
@@ -1201,109 +1201,23 @@ def trouver_ticker(nom):
     except:
         return nom
 
-def get_fear_greed_crypto():
-    """Récupère le vrai Fear & Greed Index crypto via Alternative.me API."""
-    try:
-        r = requests.get("https://api.alternative.me/fng/?limit=30&format=json", timeout=8)
-        if r.status_code == 200:
-            data = r.json().get("data", [])
-            if data:
-                current = data[0]
-                score = int(current.get("value", 50))
-                label_raw = current.get("value_classification", "Neutral")
-                history = [(int(d["value"]), datetime.fromtimestamp(int(d["timestamp"]))) for d in data]
-                return score, label_raw, history
-    except:
-        pass
-    return None, None, []
-
-def calculer_score_sentiment_avance(ticker):
-    """
-    Score de sentiment multi-facteurs fiable :
-    - RSI 14 (momentum oscillateur)
-    - Position par rapport à MA20 / MA50 / MA200
-    - Volatilité relative (VIX-like)
-    - Momentum 30j
-    - Ratio Volume vs moyenne
-    Pondération : chaque facteur contribue au score final 0-100.
-    """
-    try:
-        data = yf.Ticker(ticker).history(period="1y", interval="1d")
-        if data is None or len(data) < 60:
-            return 50, "NEUTRE ⚖️", "#f1c40f", {}
-
-        close = data['Close']
-        volume = data['Volume']
-        prix = float(close.iloc[-1])
-
-        # ── 1. RSI 14 ──
-        delta = close.diff()
-        gain = delta.clip(lower=0).rolling(14).mean()
-        loss = (-delta.clip(upper=0)).rolling(14).mean()
-        rs = gain / loss.replace(0, 1e-9)
-        rsi = float((100 - 100 / (1 + rs)).iloc[-1])
-        # RSI → score 0-100 (RSI 30=peur, 70=euphorie)
-        score_rsi = max(0, min(100, rsi))
-
-        # ── 2. Position vs Moyennes Mobiles ──
-        ma20  = float(close.rolling(20).mean().iloc[-1])
-        ma50  = float(close.rolling(50).mean().iloc[-1])
-        ma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else ma50
-        above_ma20  = 1 if prix > ma20  else 0
-        above_ma50  = 1 if prix > ma50  else 0
-        above_ma200 = 1 if prix > ma200 else 0
-        score_ma = (above_ma20 + above_ma50 + above_ma200) / 3 * 100
-
-        # ── 3. Momentum 30j ──
-        prix_30j = float(close.iloc[-31]) if len(close) >= 31 else float(close.iloc[0])
-        momentum = (prix - prix_30j) / prix_30j * 100
-        score_momentum = max(0, min(100, 50 + momentum * 2.5))
-
-        # ── 4. Volatilité (inverse : haute volat = peur) ──
-        returns = close.pct_change().dropna()
-        vol_20j = float(returns.rolling(20).std().iloc[-1]) * np.sqrt(252) * 100
-        vol_hist = float(returns.rolling(60).std().iloc[-1]) * np.sqrt(252) * 100 if len(returns) >= 60 else vol_20j
-        vol_ratio = vol_20j / (vol_hist + 1e-9)
-        score_vol = max(0, min(100, 100 - (vol_ratio - 1) * 50))
-
-        # ── 5. Volume vs Moyenne ──
-        vol_moy = float(volume.rolling(20).mean().iloc[-1])
-        vol_actuel = float(volume.iloc[-1])
-        vol_surge = vol_actuel / (vol_moy + 1e-9)
-        # Volume élevé + prix en hausse = bullish ; on simplifie en neutre si pas de contexte
-        score_volume = max(0, min(100, 50 + (vol_surge - 1) * 15))
-
-        # ── Score final pondéré ──
-        score = (
-            score_rsi      * 0.30 +
-            score_ma       * 0.25 +
-            score_momentum * 0.25 +
-            score_vol      * 0.10 +
-            score_volume   * 0.10
-        )
-        score = max(5, min(95, score))
-
-        details = {
-            "RSI (14)": f"{rsi:.1f}",
-            "Position MA20/50/200": f"{above_ma20}/{above_ma50}/{above_ma200}",
-            "Momentum 30j": f"{momentum:+.1f}%",
-            "Volatilité 20j": f"{vol_20j:.1f}%/an",
-            "Volume vs moy.": f"{vol_surge:.2f}x",
-        }
-
-        if score >= 75:   return score, "EXTRÊME EUPHORIE 🚀", "#00ffad", details
-        elif score >= 60: return score, "OPTIMISME 📈", "#2ecc71", details
-        elif score >= 45: return score, "NEUTRE ⚖️", "#f1c40f", details
-        elif score >= 30: return score, "PEUR 📉", "#e67e22", details
-        else:             return score, "PANIQUE TOTALE 💀", "#e74c3c", details
-
-    except Exception as e:
-        return 50, "NEUTRE ⚖️", "#f1c40f", {}
-
-# Alias rétrocompatibilité (utilisé ailleurs dans le code)
 def calculer_score_sentiment(ticker):
-    score, label, couleur, _ = calculer_score_sentiment_avance(ticker)
-    return score, label, couleur
+    try:
+        data = yf.Ticker(ticker).history(period="1y")
+        if len(data) < 200:
+            return 50, "NEUTRE", "gray"
+        prix_actuel = data['Close'].iloc[-1]
+        ma200 = data['Close'].rolling(window=200).mean().iloc[-1]
+        ratio = (prix_actuel / ma200) - 1
+        score = 50 + (ratio * 300)
+        score = max(10, min(90, score))
+        if score > 70:   return score, "EXTRÊME EUPHORIE 🚀", "#00ffad"
+        elif score > 55: return score, "OPTIMISME 📈", "#2ecc71"
+        elif score > 45: return score, "NEUTRE ⚖️", "#f1c40f"
+        elif score > 30: return score, "PEUR 📉", "#e67e22"
+        else:            return score, "PANIQUE TOTALE 💀", "#e74c3c"
+    except:
+        return 50, "ERREUR", "gray"
 
 def afficher_jauge_pro(score, titre, couleur, sentiment):
     fig = go.Figure(go.Indicator(
@@ -1486,47 +1400,7 @@ if "multi_charts" not in st.session_state:
 #  STYLE BLOOMBERG TERMINAL
 # ============================================================
 
-st.markdown("""
-    <style>
-        header[data-testid="stHeader"] {
-            background-color: rgba(0,0,0,0) !important;
-            color: #ff9800 !important;
-        }
-        .stApp [data-testid="stDecoration"] {
-            display: none;
-        }
-        .stApp {
-            background-color: #0d0d0d;
-            color: #ff9800 !important;
-        }
-        [data-testid="stSidebar"] {
-            background-color: #161616;
-            border-right: 1px solid #333;
-        }
-        h1, h2, h3, p, span, label, div, .stMarkdown {
-            color: #ff9800 !important;
-            text-transform: uppercase;
-        }
-        [data-testid="stMetricLabel"] {
-            color: #ff9800 !important;
-        }
-        button[data-baseweb="tab"] p {
-            color: #ff9800 !important;
-        }
-        .stButton>button {
-            background-color: #1a1a1a;
-            color: #ff9800;
-            border: 1px solid #ff9800;
-            border-radius: 4px;
-            font-weight: bold;
-            width: 100%;
-        }
-        .stButton>button:hover {
-            background-color: #ff9800;
-            color: #000;
-        }
-    </style>
-""", unsafe_allow_html=True)
+apply_bloomberg_style()
 
 
 # ============================================================
@@ -1619,27 +1493,21 @@ for tkr in st.session_state.watchlist:
         t_info = yf.Ticker(tkr).fast_info
         price = t_info['last_price']
         change = ((price - t_info['previous_close']) / t_info['previous_close']) * 100
-        color = "#00ffad" if change >= 0 else "#ff4b4b"
+        color = "#00ff41" if change >= 0 else "#ff2222"
         sign = "+" if change >= 0 else ""
-        ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 40px; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
-        ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px; font-family: monospace;">{price:,.2f} ({sign}{change:.2f}%)</span>'
+        ticker_data_string += (
+            f'<span style="color:#333; margin-left:20px;">|</span>'
+            f'<span style="color:#888; font-size:11px; margin-left:10px; font-family:\'Share Tech Mono\',monospace;">'
+            f'{tkr.replace("-USD","").replace(".PA","")}</span>'
+            f'<span style="color:#e8e8e8; font-size:11px; margin-left:5px; font-family:\'Share Tech Mono\',monospace;">'
+            f'{price:,.2f}</span>'
+            f'<span style="color:{color}; font-size:11px; margin-left:4px; font-family:\'Share Tech Mono\',monospace;">'
+            f'({sign}{change:.2f}%)</span>'
+        )
     except:
         continue
 
-marquee_html = f"""
-<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
-    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
-        {ticker_data_string} {ticker_data_string} {ticker_data_string}
-    </div>
-</div>
-<style>
-@keyframes marquee {{
-    0% {{ transform: translateX(0); }}
-    100% {{ transform: translateX(-33.33%); }}
-}}
-</style>
-"""
-components.html(marquee_html, height=60)
+bloomberg_header(ticker_data_string)
 
 
 # ════════════════════════════════════════════════════════════
@@ -3953,248 +3821,27 @@ elif outil == "CALENDRIER ÉCO":
 # OUTIL : FEAR & GREED INDEX
 # ==========================================
 elif outil == "Fear and Gread Index":
-    st.markdown("""
-        <div style='text-align:center;padding:20px;background:linear-gradient(135deg,#1a1a1a,#0d0d0d);
-             border:2px solid #ff9800;border-radius:12px;margin-bottom:20px;'>
-            <h1 style='color:#ff9800;margin:0;font-size:36px;'>🌡️ FEAR & GREED INDEX</h1>
-            <p style='color:#ffb84d;margin:8px 0 0;font-size:14px;'>
-                Sentiment multi-facteurs · RSI · Momentum · Volatilité · Moyennes Mobiles · Volume
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.title("🌡️ Market Sentiment Index")
+    st.write("Analyse de la force du marché par rapport à sa moyenne long terme (MA200).")
 
-    tab_crypto, tab_marches, tab_historique = st.tabs([
-        "₿ CRYPTO (Alternative.me)",
-        "📊 MARCHÉS MULTI-FACTEURS",
-        "📈 HISTORIQUE CRYPTO"
-    ])
+    marches = {
+        "^GSPC": "🇺🇸 USA (S&P 500)",
+        "^FCHI": "🇫🇷 France (CAC 40)",
+        "^HSI":  "🇨🇳 Chine (Hang Seng)",
+        "BTC-USD": "₿ Bitcoin",
+        "GC=F": "🟡 Or (Métal Précieux)"
+    }
+    c1, c2 = st.columns(2)
+    items = list(marches.items())
+    for i in range(len(items)):
+        ticker, nom = items[i]
+        score, label, couleur = calculer_score_sentiment(ticker)
+        fig = afficher_jauge_pro(score, nom, couleur, label)
+        if i % 2 == 0: c1.plotly_chart(fig, use_container_width=True)
+        else:           c2.plotly_chart(fig, use_container_width=True)
 
-    # ── TAB 1 : Vrai Fear & Greed Crypto ──
-    with tab_crypto:
-        st.markdown("### ₿ FEAR & GREED INDEX — BITCOIN / CRYPTO")
-        st.caption("Source : Alternative.me API — Indice officiel utilisé par les professionnels")
-
-        with st.spinner("Chargement de l'indice officiel..."):
-            fg_score, fg_label, fg_history = get_fear_greed_crypto()
-
-        if fg_score is not None:
-            # Couleur selon zone
-            if fg_score >= 75:   fg_color = "#00ffad"
-            elif fg_score >= 55: fg_color = "#2ecc71"
-            elif fg_score >= 45: fg_color = "#f1c40f"
-            elif fg_score >= 25: fg_color = "#e67e22"
-            else:                fg_color = "#e74c3c"
-
-            label_fr = {
-                "Extreme Greed": "EXTRÊME AVIDITÉ 🚀",
-                "Greed": "AVIDITÉ 📈",
-                "Neutral": "NEUTRE ⚖️",
-                "Fear": "PEUR 📉",
-                "Extreme Fear": "PEUR EXTRÊME 💀"
-            }.get(fg_label, fg_label)
-
-            col_jauge, col_info = st.columns([1, 1])
-            with col_jauge:
-                fig_fg = afficher_jauge_pro(fg_score, "CRYPTO FEAR & GREED", fg_color, label_fr)
-                st.plotly_chart(fig_fg, use_container_width=True)
-
-            with col_info:
-                st.markdown("<br><br>", unsafe_allow_html=True)
-                st.markdown(f"""
-                    <div style='background:#0d0d0d;border:1px solid {fg_color};border-radius:10px;padding:20px;text-align:center;'>
-                        <div style='color:#888;font-size:12px;font-family:monospace;'>SCORE ACTUEL</div>
-                        <div style='color:{fg_color};font-size:64px;font-weight:bold;line-height:1.1;'>{fg_score}</div>
-                        <div style='color:{fg_color};font-size:18px;font-weight:bold;margin-top:8px;'>{label_fr}</div>
-                        <hr style='border-color:#333;margin:12px 0;'>
-                        <div style='color:#666;font-size:11px;'>Source : alternative.me/fng · Mis à jour quotidiennement</div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-            # Zones d'interprétation
-            st.markdown("---")
-            st.markdown("### 📖 ZONES D'INTERPRÉTATION")
-            z1, z2, z3, z4, z5 = st.columns(5)
-            zones = [
-                (z1, "0–24", "PEUR EXTRÊME", "#e74c3c", "Opportunité d'achat historique"),
-                (z2, "25–44", "PEUR", "#e67e22", "Pessimisme, sous-évaluation possible"),
-                (z3, "45–54", "NEUTRE", "#f1c40f", "Marché équilibré"),
-                (z4, "55–74", "AVIDITÉ", "#2ecc71", "Optimisme, attention aux bulles"),
-                (z5, "75–100", "EXTRÊME AVIDITÉ", "#00ffad", "Correction probable imminente"),
-            ]
-            for col, rng, lbl, clr, desc in zones:
-                is_current = False
-                r_min, r_max = int(rng.split("–")[0]), int(rng.split("–")[1])
-                if r_min <= fg_score <= r_max:
-                    is_current = True
-                border = f"3px solid {clr}" if is_current else f"1px solid {clr}44"
-                col.markdown(f"""
-                    <div style='background:#0d0d0d;border:{border};border-radius:8px;padding:10px;text-align:center;'>
-                        <div style='color:{clr};font-size:11px;font-weight:bold;'>{rng}</div>
-                        <div style='color:{clr};font-size:13px;font-weight:bold;margin:4px 0;'>{"▶ " if is_current else ""}{lbl}</div>
-                        <div style='color:#666;font-size:10px;'>{desc}</div>
-                    </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.warning("⚠️ API Alternative.me indisponible. Vérifiez votre connexion.")
-
-    # ── TAB 2 : Multi-marchés multi-facteurs ──
-    with tab_marches:
-        st.markdown("### 📊 SENTIMENT MULTI-FACTEURS PAR MARCHÉ")
-        st.caption("₿ BTC & ETH : Alternative.me API (officiel) · Autres marchés : RSI(14) · MA20/50/200 · Momentum · Volatilité · Volume")
-
-        marches_calcul = {
-            "^GSPC":   "🇺🇸 S&P 500",
-            "^FCHI":   "🇫🇷 CAC 40",
-            "^IXIC":   "🇺🇸 NASDAQ",
-            "GC=F":    "🟡 Or",
-        }
-
-        def _fg_color(s):
-            if s >= 75:   return "#00ffad"
-            elif s >= 55: return "#2ecc71"
-            elif s >= 45: return "#f1c40f"
-            elif s >= 25: return "#e67e22"
-            else:         return "#e74c3c"
-
-        def _fg_label_fr(raw):
-            return {
-                "Extreme Greed": "EXTRÊME AVIDITÉ 🚀",
-                "Greed":         "AVIDITÉ 📈",
-                "Neutral":       "NEUTRE ⚖️",
-                "Fear":          "PEUR 📉",
-                "Extreme Fear":  "PEUR EXTRÊME 💀",
-            }.get(raw, raw)
-
-        with st.spinner("Chargement des données..."):
-            # Alternative.me pour BTC & ETH
-            fg_score, fg_label_raw, _ = get_fear_greed_crypto()
-
-            # Multi-facteurs pour les autres marchés
-            resultats = {}
-            for ticker, nom in marches_calcul.items():
-                score, label, couleur, details = calculer_score_sentiment_avance(ticker)
-                resultats[nom] = (score, label, couleur, details, "calcul")
-
-            # Injecter BTC et ETH depuis Alternative.me
-            if fg_score is not None:
-                btc_score = fg_score
-                btc_label = _fg_label_fr(fg_label_raw)
-                btc_color = _fg_color(btc_score)
-                # ETH suit le même indice (Alternative.me est global crypto)
-                eth_score = fg_score
-                eth_label = _fg_label_fr(fg_label_raw)
-                eth_color = _fg_color(eth_score)
-                resultats["₿ Bitcoin"]   = (btc_score, btc_label, btc_color, {}, "alternative.me")
-                resultats["⟠ Ethereum"]  = (eth_score, eth_label, eth_color, {}, "alternative.me")
-            else:
-                # Fallback calcul si API indispo
-                s, l, c, d = calculer_score_sentiment_avance("BTC-USD")
-                resultats["₿ Bitcoin"]  = (s, l, c, d, "calcul (fallback)")
-                s, l, c, d = calculer_score_sentiment_avance("ETH-USD")
-                resultats["⟠ Ethereum"] = (s, l, c, d, "calcul (fallback)")
-
-        # ── Affichage des jauges ──
-        # Ordre d'affichage souhaité
-        ordre = ["₿ Bitcoin", "⟠ Ethereum", "🇺🇸 S&P 500", "🇺🇸 NASDAQ", "🇫🇷 CAC 40", "🟡 Or"]
-        cols = st.columns(3)
-        for i, nom in enumerate(ordre):
-            if nom not in resultats:
-                continue
-            score, label, couleur, details, source = resultats[nom]
-            with cols[i % 3]:
-                fig = afficher_jauge_pro(score, nom, couleur, label)
-                st.plotly_chart(fig, use_container_width=True)
-                # Badge source
-                badge_color = "#00ffad" if source == "alternative.me" else "#4fc3f7"
-                badge_text  = "✅ Alternative.me" if source == "alternative.me" else "🔬 Multi-facteurs"
-                st.markdown(f"""
-                    <div style='text-align:center;margin-top:-10px;margin-bottom:8px;'>
-                        <span style='background:#0d0d0d;border:1px solid {badge_color};color:{badge_color};
-                               font-size:10px;font-family:monospace;padding:2px 8px;border-radius:10px;'>
-                            {badge_text}
-                        </span>
-                    </div>
-                """, unsafe_allow_html=True)
-                if details:
-                    with st.expander("🔬 Détail des facteurs"):
-                        for k, v in details.items():
-                            st.markdown(f"<span style='color:#888;font-size:11px;font-family:monospace;'>{k}: <b style='color:#fff;'>{v}</b></span>", unsafe_allow_html=True)
-
-        # ── Tableau synthèse ──
-        st.markdown("---")
-        st.markdown("### 📋 TABLEAU SYNTHÈSE")
-        rows_table = []
-        for nom in ordre:
-            if nom not in resultats:
-                continue
-            score, label, couleur, _, source = resultats[nom]
-            rows_table.append({
-                "Marché": nom,
-                "Score": f"{score:.0f}/100",
-                "Sentiment": label,
-                "Source": "Alternative.me" if source == "alternative.me" else "Multi-facteurs"
-            })
-        st.dataframe(pd.DataFrame(rows_table), use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-        st.info("💡 **BTC & ETH** utilisent l'indice officiel Alternative.me (même source que l'onglet Crypto). Les autres marchés utilisent un calcul multi-facteurs : RSI, moyennes mobiles, momentum, volatilité et volume.")
-
-    # ── TAB 3 : Historique 30j Crypto ──
-    with tab_historique:
-        st.markdown("### 📈 HISTORIQUE 30 JOURS — FEAR & GREED CRYPTO")
-
-        with st.spinner("Chargement de l'historique..."):
-            _, _, fg_history = get_fear_greed_crypto()
-
-        if fg_history:
-            scores_h = [s for s, _ in fg_history]
-            dates_h  = [d for _, d in fg_history]
-            scores_h.reverse(); dates_h.reverse()
-
-            colors_h = []
-            for s in scores_h:
-                if s >= 75:   colors_h.append("#00ffad")
-                elif s >= 55: colors_h.append("#2ecc71")
-                elif s >= 45: colors_h.append("#f1c40f")
-                elif s >= 25: colors_h.append("#e67e22")
-                else:         colors_h.append("#e74c3c")
-
-            fig_hist = go.Figure()
-            fig_hist.add_hrect(y0=0,  y1=25,  fillcolor="rgba(231,76,60,0.08)",   line_width=0)
-            fig_hist.add_hrect(y0=25, y1=45,  fillcolor="rgba(230,126,34,0.08)",  line_width=0)
-            fig_hist.add_hrect(y0=45, y1=55,  fillcolor="rgba(241,196,15,0.08)",  line_width=0)
-            fig_hist.add_hrect(y0=55, y1=75,  fillcolor="rgba(46,204,113,0.08)",  line_width=0)
-            fig_hist.add_hrect(y0=75, y1=100, fillcolor="rgba(0,255,173,0.08)",   line_width=0)
-            fig_hist.add_trace(go.Scatter(
-                x=dates_h, y=scores_h,
-                mode="lines+markers",
-                line=dict(color="#ff9800", width=2.5),
-                marker=dict(color=colors_h, size=8, line=dict(color="white", width=1)),
-                hovertemplate="<b>%{x|%d %b}</b><br>Score: %{y}<extra></extra>"
-            ))
-            fig_hist.update_layout(
-                template="plotly_dark", paper_bgcolor="#000000", plot_bgcolor="#0a0a0a",
-                font=dict(color="#cccccc", family="Courier New"),
-                height=400, hovermode="x unified",
-                title=dict(text="Fear & Greed Index Crypto — 30 derniers jours", font=dict(color="#ff9800", size=15)),
-                xaxis=dict(gridcolor="#1a1a1a", showgrid=True),
-                yaxis=dict(gridcolor="#1a1a1a", showgrid=True, range=[0, 100],
-                           tickvals=[0,25,45,55,75,100],
-                           ticktext=["0","Peur extrême","Peur","Neutre","Avidité","100"]),
-                margin=dict(l=50, r=20, t=50, b=40)
-            )
-            st.plotly_chart(fig_hist, use_container_width=True)
-
-            # Stats
-            scores_arr = np.array(scores_h)
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Moyenne 30j", f"{scores_arr.mean():.0f}")
-            c2.metric("Min 30j",     f"{scores_arr.min():.0f}")
-            c3.metric("Max 30j",     f"{scores_arr.max():.0f}")
-            trend = "↑ Hausse" if scores_arr[-1] > scores_arr[-7] else "↓ Baisse"
-            c4.metric("Tendance 7j", trend)
-        else:
-            st.warning("⚠️ Historique indisponible — API Alternative.me inaccessible.")
+    st.markdown("---")
+    st.info("💡 **Conseil** : La 'Panique' (0-30%) indique souvent une opportunité d'achat, tandis que l'Euphorie (70-100%) suggère une bulle potentielle.")
 
 # ==========================================
 # OUTIL : CORRÉLATION DASH
@@ -4509,48 +4156,3 @@ elif outil == "ALERTS MANAGER":
     with col_stats1: st.metric("Total Alertes", len(st.session_state.alerts))
     with col_stats2: st.metric("Alertes Actives", len([a for a in st.session_state.alerts if a['active']]))
     with col_stats3: st.metric("Alertes Déclenchées", len(st.session_state.triggered_alerts))
-
-# ══════════════════════════════════════════════
-#  FOOTER LÉGAL — À coller tout à la fin de App.py
-# ══════════════════════════════════════════════
-st.markdown("---")
-st.markdown("""
-    <div style='text-align: center; padding: 20px 10px 30px 10px; font-family: monospace;'>
-        <div style='color: #ff9800; font-size: 13px; font-weight: bold; letter-spacing: 2px; margin-bottom: 6px;'>
-            AM TRADING — AM-Trading Terminal
-        </div>
-        <div style='color: #444; font-size: 10px; margin-bottom: 14px;'>
-            © 2026 Tous droits réservés — Les Avirons, La Réunion
-        </div>
-        <div style='margin-bottom: 14px;'>
-            <a href="https://drive.google.com/file/d/1sHnuaaZt01OzgDABlH0CaeOoVI4VUQAe/view?usp=share_link"
-               target="_blank"
-               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
-               📄 CGU
-            </a>
-            <a href="https://drive.google.com/file/d/1IJnPbwKs-5Sv6WTfaGjLDiA7F2VrTR0H/view?usp=share_link"
-               target="_blank"
-               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
-               🛒 CGV
-            </a>
-            <a href="https://drive.google.com/file/d/1YkMCtAJ8V86eSd8tdn1c1wctgDxvN0dX/view?usp=share_link"
-               target="_blank"
-               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
-               🔒 Confidentialité
-            </a>
-            <a href="https://drive.google.com/file/d/15i-pvSdiEbhAs37Mf85QfD7LVdFmgDOX/view?usp=share_link"
-               target="_blank"
-               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
-               ⚖️ Mentions légales
-            </a>
-            <a href="https://drive.google.com/file/d/1AMQd57mR-n84dfMshXfccdeGCee1a8Jk/view?usp=share_link"
-               target="_blank"
-               style='color: #ff9800; text-decoration: none; margin: 0 10px; font-size: 11px;'>
-               ↩️ Rétractation
-            </a>
-        </div>
-        <div style='color: #333; font-size: 10px; font-style: italic;'>
-            Les informations fournies sont à titre informatif uniquement et ne constituent pas un conseil en investissement financier.
-        </div>
-    </div>
-""", unsafe_allow_html=True)
