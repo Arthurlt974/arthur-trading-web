@@ -1401,13 +1401,9 @@ if "multi_charts" not in st.session_state:
 
 st.markdown("""
     <style>
-        /* ── PLEIN ÉCRAN : suppression marges Streamlit ── */
-        .stApp {
-            background-color: #000000 !important;
-        }
-        #root > div:first-child {
-            padding: 0 !important;
-        }
+        /* ── PLEIN ÉCRAN ── */
+        .stApp { background-color: #000000 !important; }
+        #root > div:first-child { padding: 0 !important; }
         .main .block-container {
             padding-top: 0.5rem !important;
             padding-left: 1.2rem !important;
@@ -1415,126 +1411,34 @@ st.markdown("""
             padding-bottom: 0.5rem !important;
             max-width: 100% !important;
         }
-        header[data-testid="stHeader"] {
-            display: none !important;
-        }
-        .stApp [data-testid="stDecoration"] {
-            display: none !important;
-        }
-        footer { display: none !important; }
+        header[data-testid="stHeader"]    { display: none !important; }
+        .stApp [data-testid="stDecoration"] { display: none !important; }
+        footer   { display: none !important; }
         #MainMenu { display: none !important; }
 
-        /* ── SIDEBAR BLOOMBERG ── */
+        /* ── SIDEBAR ── */
         [data-testid="stSidebar"] {
-            background-color: #0a0a0a !important;
-            border-right: 2px solid #1a1a1a !important;
-            min-width: 220px !important;
-            max-width: 220px !important;
+            background-color: #000000 !important;
+            border-right: 1px solid #1a1a1a !important;
+            min-width: 230px !important;
+            max-width: 230px !important;
         }
         [data-testid="stSidebar"] > div:first-child {
             padding: 0 !important;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
         }
-
-        /* ── LOGO HEADER SIDEBAR ── */
-        .bb-logo {
-            background: #000;
-            border-bottom: 2px solid #ff9800;
-            padding: 14px 12px 10px;
-            text-align: center;
+        /* Force tous les textes sidebar en noir pour ne pas interférer */
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] div,
+        [data-testid="stSidebar"] label {
+            color: inherit !important;
+            text-transform: none !important;
         }
-        .bb-logo .title {
-            color: #ff9800;
-            font-size: 17px;
-            font-weight: 900;
-            font-family: 'Courier New', monospace;
-            letter-spacing: 3px;
-        }
-        .bb-logo .subtitle {
-            color: #555;
-            font-size: 9px;
-            font-family: monospace;
-            letter-spacing: 2px;
-            margin-top: 2px;
-        }
-
-        /* ── SECTION CATÉGORIES (milieu) ── */
-        .bb-section-title {
-            color: #444 !important;
-            font-size: 9px !important;
-            font-family: monospace !important;
-            letter-spacing: 2px !important;
-            padding: 10px 12px 4px !important;
-            text-transform: uppercase !important;
-            border-bottom: 1px solid #1a1a1a !important;
-        }
-        .bb-cat-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 9px 14px;
-            cursor: pointer;
-            border-left: 3px solid transparent;
-            transition: all 0.15s;
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            color: #666;
-            white-space: nowrap;
-        }
-        .bb-cat-btn:hover { background: #111; color: #ccc; border-left-color: #333; }
-        .bb-cat-btn.active { background: #111; color: #ff9800; border-left-color: #ff9800; }
-        .bb-cat-btn .icon { font-size: 14px; min-width: 18px; }
-
-        /* ── SECTION OUTILS (bas) ── */
-        .bb-tools-header {
-            color: #333 !important;
-            font-size: 9px !important;
-            font-family: monospace !important;
-            letter-spacing: 2px !important;
-            padding: 8px 12px 4px !important;
-            text-transform: uppercase !important;
-            border-top: 2px solid #1a1a1a !important;
-            border-bottom: 1px solid #1a1a1a !important;
-            margin-top: auto !important;
-        }
-        .bb-tool-btn {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            padding: 7px 14px;
-            cursor: pointer;
-            border-left: 3px solid transparent;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            letter-spacing: 0.5px;
-            color: #555;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .bb-tool-btn:hover { background: #0d0d0d; color: #ff9800; border-left-color: #ff9800; }
-        .bb-tool-btn.active { background: #0d0d0d; color: #ff9800; border-left-color: #ff9800; font-weight: bold; }
-        .bb-tool-btn .dot {
-            width: 5px; height: 5px;
-            border-radius: 50%;
-            background: #333;
-            min-width: 5px;
-        }
-        .bb-tool-btn.active .dot { background: #ff9800; }
-
-        /* ── USER ZONE (tout en bas) ── */
-        .bb-user-zone {
-            background: #050505;
-            border-top: 1px solid #1a1a1a;
-            padding: 8px 12px;
-            font-family: monospace;
-            font-size: 10px;
-            color: #444;
-        }
+        /* Masquer widgets Streamlit natifs dans sidebar */
+        [data-testid="stSidebar"] .stSelectbox,
+        [data-testid="stSidebar"] .stRadio,
+        [data-testid="stSidebar"] hr,
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] > p { display: none !important; }
 
         /* ── CONTENU PRINCIPAL ── */
         h1, h2, h3 {
@@ -1542,41 +1446,30 @@ st.markdown("""
             font-family: 'Courier New', monospace !important;
             text-transform: uppercase !important;
         }
-        p, span, label, div, .stMarkdown {
-            color: #cccccc !important;
-        }
-        [data-testid="stMetricLabel"] { color: #888 !important; }
+        [data-testid="stMetricLabel"] { color: #888888 !important; font-family: monospace !important; }
         [data-testid="stMetricValue"] { color: #ff9800 !important; }
-        button[data-baseweb="tab"] p { color: #ff9800 !important; }
+        button[data-baseweb="tab"] p  { color: #ff9800 !important; }
         .stButton > button {
             background-color: #0d0d0d !important;
             color: #ff9800 !important;
-            border: 1px solid #333 !important;
+            border: 1px solid #333333 !important;
             border-radius: 3px !important;
-            font-family: monospace !important;
+            font-family: 'Courier New', monospace !important;
             font-size: 11px !important;
             font-weight: bold !important;
             letter-spacing: 1px !important;
         }
         .stButton > button:hover {
             background-color: #ff9800 !important;
-            color: #000 !important;
+            color: #000000 !important;
             border-color: #ff9800 !important;
         }
 
-        /* ── SCROLLBAR BLOOMBERG ── */
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        /* ── SCROLLBAR ── */
+        ::-webkit-scrollbar       { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
         ::-webkit-scrollbar-thumb:hover { background: #ff9800; }
-
-        /* ── MASQUER les widgets Streamlit dans la sidebar ── */
-        [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div > div > div[data-testid="stMarkdownContainer"],
-        [data-testid="stSidebar"] .stSelectbox,
-        [data-testid="stSidebar"] .stRadio,
-        [data-testid="stSidebar"] hr {
-            display: none !important;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1648,7 +1541,7 @@ if "categorie" not in st.session_state:
 if "outil" not in st.session_state:
     st.session_state.outil = "BITCOIN DOMINANCE"
 
-# Gestion clics via query_params (Streamlit hack pour boutons HTML sidebar)
+# Gestion clics via query_params
 params = st.query_params
 if "cat" in params:
     new_cat = params["cat"]
@@ -1664,55 +1557,88 @@ if "tool" in params:
 categorie = st.session_state.categorie
 outil     = st.session_state.outil
 
-# ── Sidebar HTML Bloomberg ──
+# ── Sidebar HTML Bloomberg — tout en inline styles ──
+
+# Styles de base réutilisés
+_s_logo_wrap  = "background:#000000;border-bottom:2px solid #ff9800;padding:14px 12px 10px;text-align:center;margin:-1rem -1rem 0 -1rem;"
+_s_logo_title = "color:#ff9800 !important;font-size:17px;font-weight:900;font-family:'Courier New',monospace;letter-spacing:3px;display:block;"
+_s_logo_sub   = "color:#444444 !important;font-size:9px;font-family:monospace;letter-spacing:2px;margin-top:3px;display:block;"
+_s_sep        = "color:#333333 !important;font-size:9px;font-family:monospace;letter-spacing:2px;padding:10px 12px 4px;display:block;border-bottom:1px solid #1a1a1a;"
+_s_sep_tools  = "color:#333333 !important;font-size:9px;font-family:monospace;letter-spacing:2px;padding:10px 12px 4px;display:block;border-top:2px solid #1a1a1a;border-bottom:1px solid #1a1a1a;margin-top:6px;"
+
+def _cat_style(active):
+    if active:
+        return ("display:flex;align-items:center;gap:8px;padding:9px 14px;"
+                "border-left:3px solid #ff9800;background:#111111;"
+                "font-family:'Courier New',monospace;font-size:11px;font-weight:bold;"
+                "letter-spacing:1px;white-space:nowrap;")
+    return ("display:flex;align-items:center;gap:8px;padding:9px 14px;"
+            "border-left:3px solid transparent;background:transparent;"
+            "font-family:'Courier New',monospace;font-size:11px;font-weight:bold;"
+            "letter-spacing:1px;white-space:nowrap;")
+
+def _cat_text_style(active):
+    return "color:#ff9800 !important;" if active else "color:#555555 !important;"
+
+def _tool_style(active):
+    if active:
+        return ("display:flex;align-items:center;gap:8px;padding:7px 14px;"
+                "border-left:3px solid #ff9800;background:#0d0d0d;"
+                "font-family:'Courier New',monospace;font-size:10px;font-weight:bold;"
+                "letter-spacing:0.5px;white-space:nowrap;overflow:hidden;")
+    return ("display:flex;align-items:center;gap:8px;padding:7px 14px;"
+            "border-left:3px solid transparent;background:transparent;"
+            "font-family:'Courier New',monospace;font-size:10px;"
+            "letter-spacing:0.5px;white-space:nowrap;overflow:hidden;")
+
+def _tool_text_style(active):
+    return "color:#ff9800 !important;" if active else "color:#444444 !important;"
+
+def _dot_style(active):
+    col = "#ff9800" if active else "#2a2a2a"
+    return f"width:5px;height:5px;border-radius:50%;background:{col};min-width:5px;display:inline-block;"
+
+# Génération catégories
 cat_buttons_html = ""
 for cat_name, cat_info in CATEGORIES.items():
-    is_active = "active" if cat_name == categorie else ""
-    cat_buttons_html += f"""
-        <a href="?cat={cat_name}" style="text-decoration:none;">
-            <div class="bb-cat-btn {is_active}">
-                <span class="icon">{cat_info['icon']}</span>
-                <span>{cat_name}</span>
-            </div>
-        </a>
-    """
+    active = cat_name == categorie
+    cat_buttons_html += (
+        f'<a href="?cat={cat_name}" style="text-decoration:none;display:block;">'
+        f'<div style="{_cat_style(active)}">'
+        f'<span style="font-size:14px;min-width:18px;">{cat_info["icon"]}</span>'
+        f'<span style="{_cat_text_style(active)}">{cat_name}</span>'
+        f'</div></a>'
+    )
 
+# Génération outils
 tool_buttons_html = ""
-current_modules = MODULES.get(categorie, [])
-for icon, tool_name in current_modules:
-    is_active = "active" if tool_name == outil else ""
-    tool_buttons_html += f"""
-        <a href="?tool={tool_name}" style="text-decoration:none;">
-            <div class="bb-tool-btn {is_active}">
-                <span class="dot"></span>
-                <span>{icon} {tool_name}</span>
-            </div>
-        </a>
-    """
+for icon, tool_name in MODULES.get(categorie, []):
+    active = tool_name == outil
+    tool_buttons_html += (
+        f'<a href="?tool={tool_name}" style="text-decoration:none;display:block;">'
+        f'<div style="{_tool_style(active)}">'
+        f'<span style="{_dot_style(active)}"></span>'
+        f'<span style="{_tool_text_style(active)}">{icon} {tool_name}</span>'
+        f'</div></a>'
+    )
 
 if not tool_buttons_html:
-    tool_buttons_html = f"""
-        <div class="bb-tool-btn active">
-            <span class="dot" style="background:#ff9800;"></span>
-            <span>{categorie}</span>
-        </div>
-    """
+    tool_buttons_html = (
+        f'<div style="{_tool_style(True)}">'
+        f'<span style="{_dot_style(True)}"></span>'
+        f'<span style="{_tool_text_style(True)}">{categorie}</span>'
+        f'</div>'
+    )
 
 st.sidebar.markdown(f"""
-    <div class="bb-logo">
-        <div class="title">AM·TRADING</div>
-        <div class="subtitle">BLOOMBERG TERMINAL</div>
-    </div>
-
-    <div class="bb-section-title">▸ SECTEURS</div>
-    {cat_buttons_html}
-
-    <div class="bb-tools-header">▸ MODULES — {categorie}</div>
-    {tool_buttons_html}
-
-    <div class="bb-user-zone" id="bb-user-zone">
-        &nbsp;
-    </div>
+<div style="{_s_logo_wrap}">
+    <span style="{_s_logo_title}">AM·TRADING</span>
+    <span style="{_s_logo_sub}">BLOOMBERG TERMINAL</span>
+</div>
+<span style="{_s_sep}">▸ SECTEURS</span>
+{cat_buttons_html}
+<span style="{_s_sep_tools}">▸ MODULES — {categorie}</span>
+{tool_buttons_html}
 """, unsafe_allow_html=True)
 
 # Widgets Streamlit cachés pour compatibilité avec le reste du code
