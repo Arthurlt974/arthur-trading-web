@@ -3789,9 +3789,37 @@ elif outil == "DAILY BRIEF":
     st.markdown("---")
     tab_eco, tab_tech, tab_quotidien = st.tabs(["🌍 GLOBAL MACRO", "⚡ TECH & CRYPTO", "📅 DAILY (BOURSORAMA)"])
 
-    def afficher_flux_daily(url, filtre_boursorama_24h=False):
+    def afficher_flux_fusionne(sources):
+        """Récupère et fusionne plusieurs flux RSS triés par date décroissante."""
+        import time
+        all_articles = []
+        for url, source_label in sources:
+            try:
+                flux = feedparser.parse(url)
+                for entry in flux.entries[:15]:
+                    pub_time = time.mktime(entry.published_parsed) if 'published_parsed' in entry else 0
+                    all_articles.append({
+                        "title": entry.title.replace(" - Boursorama", "").split(" - ")[0],
+                        "link": entry.link,
+                        "published": entry.get("published", ""),
+                        "pub_time": pub_time,
+                        "source": source_label
+                    })
+            except Exception:
+                pass
+        if not all_articles:
+            st.info("NO DATA FOUND.")
+            return
+        all_articles.sort(key=lambda x: x["pub_time"], reverse=True)
+        for art in all_articles[:30]:
+            with st.expander(f"» {art['title']}"):
+                st.write(f"**SOURCE :** {art['source']}")
+                if art["published"]: st.caption(f"🕒 TIMESTAMP : {art['published']}")
+                st.link_button("READ FULL ARTICLE", art["link"])
+
+    def afficher_flux_daily(url, filtre_boursorama_24h=False, source_label="Boursorama / Google News"):
+        import time
         try:
-            import time
             flux = feedparser.parse(url)
             if not flux.entries: st.info("NO DATA FOUND."); return
             maintenant = time.time()
@@ -3804,7 +3832,7 @@ elif outil == "DAILY BRIEF":
                     trouve = True
                     clean_title = entry.title.replace(" - Boursorama", "").split(" - ")[0]
                     with st.expander(f"» {clean_title}"):
-                        st.write(f"**SOURCE :** Boursorama / Google News")
+                        st.write(f"**SOURCE :** {source_label}")
                         if 'published' in entry: st.caption(f"🕒 TIMESTAMP : {entry.published}")
                         st.link_button("READ FULL ARTICLE", entry.link)
             if not trouve and filtre_boursorama_24h:
@@ -3812,7 +3840,11 @@ elif outil == "DAILY BRIEF":
         except Exception: st.error("FEED ERROR.")
 
     with tab_eco:
-        afficher_flux_daily("https://news.google.com/rss/search?q=bourse+economie+mondiale&hl=fr&gl=FR&ceid=FR:fr")
+        afficher_flux_fusionne([
+            ("https://news.google.com/rss/search?q=bourse+economie+mondiale&hl=fr&gl=FR&ceid=FR:fr", "Google News / Macro"),
+            ("https://feeds.a.dj.com/rss/RSSMarketsMain.xml", "Wall Street Journal / Markets"),
+            ("https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml", "Wall Street Journal / Finance"),
+        ])
     with tab_tech:
         afficher_flux_daily("https://news.google.com/rss/search?q=crypto+nasdaq+nvidia&hl=fr&gl=FR&ceid=FR:fr")
     with tab_quotidien:
