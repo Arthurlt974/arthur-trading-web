@@ -29,8 +29,8 @@ def get_ticker_from_name(query):
         pass
     return query.upper()
 
-@st.cache_data(ttl=300)
-def get_rss_news(source):
+@st.cache_data(ttl=300, show_spinner=False)
+def get_rss_news(source, _version=2):
     """
     Récupère les news via RSS pour Boursorama ou Investing
     """
@@ -290,21 +290,34 @@ def show_interface_pro():
         st.markdown('<div class="section-header">📰 BREAKING NEWS</div>', unsafe_allow_html=True)
         
         # Onglets
-        tab_bourso, tab_invest, tab_wsj_markets, tab_wsj_finance = st.tabs(["🇫🇷 Boursorama", "🌐 Investing", "📰 WSJ Markets", "💼 WSJ Finance"])
-        
+        tab_bourso, tab_invest, tab_wsj = st.tabs(["🇫🇷 Boursorama", "🌐 Investing", "📰 WSJ"])
+
         def display_news_scrollable(source_name):
             news_items = get_rss_news(source_name)
             if not news_items:
                 st.info("Aucune actualité récente.")
                 return
-
-            # Création d'un conteneur SCROLLABLE de hauteur fixe (300px = environ 3 items)
-            # Cela permet d'afficher les 3 premiers et de scroller pour voir les 7 autres
             with st.container(height=300):
                 for news in news_items:
-                    # Style Expandable
                     with st.expander(f"» {news['title']}"):
                         st.write(f"**SOURCE :** {source_name}")
+                        st.caption(f"🕒 DATE : {news['time']}")
+                        st.link_button("LIRE L'ARTICLE", news['link'])
+
+        def display_news_fusionne(sources):
+            """Fusionne plusieurs sources RSS triées par date décroissante."""
+            all_news = []
+            for source_name in sources:
+                for item in get_rss_news(source_name):
+                    all_news.append(item)
+            if not all_news:
+                st.info("Aucune actualité récente.")
+                return
+            all_news.sort(key=lambda x: x['time'], reverse=True)
+            with st.container(height=300):
+                for news in all_news[:20]:
+                    with st.expander(f"» {news['title']}"):
+                        st.write(f"**SOURCE :** {news['source']}")
                         st.caption(f"🕒 DATE : {news['time']}")
                         st.link_button("LIRE L'ARTICLE", news['link'])
 
@@ -314,11 +327,8 @@ def show_interface_pro():
         with tab_invest:
             display_news_scrollable("Investing")
 
-        with tab_wsj_markets:
-            display_news_scrollable("WSJ Markets")
-
-        with tab_wsj_finance:
-            display_news_scrollable("WSJ Finance")
+        with tab_wsj:
+            display_news_fusionne(["WSJ Markets", "WSJ Finance"])
         
         st.markdown("<br>", unsafe_allow_html=True)
         
