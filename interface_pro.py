@@ -38,7 +38,9 @@ def get_rss_news(source):
     
     rss_urls = {
         "Boursorama": "https://www.boursorama.com/rss/actualites/economie/",
-        "Investing": "https://fr.investing.com/rss/news.rss"
+        "Investing": "https://fr.investing.com/rss/news.rss",
+        "WSJ Markets": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+        "WSJ Finance": "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml"
     }
     
     url = rss_urls.get(source)
@@ -288,7 +290,7 @@ def show_interface_pro():
         st.markdown('<div class="section-header">📰 BREAKING NEWS</div>', unsafe_allow_html=True)
         
         # Onglets
-        tab_bourso, tab_invest = st.tabs(["🇫🇷 Boursorama", "🌐 Investing"])
+        tab_bourso, tab_invest, tab_wsj_markets, tab_wsj_finance = st.tabs(["🇫🇷 Boursorama", "🌐 Investing", "📰 WSJ Markets", "💼 WSJ Finance"])
         
         def display_news_scrollable(source_name):
             news_items = get_rss_news(source_name)
@@ -311,6 +313,12 @@ def show_interface_pro():
 
         with tab_invest:
             display_news_scrollable("Investing")
+
+        with tab_wsj_markets:
+            display_news_scrollable("WSJ Markets")
+
+        with tab_wsj_finance:
+            display_news_scrollable("WSJ Finance")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
