@@ -495,7 +495,7 @@ def show_interface_crypto():
         tv_symbol = get_crypto_pair(search_input)
         with c_info:
             st.markdown(
-                f"<div style='text-align:right;color:#666;padding-top:10px;'>"
+                f"<div style='text-align:right;color:#00e676;padding-top:10px;'>"
                 f"ACTIVE: <b style='color:#fff'>{tv_symbol}</b></div>",
                 unsafe_allow_html=True
             )
