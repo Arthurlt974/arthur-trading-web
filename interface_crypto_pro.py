@@ -486,16 +486,47 @@ def show_interface_crypto():
     with col_left:
         st.markdown('<div class="section-header">📊 CRYPTO TERMINAL</div>', unsafe_allow_html=True)
 
-        # ── Chart AM.Terminal — recherche gérée directement dans le graphique ──
+        # ── Recherche avec bouton VALIDER — évite le rerun à chaque frappe ──
+        if "chart_symbol" not in st.session_state:
+            st.session_state.chart_symbol = "BTCUSDT"
+            st.session_state.chart_base   = "BTC"
+
+        c_search, c_btn, c_info = st.columns([3, 1, 1.5])
+        with c_search:
+            search_input = st.text_input(
+                "CRYPTO", value=st.session_state.chart_base,
+                label_visibility="collapsed",
+                placeholder="BTC, ETH, SOL, PEPE..."
+            )
+        with c_btn:
+            if st.button("VALIDER", use_container_width=True, key="btn_chart_search"):
+                _mapping = {
+                    "BITCOIN":"BTC","ETHER":"ETH","ETHEREUM":"ETH","RIPPLE":"XRP",
+                    "CARDANO":"ADA","SOLANA":"SOL","DOGECOIN":"DOGE","POLKADOT":"DOT",
+                    "AVALANCHE":"AVAX","SHIBA":"SHIB","MATIC":"MATIC","POLYGON":"MATIC",
+                }
+                _raw  = search_input.strip().upper()
+                _base = _mapping.get(_raw, _raw)
+                _base = _base.replace("-USD","").replace("USDT","").replace("USD","").replace("BINANCE:","")
+                st.session_state.chart_symbol = _base + "USDT"
+                st.session_state.chart_base   = _base
+        with c_info:
+            st.markdown(
+                f"<div style='text-align:right;color:#666;padding-top:10px;font-family:monospace;font-size:11px;'>"
+                f"ACTIF : <b style='color:#ff6600'>{st.session_state.chart_base}/USDT</b></div>",
+                unsafe_allow_html=True
+            )
+
+        # ── Chart — ne se recharge QUE quand VALIDER est pressé ──
         from chart_module import render_chart
         components.html(
             render_chart(
-                symbol="BTCUSDT",
+                symbol=st.session_state.chart_symbol,
                 interval="4h",
                 limit=200,
                 height=700,
                 exchange="Binance · Spot",
-                pair_label="BTC/USDT",
+                pair_label=f"{st.session_state.chart_base}/USDT",
             ),
             height=700,
             scrolling=False,
