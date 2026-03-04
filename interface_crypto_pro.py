@@ -427,56 +427,28 @@ def render_onchain_panel():
 
 def show_interface_crypto():
     st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
-        .stApp { background-color: #000000; }
-        .block-container { padding-top: 1rem !important; max-width: 98% !important; }
-
-        .stTextInput input {
-            background-color: #111 !important;
-            color: #00ffad !important;
-            border: 1px solid #333 !important;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-        }
         .section-header {
-            color: #00ffad;
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 5px;
-            margin-top: 20px;
-            letter-spacing: 1px;
-        }
-        .news-time-brief { color: #666; font-size: 11px; font-weight: bold; margin-right: 10px; }
-        .source-badge    { font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 3px; margin-right: 10px; display: inline-block; text-transform: uppercase; }
-        .badge-coindesk  { background-color: #F7931A; color: black; }
-        .badge-cointele  { background-color: #FABE2C; color: black; }
-        .badge-cryptoast { background-color: #0056b3; color: white; }
-        [data-testid="stExpander"] {
-            background-color: #0A0A0A !important;
-            border: none !important;
-            border-bottom: 1px solid #1A1A1A !important;
-            border-radius: 0px !important;
-        }
-        .event-item {
-            display: flex; justify-content: space-between;
-            padding: 8px 0; border-bottom: 1px solid #1A1A1A;
-            color: white; font-size: 13px;
-        }
-        .stSelectbox > div > div {
-            background-color: #111 !important;
-            color: #00ffad !important;
-            border: 1px solid #333 !important;
-            font-family: 'Courier New', monospace !important;
-            font-weight: bold !important;
-        }
-        .stTabs [data-baseweb="tab"] {
-            font-family: 'Courier New', monospace;
+            color: #ff6600;
+            font-family: 'Share Tech Mono', 'Courier New', monospace;
             font-size: 11px;
-            letter-spacing: 1px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin: 14px 0 8px 0;
+            padding: 5px 0 5px 10px;
+            border-left: 3px solid #ff6600;
+            border-bottom: 1px solid #1a1a1a;
         }
-        .stTabs [aria-selected="true"] { color: #00ffad !important; }
+        .news-time-brief { color: #444; font-size: 10px; font-family: 'Share Tech Mono', monospace; margin-right: 8px; }
+        .source-badge { font-size: 9px; font-family: 'Share Tech Mono', monospace; font-weight: 700; padding: 2px 6px; border-radius: 0; margin-right: 8px; display: inline-block; text-transform: uppercase; letter-spacing: 1px; }
+        .badge-coindesk  { background: #F7931A; color: #000; }
+        .badge-cointele  { background: #FABE2C; color: #000; }
+        .badge-cryptoast { background: #0055bb; color: #fff; }
+        [data-testid="stExpander"] { background: #060606 !important; border: none !important; border-bottom: 1px solid #111 !important; border-radius: 0 !important; }
+        .event-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #0d0d0d; font-family: 'Share Tech Mono', monospace; font-size: 11px; color: #ccc; }
+        .event-item b { color: #e8e8e8; letter-spacing: 1px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -613,10 +585,6 @@ def show_interface_crypto():
                         <span style="color:{color};margin-left:8px;">{sign}{m['change']:.2f}%</span>
                     </div>
                 </div>""", unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    show_interface_crypto()
-
 
 if __name__ == "__main__":
     show_interface_crypto()
