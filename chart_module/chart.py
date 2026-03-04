@@ -373,7 +373,8 @@ let isDragging = false, dragStartX = 0, dragStartView = 0;
 // ════════════════════════════════════════════════════════
 //  SIMULATION
 // ════════════════════════════════════════════════════════
-let simActive   = true;
+// simActive démarre FALSE → attend confirmation live avant toute sim
+let simActive   = false;
 let simPrice    = D.c[D.c.length-1] || 100;
 let candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
 let prevPrice   = simPrice;
@@ -381,14 +382,17 @@ const VOLATILITY = 0.0006;
 
 function simTick() {{
   if(!simActive) return;
+  if(D.t.length === 0) return;  // Pas de données → skip
+  if(simPrice <= 0) {{ simPrice = D.c[D.c.length-1] || 100; return; }} // Prix invalide → reset
   const now = Math.floor(Date.now()/1000);
   const drift    = (Math.random()-0.499)*VOLATILITY;
   const momentum = (simPrice-prevPrice)*0.12;
   const noise    = (Math.random()-0.5)*simPrice*VOLATILITY*0.4;
   prevPrice = simPrice;
-  simPrice  = Math.max(simPrice*(1+drift)+momentum+noise, 0.01);
+  simPrice  = Math.max(simPrice*(1+drift)+momentum+noise, simPrice*0.95); // plancher 5% sous prix actuel
 
-  if(now >= candleStart+IV_SEC) {{
+  const ivSec = window.IV_SEC_CURRENT || IV_SEC;
+  if(now >= candleStart+ivSec) {{
     candleStart = now;
     D.t.push(now); D.o.push(simPrice); D.h.push(simPrice);
     D.l.push(simPrice); D.c.push(simPrice); D.v.push(0);
@@ -396,6 +400,7 @@ function simTick() {{
     if(VIEW_END>=D.t.length-1) VIEW_END=D.t.length;
   }} else {{
     const i=D.t.length-1;
+    if(i<0) return;
     D.c[i]=simPrice;
     if(simPrice>D.h[i])D.h[i]=simPrice;
     if(simPrice<D.l[i])D.l[i]=simPrice;
@@ -880,15 +885,17 @@ async function reloadOHLCV(tf) {{
       D.v.push(parseFloat(c[5]));
     }});
 
-    // Reset vue
+    // Reset vue + sim proprement
     VIEW_START = Math.max(0, D.t.length-120);
     VIEW_END   = D.t.length;
     candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
     simPrice    = D.c[D.c.length-1] || simPrice;
+    prevPrice   = simPrice; // Important : évite momentum parasite
+    simActive   = false;    // Pas de sim tant que WS pas reconnecté
 
     render();
     updateStats();
-    console.log(`[AM.Terminal] TF ${{tf}} → ${{D.t.length}} bougies chargées`);
+    console.log(`[AM.Terminal] TF ${{tf}} → ${{D.t.length}} bougies chargées — simPrice=${{simPrice.toFixed(2)}}`);
 
   }} catch(e) {{
     console.warn('[AM.Terminal] reloadOHLCV erreur:', e.message);
@@ -1007,18 +1014,32 @@ function applyPriceUpdate(price, chg24, vol24, high24, low24) {{
 
 function startBinanceWS() {{
   const sym='{binance_symbol}'.toLowerCase();
-  if(!sym||sym==='undefined'){{ startFallbackPolling(); return; }}
+  if(!sym||sym==='undefined'||sym==='usdt'){{ startFallbackPolling(); return; }}
+  // Fermer proprement le WS précédent
+  if(ws && ws.readyState < 2) {{ ws.onclose=null; ws.close(); }}
+  simActive = false; // Stoppe toute simulation pendant reconnexion
   ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`);
-  ws.onopen=()=>{{ simActive=false; console.log('[AM.Terminal] WS Binance connecté'); }};
+  ws.onopen=()=>{{
+    simActive=false;
+    console.log('[AM.Terminal] WS Binance connecté →', sym);
+  }};
   ws.onmessage=e=>{{
     try {{
       const d=(JSON.parse(e.data).data)||JSON.parse(e.data);
       const p=parseFloat(d.c);
-      if(!isNaN(p)) applyPriceUpdate(p,parseFloat(d.P),parseFloat(d.q),parseFloat(d.h),parseFloat(d.l));
+      if(!isNaN(p) && p>0) applyPriceUpdate(p,parseFloat(d.P),parseFloat(d.q),parseFloat(d.h),parseFloat(d.l));
     }} catch(err) {{}}
   }};
-  ws.onclose=()=>{{ setTimeout(startBinanceWS,5000); }};
-  ws.onerror=()=>{{ simActive=false; ws.close(); startFallbackPolling(); }};
+  ws.onclose=()=>{{
+    // Reconnexion uniquement si pas de chargement en cours
+    if(D.t.length>0) setTimeout(startBinanceWS, 5000);
+  }};
+  ws.onerror=()=>{{
+    ws.onclose=null;
+    ws.close();
+    console.warn('[AM.Terminal] WS erreur → fallback polling');
+    startFallbackPolling();
+  }};
 }}
 
 async function fetchLivePrice() {{
@@ -1043,8 +1064,11 @@ function init() {{
   VIEW_END=D.t.length;
   render();
   updateStats();
+  // Démarrer WS — simActive restera false jusqu'à échec WS
   startBinanceWS();
   if(RUN_SIM) {{
+    // Activer sim seulement après 3s si WS pas encore connecté
+    setTimeout(()=>{{ if(!ws||ws.readyState!==WebSocket.OPEN) simActive=true; }}, 3000);
     setInterval(simTick, 400);
     setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 100);
   }} else {{
