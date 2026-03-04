@@ -608,17 +608,9 @@ function drawMain() {{
     const bH =Math.max(1, Math.abs(cy-oy));
     const hw =Math.max(1, BW/2);
 
-    if(bull) {{
-      // Haussier : contour + fill semi-transparent (style TradingView)
-      ctx.fillStyle='rgba(38,166,154,0.15)';
-      ctx.fillRect(x-hw, top, hw*2, bH);
-      ctx.strokeStyle=bullCol; ctx.lineWidth=1.5;
-      ctx.strokeRect(x-hw, top, hw*2, bH);
-    }} else {{
-      // Baissier : plein
-      ctx.fillStyle=bearCol;
-      ctx.fillRect(x-hw, top, hw*2, bH);
-    }}
+    // Corps plein — haussier vert, baissier rouge
+    ctx.fillStyle = bull ? bullCol : bearCol;
+    ctx.fillRect(x-hw, top, hw*2, bH);
 
     // Dernière bougie — halo pulsant
     if(i===N-1) {{
@@ -830,10 +822,109 @@ cvMain.addEventListener('wheel', e => {{
 // ── Variable globale mode ──
 let CHART_MODE = 'normal';  // 'normal' | 'pro' | 'quant'
 
-function setTF(btn,tf) {{
+// ── Mapping TF → intervalle Binance + secondes ──
+const TF_MAP = {{
+  '1m':  {{iv:'1m',  sec:60}},
+  '5m':  {{iv:'5m',  sec:300}},
+  '15m': {{iv:'15m', sec:900}},
+  '1h':  {{iv:'1h',  sec:3600}},
+  '4h':  {{iv:'4h',  sec:14400}},
+  '1d':  {{iv:'1d',  sec:86400}},
+  '1w':  {{iv:'1w',  sec:604800}},
+}};
+
+let CURRENT_TF = '{active_tf}';
+
+async function setTF(btn, tf) {{
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  console.log('[AM.Terminal] TF →', tf);
+  CURRENT_TF = tf;
+
+  // Fermer WS actuel
+  if(ws && ws.readyState===WebSocket.OPEN) ws.close();
+
+  // Loader visuel
+  const badge = $('apiBadge');
+  if(badge) {{ badge.textContent='⟳ CHARGEMENT'; badge.className='live-badge sim'; }}
+
+  // Recharger les données OHLCV
+  await reloadOHLCV(tf);
+
+  // Redémarrer le WS avec la même paire
+  startBinanceWS();
+}}
+
+async function reloadOHLCV(tf) {{
+  const sym   = '{binance_symbol}'.toUpperCase();
+  const cfg   = TF_MAP[tf] || TF_MAP['4h'];
+  const limit = 200;
+
+  // Mettre à jour IV_SEC globalement
+  window.IV_SEC_CURRENT = cfg.sec;
+
+  try {{
+    const url = `https://api.binance.com/api/v3/klines?symbol=${{sym}}&interval=${{cfg.iv}}&limit=${{limit}}`;
+    const res  = await fetch(url);
+    if(!res.ok) throw new Error('Binance ' + res.status);
+    const raw = await res.json();
+
+    // Remplacer les données
+    D.t.length=0; D.o.length=0; D.h.length=0;
+    D.l.length=0; D.c.length=0; D.v.length=0;
+    raw.forEach(c=>{{
+      D.t.push(Math.floor(c[0]/1000));
+      D.o.push(parseFloat(c[1]));
+      D.h.push(parseFloat(c[2]));
+      D.l.push(parseFloat(c[3]));
+      D.c.push(parseFloat(c[4]));
+      D.v.push(parseFloat(c[5]));
+    }});
+
+    // Reset vue
+    VIEW_START = Math.max(0, D.t.length-120);
+    VIEW_END   = D.t.length;
+    candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
+    simPrice    = D.c[D.c.length-1] || simPrice;
+
+    render();
+    updateStats();
+    console.log(`[AM.Terminal] TF ${{tf}} → ${{D.t.length}} bougies chargées`);
+
+  }} catch(e) {{
+    console.warn('[AM.Terminal] reloadOHLCV erreur:', e.message);
+    // Fallback CoinGecko si Binance bloqué
+    await reloadOHLCVCoinGecko(tf);
+  }}
+}}
+
+async function reloadOHLCVCoinGecko(tf) {{
+  const coinId = '{coingecko_id}';
+  const daysMap = {{'1m':1,'5m':1,'15m':1,'1h':7,'4h':30,'1d':365,'1w':1825}};
+  const days = daysMap[tf] || 30;
+  try {{
+    const url = `https://api.coingecko.com/api/v3/coins/${{coinId}}/ohlc?vs_currency=usd&days=${{days}}`;
+    const res  = await fetch(url, {{signal: AbortSignal.timeout(10000)}});
+    const raw  = await res.json();
+    if(!Array.isArray(raw)||!raw.length) throw new Error('vide');
+
+    D.t.length=0; D.o.length=0; D.h.length=0;
+    D.l.length=0; D.c.length=0; D.v.length=0;
+    raw.forEach(c=>{{
+      D.t.push(Math.floor(c[0]/1000));
+      D.o.push(parseFloat(c[1]));
+      D.h.push(parseFloat(c[2]));
+      D.l.push(parseFloat(c[3]));
+      D.c.push(parseFloat(c[4]));
+      D.v.push(0);
+    }});
+
+    VIEW_START=Math.max(0,D.t.length-120);
+    VIEW_END=D.t.length;
+    render(); updateStats();
+    console.log(`[AM.Terminal] CoinGecko fallback TF ${{tf}} → ${{D.t.length}} bougies`);
+  }} catch(e) {{
+    console.warn('[AM.Terminal] CoinGecko fallback échoué:', e.message);
+  }}
 }}
 
 function toggleModeDD() {{
