@@ -29,6 +29,14 @@ def render_chart(
         symbol.upper() + "/USD" if symbol.lower() in ["bitcoin","ethereum","solana","dogecoin","cardano","ripple","polkadot","avalanche-2","chainlink","litecoin","cosmos","near","uniswap","binancecoin","matic-network"]
         else symbol.replace("USDT","/USDT").replace("-USD","/USD")
     )
+    # Résoudre l'ID CoinGecko + symbol Binance pour le fetch live côté JS
+    from .config import COINGECKO_IDS
+    _s = symbol.upper().replace("USDT","").replace("USD","").replace("-","")
+    coingecko_id  = COINGECKO_IDS.get(_s, symbol.lower())
+    # Symbol Binance : si déjà format BTCUSDT on garde, sinon on ajoute USDT
+    _sym_up = symbol.upper().replace("-","").replace("/","")
+    binance_symbol = _sym_up if _sym_up.endswith("USDT") or _sym_up.endswith("BUSD") else _sym_up + "USDT"
+
     c          = COLORS
     cd         = json.dumps(candles)
     status_txt = "● LIVE" if is_live else "◎ SIM"
@@ -629,82 +637,119 @@ function init() {{
   render();
   updateStats();
 
-  // Toujours tenter le prix live au démarrage
-  fetchLivePrice();
+  // Démarrer le prix temps réel : Binance WS en priorité, CoinGecko en fallback
+  startBinanceWS();
 
   if(RUN_SIM) {{
-    console.log('[AM.Terminal] Mode simulation actif (CoinGecko non dispo)');
+    console.log('[AM.Terminal] Mode simulation actif (données historiques indisponibles)');
     setInterval(simTick, 400);
     setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 100);
   }} else {{
-    console.log('[AM.Terminal] Mode LIVE — rafraîchissement prix toutes les 15s');
+    console.log('[AM.Terminal] Mode LIVE — Binance WebSocket actif');
     setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 150);
-    setInterval(fetchLivePrice, 15000);
   }}
 }}
 
-// ── FETCH PRIX EN TEMPS RÉEL ─────────────────────────────
+// ── PRIX EN TEMPS RÉEL — Binance WebSocket + fallback CoinGecko ──────────
+let ws = null;
+let last24hData = {{}};
+
+function applyPriceUpdate(price, chg24, vol24, high24, low24) {{
+  const bull = parseFloat(chg24) >= 0;
+  const clr  = bull ? 'var(--green2)' : 'var(--red2)';
+
+  // Mettre à jour la dernière bougie
+  const last = D.t.length - 1;
+  if(last >= 0) {{
+    D.c[last] = price;
+    if(price > D.h[last]) D.h[last] = price;
+    if(price < D.l[last]) D.l[last] = price;
+  }}
+
+  // Header prix
+  const pe = document.getElementById('curPrice');
+  const ce = document.getElementById('curChg');
+  if(pe) {{
+    const prev = parseFloat(pe.textContent.replace(/,/g,'')) || price;
+    pe.textContent = fmt(price);
+    pe.style.color = clr;
+    pe.style.textShadow = price > prev
+      ? '0 0 10px rgba(0,200,83,0.6)'
+      : '0 0 10px rgba(255,59,48,0.6)';
+    setTimeout(()=>{{ if(pe) pe.style.textShadow='none'; }}, 300);
+  }}
+  if(ce) {{ ce.textContent = (bull?'▲ +':'▼ ')+parseFloat(chg24).toFixed(2)+'%'; ce.style.color=clr; }}
+
+  const fV = v => v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':(v||0).toFixed(0);
+  if(vol24)  {{ setTxt('statVol',fV(vol24));  setTxt('b_vol',fV(vol24)); }}
+  if(high24) {{ setTxt('stat24h',fmt(high24)); setTxt('b_hi',fmt(high24)); setCol('stat24h','var(--green2)'); }}
+  if(low24)  {{ setTxt('stat24l',fmt(low24));  setTxt('b_lo',fmt(low24));  setCol('stat24l','var(--red2)'); }}
+  setTxt('b_chg',(bull?'+':'')+parseFloat(chg24).toFixed(2)+'%');
+  setCol('b_chg',clr);
+
+  const badge = document.getElementById('apiBadge');
+  if(badge) {{ badge.textContent='● LIVE'; badge.className='api-badge live pulse'; }}
+
+  render();
+}}
+
+// ── 1. Binance WebSocket (tick par tick, gratuit, sans clé API) ──
+function startBinanceWS() {{
+  const sym = '{binance_symbol}'.toLowerCase();
+  if(!sym || sym==='undefined') {{ startFallbackPolling(); return; }}
+
+  const wsUrl = `wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`;
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => console.log('[AM.Terminal] Binance WS connecté :', sym);
+
+  ws.onmessage = e => {{
+    try {{
+      const msg  = JSON.parse(e.data);
+      const d    = msg.data || msg;
+      const price  = parseFloat(d.c);   // close = dernier prix
+      const chg24  = parseFloat(d.P);   // % change 24h
+      const vol24  = parseFloat(d.q);   // volume quote 24h
+      const high24 = parseFloat(d.h);
+      const low24  = parseFloat(d.l);
+      if(isNaN(price)) return;
+      last24hData = {{chg24, vol24, high24, low24}};
+      applyPriceUpdate(price, chg24, vol24, high24, low24);
+    }} catch(err) {{}}
+  }};
+
+  ws.onerror = () => {{
+    console.warn('[AM.Terminal] Binance WS erreur — fallback CoinGecko');
+    ws.close();
+    startFallbackPolling();
+  }};
+
+  ws.onclose = () => {{
+    console.warn('[AM.Terminal] Binance WS fermé — reconnexion dans 5s');
+    setTimeout(startBinanceWS, 5000);
+  }};
+}}
+
+// ── 2. Fallback CoinGecko polling (toutes les 15s si WS indispo) ──
 async function fetchLivePrice() {{
   try {{
-    const coinId = '{symbol}';
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${{coinId}}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_24h_high=true&include_24h_low=true`;
-    const res  = await fetch(url);
+    const coinId = '{coingecko_id}';
+    if(!coinId) return;
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${{coinId}}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true`;
+    const res  = await fetch(url, {{signal: AbortSignal.timeout(8000)}});
     const json = await res.json();
     const data = json[coinId];
     if(!data) return;
-
-    const price   = data.usd;
-    const chg24   = data.usd_24h_change?.toFixed(2);
-    const vol24   = data.usd_24h_vol;
-    const high24  = data.usd_24h_high;
-    const low24   = data.usd_24h_low;
-    const bull     = chg24 >= 0;
-    const clr      = bull ? 'var(--green2)' : 'var(--red2)';
-
-    // Mettre à jour le close de la dernière bougie avec le vrai prix
-    const last = D.t.length - 1;
-    if(last >= 0) {{
-      D.c[last] = price;
-      if(price > D.h[last]) D.h[last] = price;
-      if(price < D.l[last]) D.l[last] = price;
-    }}
-
-    // Header prix
-    const pe = document.getElementById('curPrice');
-    const ce = document.getElementById('curChg');
-    if(pe) {{
-      pe.textContent = fmt(price);
-      pe.style.color = clr;
-      pe.style.textShadow = bull
-        ? '0 0 10px rgba(0,200,83,0.5)'
-        : '0 0 10px rgba(255,59,48,0.5)';
-      setTimeout(()=>{{ if(pe) pe.style.textShadow='none'; }}, 500);
-    }}
-    if(ce) {{
-      ce.textContent = (bull?'▲ +':'▼ ')+chg24+'%';
-      ce.style.color = clr;
-    }}
-
-    // Stats header
-    const fmtV = v => v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v?.toFixed(0)??'—';
-    setTxt('statVol',  fmtV(vol24));
-    setTxt('stat24h',  fmt(high24));
-    setTxt('stat24l',  fmt(low24));
-    setTxt('b_hi',     fmt(high24));
-    setTxt('b_lo',     fmt(low24));
-    setTxt('b_chg',    (bull?'+':'')+chg24+'%');
-    setTxt('b_vol',    fmtV(vol24));
-    setCol('b_chg',    clr);
-
-    // Badge LIVE
-    const badge = document.getElementById('apiBadge');
-    if(badge) {{ badge.textContent = '● LIVE'; badge.className='api-badge live pulse'; }}
-
-    render();
-    console.log(`[Arthur Trading] Prix live: ${{fmt(price)}} (${{chg24}}%)`);
+    applyPriceUpdate(data.usd, data.usd_24h_change, data.usd_24h_vol, null, null);
+    console.log(`[AM.Terminal] CoinGecko fallback: ${{fmt(data.usd)}}`);
   }} catch(e) {{
-    console.warn('[Arthur Trading] Prix live indisponible:', e.message);
+    console.warn('[AM.Terminal] CoinGecko indisponible:', e.message);
   }}
+}}
+
+function startFallbackPolling() {{
+  fetchLivePrice();
+  setInterval(fetchLivePrice, 15000);
 }}
 
 window.addEventListener('load', init);
