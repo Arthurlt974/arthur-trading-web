@@ -1,958 +1,605 @@
-import json
-from .data import fetch_ohlcv
-from .config import (
-    DEFAULT_SYMBOL, DEFAULT_INTERVAL, DEFAULT_LIMIT,
-    CHART_HEIGHT, VOLUME_HEIGHT, BOTTOM_BAR_H, COLORS
-)
+import streamlit.components.v1 as components
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import feedparser
+import requests
+from datetime import datetime
 
+# Headers pour éviter d'être bloqué par les API
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
 
-def render_chart(
-    symbol: str       = DEFAULT_SYMBOL,
-    interval: str     = DEFAULT_INTERVAL,
-    limit: int        = DEFAULT_LIMIT,
-    height: int       = 700,
-    show_header: bool = True,   # afficher le header avec prix/OHLC
-    show_volume: bool = True,   # afficher le panneau volume
-    show_bottom: bool = True,   # afficher la barre du bas (24H stats)
-    pair_label: str   = None,   # label affiché (ex: "BTC/USDT")
-    exchange: str     = "Binance · Spot",  # source affichée
-    live_sim: bool    = True,   # simulation si pas de données live
-    show_ma: bool     = True,   # afficher MA20/50/200
-    show_bb: bool     = False,  # afficher Bollinger Bands
-    default_tf: str   = None,   # timeframe actif par défaut (ex: "4h")
-) -> str:
+# ============================================
+# 1. FONCTIONS UTILITAIRES CRYPTO
+# ============================================
 
-    from .config import COINGECKO_IDS, DATA_SOURCE
-
-    try:
-        candles, is_live = fetch_ohlcv(symbol=symbol, interval=interval, limit=limit)
-    except Exception as e:
-        print(f"[chart_module] Erreur fetch ({symbol} {interval}): {e}")
-        candles, is_live = [], False
-
-    # ── Affichage du nom de la paire ──
-    pair_disp = pair_label or (
-        symbol.upper() + "/USD"
-        if symbol.lower() in ["bitcoin","ethereum","solana","dogecoin","cardano",
-                               "ripple","polkadot","avalanche-2","chainlink",
-                               "litecoin","cosmos","near","uniswap","binancecoin","matic-network"]
-        else symbol.replace("USDT","/USDT").replace("-USD","/USD")
-    )
-
-    # ── ID CoinGecko (pour fallback prix live) ──
-    _s = symbol.upper().replace("USDT","").replace("USD","").replace("-","")
-    coingecko_id = COINGECKO_IDS.get(_s, symbol.lower())
-
-    # ── Symbol Binance (pour WebSocket) ──
-    _sym_up = symbol.upper().replace("-","").replace("/","")
-    binance_symbol = _sym_up if _sym_up.endswith("USDT") or _sym_up.endswith("BUSD") else _sym_up + "USDT"
-
-    # ── Exchange affiché selon source ──
-    src_labels = {
-        "binance":   "Binance · Spot",
-        "bybit":     "Bybit · Spot",
-        "coingecko": "CoinGecko · Spot",
-        "yfinance":  "Yahoo Finance",
-        "kraken":    "Kraken · Spot",
-        "mock":      "Simulation",
+def get_crypto_pair(query):
+    query = query.strip().upper()
+    mapping = {
+        "BITCOIN": "BTC", "ETHER": "ETH", "ETHEREUM": "ETH", "RIPPLE": "XRP",
+        "CARDANO": "ADA", "SOLANA": "SOL", "DOGECOIN": "DOGE", "POLKADOT": "DOT",
+        "AVALANCHE": "AVAX", "SHIBA": "SHIB", "MATIC": "MATIC", "POLYGON": "MATIC"
     }
-    if exchange == "Binance · Spot":  # valeur par défaut → auto-detect
-        exchange = src_labels.get(DATA_SOURCE.lower(), DATA_SOURCE)
-
-    # ── Timeframe actif par défaut ──
-    active_tf = default_tf or interval.lower()
-
-    c          = COLORS
-    cd         = json.dumps(candles)
-    n_candles  = len(candles)
-    status_txt = "● LIVE" if is_live else "◎ SIM"
-    status_cls = "live"   if is_live else "sim"
-    run_sim    = "true"   if (not is_live and live_sim) else "false"
-
-    # ── Visibilité des sections ──
-    hdr_display  = "flex"   if show_header else "none"
-    bbar_display = "flex"   if show_bottom else "none"
-    vol_init_js  = "true"   if show_volume else "false"
-    ma_init_js   = "true"   if show_ma     else "false"
-    bb_init_js   = "true"   if show_bb     else "false"
-
-    data_info = (
-        f"{DATA_SOURCE.upper()} · {n_candles} bougies · LIVE"
-        if is_live else
-        f"MOCK · {n_candles} bougies ({DATA_SOURCE} indisponible)"
-    )
-
-    iv_sec = {
-        "1m":60,"5m":300,"15m":900,"30m":1800,
-        "1h":3600,"4h":14400,"1d":86400,"1w":604800
-    }.get(interval.lower(), 14400)
-
-    return f"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
-:root{{
-  --bg:#131722;--surface:#1e222d;--surface2:#2a2e39;
-  --border:#2a2e39;--border2:#363a45;
-  --text:#d1d4dc;--text2:#b2b5be;--muted:#787b86;
-  --faint:#50535e;--fainter:#363a45;
-  --orange:#ff9800;--yellow:#f0b429;
-  --green:#26a69a;--green2:#00e676;
-  --red:#ef5350;--red2:#ff5252;
-  --bull:#26a69a;--bear:#ef5350;
-  --bull-bg:rgba(38,166,154,0.15);--bear-bg:rgba(239,83,80,0.15);
-}}
-*{{margin:0;padding:0;box-sizing:border-box;}}
-html,body{{
-  background:var(--bg);color:var(--text);
-  font-family:'IBM Plex Mono',monospace;font-size:12px;
-  width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column;
-}}
-
-/* ── HEADER ── */
-.hdr{{display:flex;align-items:center;background:var(--surface);
-  border-bottom:1px solid var(--border2);height:46px;padding:0 12px;gap:0;flex-shrink:0;}}
-.logo{{font-weight:700;font-size:12px;letter-spacing:2px;color:var(--orange);
-  padding-right:14px;border-right:1px solid var(--border2);margin-right:14px;white-space:nowrap;}}
-.pair{{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.5px;margin-right:8px;}}
-.exch{{font-size:9px;color:var(--faint);letter-spacing:1px;margin-right:16px;}}
-.price-big{{font-size:20px;font-weight:700;letter-spacing:-0.5px;transition:color .15s;margin-right:6px;}}
-.price-chg{{font-size:11px;padding:2px 7px;border-radius:3px;font-weight:600;margin-right:16px;}}
-.price-chg.up{{background:rgba(38,166,154,0.15);color:var(--bull);}}
-.price-chg.dn{{background:rgba(239,83,80,0.15);color:var(--bear);}}
-.ohlc-row{{display:flex;gap:16px;align-items:center;}}
-.ohlc-item{{display:flex;flex-direction:column;gap:1px;}}
-.ohlc-lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
-.ohlc-val{{font-size:11px;font-weight:600;}}
-.hdr-right{{margin-left:auto;display:flex;align-items:center;gap:12px;}}
-.live-badge{{font-size:9px;padding:2px 8px;border-radius:2px;letter-spacing:1px;font-weight:700;}}
-.live-badge.live{{color:#00e676;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);animation:pulse 1.5s infinite;}}
-.live-badge.sim{{color:var(--orange);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.3);}}
-@keyframes pulse{{0%,100%{{opacity:1;}}50%{{opacity:0.4;}}}}
-
-/* ── TOOLBAR (timeframes) ── */
-.toolbar{{display:flex;align-items:center;background:var(--surface);
-  border-bottom:1px solid var(--border2);height:34px;padding:0 8px;gap:2px;flex-shrink:0;}}
-.tf-btn{{padding:3px 9px;border:none;background:transparent;color:var(--muted);
-  font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
-  border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.5px;}}
-.tf-btn:hover{{background:var(--surface2);color:var(--text);}}
-.tf-btn.active{{background:rgba(255,152,0,0.12);color:var(--orange);}}
-.tb-sep{{width:1px;height:18px;background:var(--border2);margin:0 4px;}}
-.indicator-btn{{padding:3px 9px;border:1px solid var(--border2);background:transparent;
-  color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;
-  border-radius:3px;transition:all .1s;}}
-.indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
-.indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
-
-/* ── CHART ZONE ── */
-.chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
-#cvMain{{display:block;cursor:crosshair;}}
-.vol-sep{{height:1px;background:var(--border);flex-shrink:0;}}
-#cvVol{{display:block;background:var(--bg);flex-shrink:0;}}
-
-/* ── TOOLTIP FLOTTANT ── */
-#tooltip{{
-  position:fixed;pointer-events:none;z-index:9999;
-  background:var(--surface);border:1px solid var(--border2);
-  padding:8px 12px;border-radius:4px;font-size:10px;
-  box-shadow:0 4px 16px rgba(0,0,0,0.6);display:none;
-  min-width:160px;
-}}
-#tooltip .tt-date{{color:var(--muted);font-size:9px;margin-bottom:6px;letter-spacing:1px;}}
-#tooltip .tt-row{{display:flex;justify-content:space-between;gap:16px;margin:2px 0;}}
-#tooltip .tt-lbl{{color:var(--faint);font-size:9px;}}
-#tooltip .tt-val{{font-weight:600;font-size:10px;}}
-
-/* ── BOTTOM BAR ── */
-.bbar{{display:flex;background:var(--surface);border-top:1px solid var(--border2);
-  height:36px;flex-shrink:0;}}
-.bstat{{flex:1;padding:0 14px;border-right:1px solid var(--border);
-  display:flex;align-items:center;gap:8px;}}
-.bstat:last-child{{border-right:none;}}
-.bstat .lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
-.bstat .val{{font-size:12px;font-weight:700;}}
-
-::-webkit-scrollbar{{width:4px;}}
-::-webkit-scrollbar-track{{background:var(--bg);}}
-::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:2px;}}
-
-/* ── MODE DROPDOWN ── */
-.mode-wrap{{position:relative;margin-left:auto;}}
-.mode-btn{{
-  display:flex;align-items:center;gap:8px;padding:0 12px;height:34px;
-  cursor:pointer;background:transparent;border:none;
-  border-left:1px solid var(--border2);
-  font-family:'IBM Plex Mono',monospace;
-  transition:background .12s;
-}}
-.mode-btn:hover{{background:var(--surface2);}}
-.mode-icon{{font-size:13px;}}
-.mode-info{{display:flex;flex-direction:column;gap:1px;text-align:left;}}
-.mode-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);}}
-.mode-sub{{font-size:8px;color:var(--faint);}}
-.mode-caret{{font-size:8px;color:var(--faint);transition:transform .15s;margin-left:4px;}}
-.mode-caret.open{{transform:rotate(180deg);}}
-
-/* Couleur selon mode */
-.mode-btn[data-mode="normal"] .mode-lbl{{color:var(--text2);}}
-.mode-btn[data-mode="pro"]    .mode-lbl{{color:var(--orange);}}
-.mode-btn[data-mode="quant"]  .mode-lbl{{color:var(--yellow);}}
-.mode-btn[data-mode="normal"] {{border-bottom:2px solid var(--border2);}}
-.mode-btn[data-mode="pro"]    {{border-bottom:2px solid var(--orange);}}
-.mode-btn[data-mode="quant"]  {{border-bottom:2px solid var(--yellow);}}
-
-.mode-dd{{
-  display:none;position:absolute;top:100%;right:0;
-  background:var(--surface);border:1px solid var(--border2);
-  min-width:190px;z-index:9999;
-  box-shadow:0 8px 24px rgba(0,0,0,0.7);
-}}
-.mode-dd.open{{display:block;}}
-.mode-opt{{
-  display:flex;align-items:center;gap:12px;
-  padding:10px 14px;cursor:pointer;
-  border-bottom:1px solid var(--border);
-  transition:background .1s;
-}}
-.mode-opt:last-child{{border-bottom:none;}}
-.mode-opt:hover{{background:var(--surface2);}}
-.mode-opt.active{{background:rgba(255,152,0,0.05);}}
-.mo-icon{{font-size:16px;min-width:20px;}}
-.mo-text{{flex:1;}}
-.mo-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}}
-.mo-desc{{font-size:9px;color:var(--faint);margin-top:2px;}}
-.mo-check{{font-size:11px;color:var(--orange);opacity:0;}}
-.mode-opt.active .mo-check{{opacity:1;}}
-.mo-badge{{font-size:8px;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;
-  background:rgba(255,152,0,0.1);color:var(--orange);border:1px solid rgba(255,152,0,0.2);}}
-</style>
-</head>
-<body>
-
-<!-- HEADER -->
-<div class="hdr" style="display:{hdr_display}">
-  <div class="logo">AM<span style="color:#fff">.</span>TERMINAL</div>
-  <div class="pair">{pair_disp}</div>
-  <div class="exch">{exchange}</div>
-  <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:1px;">{DATA_SOURCE.upper()}</div>
-  <div class="price-big" id="curPrice">—</div>
-  <div class="price-chg up" id="curChg">—</div>
-  <div class="ohlc-row">
-    <div class="ohlc-item"><div class="ohlc-lbl">O</div><div class="ohlc-val" id="ho">—</div></div>
-    <div class="ohlc-item"><div class="ohlc-lbl">H</div><div class="ohlc-val" id="hh" style="color:var(--bull)">—</div></div>
-    <div class="ohlc-item"><div class="ohlc-lbl">L</div><div class="ohlc-val" id="hl" style="color:var(--bear)">—</div></div>
-    <div class="ohlc-item"><div class="ohlc-lbl">C</div><div class="ohlc-val" id="hc">—</div></div>
-  </div>
-  <div class="hdr-right">
-    <span class="live-badge {status_cls}" id="apiBadge">{status_txt}</span>
-  </div>
-</div>
-
-<!-- TOOLBAR -->
-<div class="toolbar">
-  <button class="tf-btn {'active' if active_tf=='1m' else ''}" onclick="setTF(this,'1m')">1m</button>
-  <button class="tf-btn {'active' if active_tf=='5m' else ''}" onclick="setTF(this,'5m')">5m</button>
-  <button class="tf-btn {'active' if active_tf=='15m' else ''}" onclick="setTF(this,'15m')">15m</button>
-  <button class="tf-btn {'active' if active_tf=='1h' else ''}" onclick="setTF(this,'1h')">1h</button>
-  <button class="tf-btn {'active' if active_tf=='4h' else ''}" onclick="setTF(this,'4h')">4h</button>
-  <button class="tf-btn {'active' if active_tf=='1d' else ''}" onclick="setTF(this,'1D')">1D</button>
-  <button class="tf-btn {'active' if active_tf=='1w' else ''}" onclick="setTF(this,'1W')">1W</button>
-  <div class="tb-sep"></div>
-  <button class="indicator-btn {'on' if show_ma else ''}" id="btnMA" onclick="toggleMA()">MA</button>
-  <button class="indicator-btn {'on' if show_volume else ''}" id="btnVol" onclick="toggleVol()">Vol</button>
-  <button class="indicator-btn {'on' if show_bb else ''}" id="btnBB" onclick="toggleBB()">BB</button>
-
-  <!-- MODE DROPDOWN -->
-  <div class="mode-wrap">
-    <button class="mode-btn" id="modeBtn" data-mode="normal" onclick="toggleModeDD()">
-      <span class="mode-icon" id="modeIcon">📊</span>
-      <div class="mode-info">
-        <div class="mode-lbl" id="modeLbl">Normal</div>
-        <div class="mode-sub" id="modeSub">Vue standard</div>
-      </div>
-      <span class="mode-caret" id="modeCaret">&#9660;</span>
-    </button>
-    <div class="mode-dd" id="modeDD">
-      <div class="mode-opt active" onclick="pickMode('normal','Normal','Vue standard','📊')">
-        <span class="mo-icon">📊</span>
-        <div class="mo-text">
-          <div class="mo-lbl" style="color:var(--text2)">Normal</div>
-          <div class="mo-desc">Bougies · MA · Volume</div>
-        </div>
-        <span class="mo-check">✓</span>
-      </div>
-      <div class="mode-opt" onclick="pickMode('pro','Pro','Vue avancée','⚡')">
-        <span class="mo-icon">⚡</span>
-        <div class="mo-text">
-          <div class="mo-lbl" style="color:var(--orange)">Pro</div>
-          <div class="mo-desc">Indicateurs avancés · RSI · MACD</div>
-        </div>
-        <span class="mo-badge">Bientôt</span>
-        <span class="mo-check">✓</span>
-      </div>
-      <div class="mode-opt" onclick="pickMode('quant','Quant','Algorithmique','🤖')">
-        <span class="mo-icon">🤖</span>
-        <div class="mo-text">
-          <div class="mo-lbl" style="color:var(--yellow)">Quant</div>
-          <div class="mo-desc">Signaux algo · Patterns · AI</div>
-        </div>
-        <span class="mo-badge">Bientôt</span>
-        <span class="mo-check">✓</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ZONE CHART -->
-<div class="chart-zone">
-  <canvas id="cvMain"></canvas>
-  <div class="vol-sep"></div>
-  <canvas id="cvVol"></canvas>
-</div>
-
-<!-- TOOLTIP -->
-<div id="tooltip">
-  <div class="tt-date" id="ttDate">—</div>
-  <div class="tt-row"><span class="tt-lbl">Open</span><span class="tt-val" id="ttO">—</span></div>
-  <div class="tt-row"><span class="tt-lbl">High</span><span class="tt-val" id="ttH" style="color:var(--bull)">—</span></div>
-  <div class="tt-row"><span class="tt-lbl">Low</span> <span class="tt-val" id="ttL" style="color:var(--bear)">—</span></div>
-  <div class="tt-row"><span class="tt-lbl">Close</span><span class="tt-val" id="ttC">—</span></div>
-  <div class="tt-row"><span class="tt-lbl">Vol</span><span class="tt-val" id="ttV" style="color:var(--muted)">—</span></div>
-</div>
-
-<!-- BOTTOM BAR -->
-<div class="bbar" style="display:{bbar_display}">
-  <div class="bstat"><span class="lbl">24H HIGH</span><span class="val" id="b_hi" style="color:var(--bull)">—</span></div>
-  <div class="bstat"><span class="lbl">24H LOW</span> <span class="val" id="b_lo" style="color:var(--bear)">—</span></div>
-  <div class="bstat"><span class="lbl">CHANGE</span>  <span class="val" id="b_chg">—</span></div>
-  <div class="bstat"><span class="lbl">VOLUME</span>  <span class="val" id="b_vol" style="color:var(--muted)">—</span></div>
-</div>
-
-<script>
-// ════════════════════════════════════════════════════════
-//  DONNÉES
-// ════════════════════════════════════════════════════════
-const HISTORICAL = {cd};
-const IV_SEC     = {iv_sec};
-
-const D = {{
-  t: HISTORICAL.map(r=>r.t),
-  o: HISTORICAL.map(r=>r.o),
-  h: HISTORICAL.map(r=>r.h),
-  l: HISTORICAL.map(r=>r.l),
-  c: HISTORICAL.map(r=>r.c),
-  v: HISTORICAL.map(r=>r.v),
-}};
-
-// ════════════════════════════════════════════════════════
-//  CONFIG RENDU
-// ════════════════════════════════════════════════════════
-const PAD  = {{l:0, r:72, t:8, b:24}};
-const VPAH = 80;   // hauteur volume
-let showMA  = {ma_init_js};
-let showVol = {vol_init_js};
-let showBB  = {bb_init_js};
-
-let VIEW_START = 0, VIEW_END = 0;
-let HOVER_IDX  = -1, HOVER_Y = -1;
-let isDragging = false, dragStartX = 0, dragStartView = 0;
-
-// ════════════════════════════════════════════════════════
-//  SIMULATION
-// ════════════════════════════════════════════════════════
-let simActive   = true;
-let simPrice    = D.c[D.c.length-1] || 100;
-let candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
-let prevPrice   = simPrice;
-const VOLATILITY = 0.0006;
-
-function simTick() {{
-  if(!simActive) return;
-  const now = Math.floor(Date.now()/1000);
-  const drift    = (Math.random()-0.499)*VOLATILITY;
-  const momentum = (simPrice-prevPrice)*0.12;
-  const noise    = (Math.random()-0.5)*simPrice*VOLATILITY*0.4;
-  prevPrice = simPrice;
-  simPrice  = Math.max(simPrice*(1+drift)+momentum+noise, 0.01);
-
-  if(now >= candleStart+IV_SEC) {{
-    candleStart = now;
-    D.t.push(now); D.o.push(simPrice); D.h.push(simPrice);
-    D.l.push(simPrice); D.c.push(simPrice); D.v.push(0);
-    if(D.t.length>350){{D.t.shift();D.o.shift();D.h.shift();D.l.shift();D.c.shift();D.v.shift();if(VIEW_START>0)VIEW_START--;}}
-    if(VIEW_END>=D.t.length-1) VIEW_END=D.t.length;
-  }} else {{
-    const i=D.t.length-1;
-    D.c[i]=simPrice;
-    if(simPrice>D.h[i])D.h[i]=simPrice;
-    if(simPrice<D.l[i])D.l[i]=simPrice;
-    D.v[i]+=Math.random()*0.3;
-  }}
-  applyHeaderPrice(simPrice, ((simPrice-D.o[0])/D.o[0]*100));
-  render();
-}}
-
-// ════════════════════════════════════════════════════════
-//  CANVAS
-// ════════════════════════════════════════════════════════
-const cvMain = document.getElementById('cvMain');
-const cvVol  = document.getElementById('cvVol');
-const ctxM   = cvMain.getContext('2d');
-const ctxV   = cvVol.getContext('2d');
-const $      = id => document.getElementById(id);
-const setTxt = (id,v) => {{ const e=$(id); if(e) e.textContent=v; }};
-const setCol = (id,c) => {{ const e=$(id); if(e) e.style.color=c; }};
-
-const fmt = v => {{
-  if(v==null||isNaN(v)) return '—';
-  if(v>=10000) return v.toLocaleString('en-US',{{minimumFractionDigits:2,maximumFractionDigits:2}});
-  if(v>=100)   return v.toFixed(2);
-  if(v>=1)     return v.toFixed(4);
-  return v.toFixed(6);
-}};
-const fmtV = v => v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v.toFixed(0);
-const fmtDate = ts => {{
-  const d=new Date(ts*1000);
-  return d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}})
-    +' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-}};
-
-function setupCanvas() {{
-  const W  = window.innerWidth  || 900;
-  const fullH = window.innerHeight || 600;
-  // Hauteurs fixes des zones UI
-  const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
-  const volH  = showVol ? VPAH : 0;
-  const mainH = Math.max(fullH - hdrH - tbH - bbarH - volH - sepH, 150);
-
-  cvMain.width=W; cvMain.height=mainH;
-  cvVol.width=W;  cvVol.height=volH;
-  cvMain.style.width=W+'px'; cvMain.style.height=mainH+'px';
-  cvVol.style.width=W+'px';  cvVol.style.height=volH+'px';
-  cvVol.style.display=showVol?'block':'none';
-  document.querySelector('.vol-sep').style.display=showVol?'block':'none';
-}}
-
-// ── Calcul MA ──
-function calcMA(data, period) {{
-  const out=[];
-  for(let i=0;i<data.length;i++) {{
-    if(i<period-1){{out.push(null);continue;}}
-    let s=0;for(let j=i-period+1;j<=i;j++) s+=data[j];
-    out.push(s/period);
-  }}
-  return out;
-}}
-
-// ── Calcul Bollinger Bands ──
-function calcBB(data, period=20, mult=2) {{
-  const ma=calcMA(data,period);
-  const upper=[],lower=[];
-  for(let i=0;i<data.length;i++) {{
-    if(ma[i]===null){{upper.push(null);lower.push(null);continue;}}
-    let v=0;for(let j=i-period+1;j<=i;j++) v+=Math.pow(data[j]-ma[i],2);
-    const sd=Math.sqrt(v/period);
-    upper.push(ma[i]+mult*sd);lower.push(ma[i]-mult*sd);
-  }}
-  return {{ma,upper,lower}};
-}}
-
-function drawMain() {{
-  const W=cvMain.width, H=cvMain.height;
-  const ctx=ctxM;
-  ctx.clearRect(0,0,W,H);
-
-  const N=VIEW_END-VIEW_START;
-  if(N<1) return;
-
-  const slice=(arr)=>arr.slice(VIEW_START,VIEW_END);
-  const ts=slice(D.t), os=slice(D.o), hs=slice(D.h), ls=slice(D.l), cs=slice(D.c);
-
-  const minP=Math.min(...ls);
-  const maxP=Math.max(...hs);
-  const pad =Math.max((maxP-minP)*0.05, maxP*0.001);
-  const lo=minP-pad, hi=maxP+pad, rng=hi-lo||1;
-
-  const CW=(W-PAD.l-PAD.r)/N;
-  const BW=Math.max(1, CW*0.75);
-  const toX=i=>PAD.l+i*CW+CW/2;
-  const toY=p=>PAD.t+(hi-p)/rng*(H-PAD.t-PAD.b);
-
-  // ── FOND ──
-  ctx.fillStyle='#131722';
-  ctx.fillRect(0,0,W,H);
-
-  // ── GRILLE HORIZONTALE ──
-  const gridSteps=6;
-  for(let s=0;s<=gridSteps;s++) {{
-    const y=PAD.t+s*(H-PAD.t-PAD.b)/gridSteps;
-    const price=hi-s*rng/gridSteps;
-    ctx.strokeStyle='#1e222d'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
-    // Prix axe droit
-    ctx.fillStyle='#787b86'; ctx.font='10px IBM Plex Mono,monospace';
-    ctx.textAlign='left'; ctx.fillText(fmt(price), W-PAD.r+6, y+4);
-  }}
-
-  // ── GRILLE VERTICALE + AXE TEMPS ──
-  ctx.fillStyle='#787b86'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='center';
-  const nTicks=Math.min(10,Math.max(3,Math.floor(N/15)));
-  const prevMonth={{val:-1}};
-  for(let t=0;t<=nTicks;t++) {{
-    const i=Math.floor(t*(N-1)/Math.max(nTicks,1));
-    const x=toX(i);
-    const d=new Date(ts[i]*1000);
-    ctx.strokeStyle='#1e222d'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H-PAD.b); ctx.stroke();
-    // Label : heure si intraday, date si daily+
-    let lbl;
-    if(IV_SEC<86400) {{
-      lbl=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-      if(d.getDate()!==prevMonth.val) {{
-        lbl=d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}});
-        prevMonth.val=d.getDate();
-      }}
-    }} else {{
-      lbl=d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}});
-    }}
-    ctx.fillText(lbl, x, H-6);
-  }}
-
-  // ── BOLLINGER BANDS ──
-  if(showBB) {{
-    const bbAll=calcBB(D.c,20,2);
-    const bbU=bbAll.upper.slice(VIEW_START,VIEW_END);
-    const bbL=bbAll.lower.slice(VIEW_START,VIEW_END);
-    const bbM=bbAll.ma.slice(VIEW_START,VIEW_END);
-
-    // Fill entre upper et lower
-    ctx.beginPath();
-    for(let i=0;i<N;i++) {{ if(bbU[i]!==null){{ const x=toX(i);i===0?ctx.moveTo(x,toY(bbU[i])):ctx.lineTo(x,toY(bbU[i])); }} }}
-    for(let i=N-1;i>=0;i--) {{ if(bbL[i]!==null){{ ctx.lineTo(toX(i),toY(bbL[i])); }} }}
-    ctx.closePath();
-    ctx.fillStyle='rgba(255,152,0,0.04)'; ctx.fill();
-
-    // Lignes upper/lower/middle
-    [bbU,bbL].forEach((band,bi)=>{{
-      ctx.beginPath(); let started=false;
-      for(let i=0;i<N;i++) {{
-        if(band[i]===null) continue;
-        started?ctx.lineTo(toX(i),toY(band[i])):ctx.moveTo(toX(i),toY(band[i]));
-        started=true;
-      }}
-      ctx.strokeStyle='rgba(255,152,0,0.4)'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
-    }});
-    ctx.beginPath(); let s2=false;
-    for(let i=0;i<N;i++) {{
-      if(bbM[i]===null) continue;
-      s2?ctx.lineTo(toX(i),toY(bbM[i])):ctx.moveTo(toX(i),toY(bbM[i]));
-      s2=true;
-    }}
-    ctx.strokeStyle='rgba(255,152,0,0.5)'; ctx.lineWidth=1; ctx.stroke();
-  }}
-
-  // ── MOVING AVERAGES ──
-  if(showMA) {{
-    const maConf=[
-      {{p:20,  color:'rgba(255,200,50,0.85)',  w:1.2}},
-      {{p:50,  color:'rgba(33,150,243,0.85)',  w:1.2}},
-      {{p:200, color:'rgba(255,82,82,0.85)',   w:1.5}},
-    ];
-    maConf.forEach(mc=>{{
-      const ma=calcMA(D.c,mc.p).slice(VIEW_START,VIEW_END);
-      ctx.beginPath(); let started=false;
-      for(let i=0;i<N;i++) {{
-        if(ma[i]===null) continue;
-        const x=toX(i), y=toY(ma[i]);
-        started?ctx.lineTo(x,y):ctx.moveTo(x,y);
-        started=true;
-      }}
-      ctx.strokeStyle=mc.color; ctx.lineWidth=mc.w; ctx.stroke();
-    }});
-    // Légende MA
-    ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='left';
-    [{{'p':20,'c':'rgba(255,200,50,0.85)'}},{{'p':50,'c':'rgba(33,150,243,0.85)'}},{{'p':200,'c':'rgba(255,82,82,0.85)'}}].forEach((m,i)=>{{
-      ctx.fillStyle=m.c;
-      ctx.fillText(`MA${{m.p}}`, 8+i*52, 18);
-    }});
-  }}
-
-  // ── BOUGIES ──
-  for(let i=0;i<N;i++) {{
-    const x=toX(i);
-    const oy=toY(os[i]), hy=toY(hs[i]), ly=toY(ls[i]), cy=toY(cs[i]);
-    const bull=cs[i]>=os[i];
-    const bullCol='#26a69a', bearCol='#ef5350';
-    const col=bull?bullCol:bearCol;
-
-    // Mèche
-    const wickW=Math.max(1, BW*0.1);
-    ctx.strokeStyle=col; ctx.lineWidth=wickW;
-    ctx.beginPath(); ctx.moveTo(x,hy); ctx.lineTo(x,ly); ctx.stroke();
-
-    // Corps
-    const top=Math.min(oy,cy);
-    const bH =Math.max(1, Math.abs(cy-oy));
-    const hw =Math.max(1, BW/2);
-
-    if(bull) {{
-      // Haussier : contour + fill semi-transparent (style TradingView)
-      ctx.fillStyle='rgba(38,166,154,0.15)';
-      ctx.fillRect(x-hw, top, hw*2, bH);
-      ctx.strokeStyle=bullCol; ctx.lineWidth=1.5;
-      ctx.strokeRect(x-hw, top, hw*2, bH);
-    }} else {{
-      // Baissier : plein
-      ctx.fillStyle=bearCol;
-      ctx.fillRect(x-hw, top, hw*2, bH);
-    }}
-
-    // Dernière bougie — halo pulsant
-    if(i===N-1) {{
-      const glow=1.5+Math.sin(Date.now()/300)*1;
-      ctx.strokeStyle=bull?'rgba(38,166,154,0.6)':'rgba(239,83,80,0.6)';
-      ctx.lineWidth=1;
-      ctx.strokeRect(x-hw-glow, top-glow, hw*2+glow*2, bH+glow*2);
-    }}
-  }}
-
-  // ── LIGNE PRIX ACTUEL ──
-  const lastC=cs[N-1], lastO=os[N-1];
-  const lastBull=lastC>=lastO;
-  const py=toY(lastC);
-  // Ligne pointillée
-  ctx.strokeStyle=lastBull?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)';
-  ctx.lineWidth=1; ctx.setLineDash([4,4]);
-  ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(W-PAD.r,py); ctx.stroke();
-  ctx.setLineDash([]);
-  // Tag prix
-  const tagCol=lastBull?'#26a69a':'#ef5350';
-  ctx.fillStyle=tagCol;
-  ctx.beginPath();
-  ctx.roundRect(W-PAD.r+2, py-9, PAD.r-4, 18, 2);
-  ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='left';
-  ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
-
-  // ── CROSSHAIR ──
-  if(HOVER_IDX>=0 && HOVER_IDX<N) {{
-    const x=toX(HOVER_IDX);
-    // Ligne verticale
-    ctx.strokeStyle='rgba(132,142,156,0.4)'; ctx.lineWidth=1; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H); ctx.stroke();
-    // Ligne horizontale
-    if(HOVER_Y>0) {{
-      ctx.beginPath(); ctx.moveTo(0,HOVER_Y); ctx.lineTo(W-PAD.r,HOVER_Y); ctx.stroke();
-      // Tag prix crosshair à droite
-      const hp=hi-(HOVER_Y-PAD.t)/((H-PAD.t-PAD.b))*rng;
-      ctx.fillStyle='#363a45';
-      ctx.beginPath(); ctx.roundRect(W-PAD.r+2,HOVER_Y-9,PAD.r-4,18,2); ctx.fill();
-      ctx.fillStyle='#d1d4dc'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='left';
-      ctx.fillText(fmt(hp), W-PAD.r+5, HOVER_Y+4);
-    }}
-    // Label date en bas
-    const d=new Date(ts[HOVER_IDX]*1000);
-    const dateLbl=fmtDate(ts[HOVER_IDX]);
-    ctx.fillStyle='#363a45'; ctx.textAlign='center';
-    const tw=ctx.measureText(dateLbl).width+12;
-    ctx.beginPath(); ctx.roundRect(x-tw/2, H-PAD.b+2, tw, 16, 2); ctx.fill();
-    ctx.fillStyle='#d1d4dc'; ctx.font='9px IBM Plex Mono,monospace';
-    ctx.fillText(dateLbl, x, H-PAD.b+13);
-
-    // Mise à jour OHLC header
-    const ri=VIEW_START+HOVER_IDX;
-    const bull2=D.c[ri]>=D.o[ri];
-    setTxt('ho',fmt(D.o[ri])); setCol('ho',bull2?'var(--bull)':'var(--bear)');
-    setTxt('hh',fmt(D.h[ri])); setCol('hh','var(--bull)');
-    setTxt('hl',fmt(D.l[ri])); setCol('hl','var(--bear)');
-    setTxt('hc',fmt(D.c[ri])); setCol('hc',bull2?'var(--bull)':'var(--bear)');
-  }}
-}}
-
-function drawVol() {{
-  if(!showVol) return;
-  const W=cvVol.width, H=cvVol.height;
-  const ctx=ctxV;
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#131722'; ctx.fillRect(0,0,W,H);
-
-  const N=VIEW_END-VIEW_START;
-  if(!N||H<4) return;
-  const vs=D.v.slice(VIEW_START,VIEW_END);
-  const maxV=Math.max(...vs)||1;
-  const CW=(W-PAD.l-PAD.r)/N;
-
-  // MA volume (20)
-  const maV=calcMA(D.v,20).slice(VIEW_START,VIEW_END);
-
-  for(let i=0;i<N;i++) {{
-    const bh=Math.max(1,(vs[i]/maxV)*(H-4));
-    const bull=D.c[VIEW_START+i]>=D.o[VIEW_START+i];
-    ctx.fillStyle=bull?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)';
-    ctx.fillRect(PAD.l+i*CW+1, H-bh, Math.max(1,CW-2), bh);
-  }}
-
-  // MA volume line
-  ctx.beginPath(); let s=false;
-  for(let i=0;i<N;i++) {{
-    if(maV[i]===null) continue;
-    const x=PAD.l+i*CW+CW/2;
-    const y=H-(maV[i]/maxV)*(H-4);
-    s?ctx.lineTo(x,y):ctx.moveTo(x,y); s=true;
-  }}
-  ctx.strokeStyle='rgba(255,152,0,0.7)'; ctx.lineWidth=1; ctx.stroke();
-
-  // Label
-  ctx.fillStyle='#50535e'; ctx.font='8px IBM Plex Mono,monospace';
-  ctx.textAlign='left'; ctx.fillText('VOLUME', 4, 10);
-}}
-
-function render() {{ drawMain(); drawVol(); }}
-
-function applyHeaderPrice(price, pct) {{
-  const bull=parseFloat(pct)>=0;
-  const clr=bull?'var(--bull)':'var(--bear)';
-  const pe=$('curPrice'), ce=$('curChg');
-  if(pe) {{ pe.textContent=fmt(price); pe.style.color=clr; }}
-  if(ce) {{
-    ce.textContent=(bull?'▲ +':'▼ ')+Math.abs(parseFloat(pct)).toFixed(2)+'%';
-    ce.className='price-chg '+(bull?'up':'dn');
-  }}
-}}
-
-function updateStats() {{
-  const N=D.c.length; if(!N) return;
-  const last=D.c[N-1];
-  const h24=Math.max(...D.h.slice(-96)), l24=Math.min(...D.l.slice(-96));
-  const vol=D.v.slice(-96).reduce((a,b)=>a+b,0);
-  const chg=((last-D.o[Math.max(0,N-96)])/D.o[Math.max(0,N-96)]*100);
-  const bull=chg>=0;
-  applyHeaderPrice(last,chg);
-  setTxt('statVol',fmtV(vol));
-  setTxt('b_hi',fmt(h24)); setTxt('b_lo',fmt(l24));
-  setTxt('b_chg',(bull?'+':'')+chg.toFixed(2)+'%'); setCol('b_chg',bull?'var(--bull)':'var(--bear)');
-  setTxt('b_vol',fmtV(vol));
-  // OHLC header = dernière bougie
-  setTxt('ho',fmt(D.o[N-1])); setTxt('hh',fmt(D.h[N-1]));
-  setTxt('hl',fmt(D.l[N-1])); setTxt('hc',fmt(D.c[N-1]));
-}}
-
-// ════════════════════════════════════════════════════════
-//  INTERACTIONS SOURIS
-// ════════════════════════════════════════════════════════
-cvMain.addEventListener('mousemove', e => {{
-  const rect=cvMain.getBoundingClientRect();
-  const mx=e.clientX-rect.left;
-  const my=e.clientY-rect.top;
-  HOVER_Y=my;
-
-  if(isDragging) {{
-    const N=VIEW_END-VIEW_START;
-    const CW=(cvMain.width-PAD.l-PAD.r)/N;
-    const shift=Math.round(-(e.clientX-dragStartX)/CW);
-    const totalN=D.t.length;
-    let s=Math.max(0,Math.min(totalN-N,dragStartView+shift));
-    VIEW_START=s; VIEW_END=s+N;
-    render(); return;
-  }}
-
-  const N=VIEW_END-VIEW_START;
-  const CW=(cvMain.width-PAD.l-PAD.r)/N;
-  HOVER_IDX=Math.max(0,Math.min(N-1,Math.floor((mx-PAD.l)/CW)));
-
-  // Tooltip flottant
-  const ri=VIEW_START+HOVER_IDX;
-  const tt=$('tooltip');
-  if(tt && ri>=0 && ri<D.t.length) {{
-    const bull2=D.c[ri]>=D.o[ri];
-    tt.style.display='block';
-    // Position : éviter bords
-    let tx=e.clientX+16, ty=e.clientY-80;
-    if(tx+180>window.innerWidth) tx=e.clientX-196;
-    if(ty<0) ty=e.clientY+10;
-    tt.style.left=tx+'px'; tt.style.top=ty+'px';
-    setTxt('ttDate', fmtDate(D.t[ri]));
-    setTxt('ttO', fmt(D.o[ri])); setCol('ttO', bull2?'var(--bull)':'var(--bear)');
-    setTxt('ttH', fmt(D.h[ri]));
-    setTxt('ttL', fmt(D.l[ri]));
-    setTxt('ttC', fmt(D.c[ri])); setCol('ttC', bull2?'var(--bull)':'var(--bear)');
-    setTxt('ttV', fmtV(D.v[ri]));
-  }}
-  drawMain();
-}});
-
-cvMain.addEventListener('mousedown', e => {{
-  isDragging=true; dragStartX=e.clientX; dragStartView=VIEW_START;
-  cvMain.style.cursor='grabbing';
-}});
-window.addEventListener('mouseup', () => {{
-  isDragging=false; cvMain.style.cursor='crosshair';
-}});
-cvMain.addEventListener('mouseleave', () => {{
-  HOVER_IDX=-1; HOVER_Y=-1;
-  const tt=$('tooltip'); if(tt) tt.style.display='none';
-  // Remettre OHLC de la dernière bougie
-  const N=D.c.length;
-  if(N) {{ setTxt('ho',fmt(D.o[N-1])); setTxt('hh',fmt(D.h[N-1])); setTxt('hl',fmt(D.l[N-1])); setTxt('hc',fmt(D.c[N-1])); }}
-  drawMain();
-}});
-
-// Scroll = zoom
-cvMain.addEventListener('wheel', e => {{
-  e.preventDefault();
-  const N=VIEW_END-VIEW_START;
-  const factor=e.deltaY>0?1.1:0.9;
-  const newN=Math.max(20,Math.min(D.t.length,Math.round(N*factor)));
-  const center=HOVER_IDX>=0?VIEW_START+HOVER_IDX:Math.floor((VIEW_START+VIEW_END)/2);
-  let s=Math.max(0,center-Math.floor(newN/2));
-  let en=s+newN;
-  if(en>D.t.length){{en=D.t.length;s=Math.max(0,en-newN);}}
-  VIEW_START=s; VIEW_END=en;
-  render();
-}},{{passive:false}});
-
-// ════════════════════════════════════════════════════════
-//  TIMEFRAME & INDICATEURS
-// ════════════════════════════════════════════════════════
-// ── Variable globale mode ──
-let CHART_MODE = 'normal';  // 'normal' | 'pro' | 'quant'
-
-function setTF(btn,tf) {{
-  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  console.log('[AM.Terminal] TF →', tf);
-}}
-
-function toggleModeDD() {{
-  $('modeDD').classList.toggle('open');
-  $('modeCaret').classList.toggle('open');
-}}
-
-function pickMode(key, lbl, sub, icon) {{
-  CHART_MODE = key;
-  // Mettre à jour le bouton
-  const btn = $('modeBtn');
-  btn.setAttribute('data-mode', key);
-  $('modeLbl').textContent = lbl;
-  $('modeSub').textContent = sub;
-  $('modeIcon').textContent = icon;
-  // Coches
-  document.querySelectorAll('.mode-opt').forEach(el => {{
-    el.classList.remove('active');
-    el.querySelector('.mo-check').style.opacity = '0';
-  }});
-  const opts = document.querySelectorAll('.mode-opt');
-  const idx = ['normal','pro','quant'].indexOf(key);
-  if(idx>=0) {{
-    opts[idx].classList.add('active');
-    opts[idx].querySelector('.mo-check').style.opacity = '1';
-  }}
-  // Fermer le dropdown
-  $('modeDD').classList.remove('open');
-  $('modeCaret').classList.remove('open');
-
-  // ─────────────────────────────────────────────
-  //  TODO : logique par mode
-  //  CHART_MODE === 'normal' → bougies + MA + Vol
-  //  CHART_MODE === 'pro'    → + RSI + MACD + panels
-  //  CHART_MODE === 'quant'  → + signaux algo + patterns
-  // ─────────────────────────────────────────────
-  console.log('[AM.Terminal] Mode →', key);
-  render();
-}}
-
-// Fermer dropdown si clic extérieur
-document.addEventListener('click', e => {{
-  const w = document.querySelector('.mode-wrap');
-  if(w && !w.contains(e.target)) {{
-    $('modeDD').classList.remove('open');
-    $('modeCaret').classList.remove('open');
-  }}
-}});
-function toggleMA() {{
-  showMA=!showMA; $('btnMA').classList.toggle('on',showMA); render();
-}}
-function toggleVol() {{
-  showVol=!showVol; $('btnVol').classList.toggle('on',showVol);
-  setupCanvas(); render();
-}}
-function toggleBB() {{
-  showBB=!showBB; $('btnBB').classList.toggle('on',showBB); render();
-}}
-
-// ════════════════════════════════════════════════════════
-//  PRIX TEMPS RÉEL
-// ════════════════════════════════════════════════════════
-let ws=null;
-
-function applyPriceUpdate(price, chg24, vol24, high24, low24) {{
-  const bull=parseFloat(chg24)>=0;
-  const last=D.t.length-1;
-  if(last>=0){{ D.c[last]=price; if(price>D.h[last])D.h[last]=price; if(price<D.l[last])D.l[last]=price; }}
-  applyHeaderPrice(price, chg24);
-  const fV=v=>v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':(v||0).toFixed(0);
-  if(vol24){{ setTxt('b_vol',fV(vol24)); }}
-  if(high24){{ setTxt('b_hi',fmt(high24)); }}
-  if(low24) {{ setTxt('b_lo',fmt(low24)); }}
-  setTxt('b_chg',(bull?'+':'')+parseFloat(chg24).toFixed(2)+'%');
-  setCol('b_chg',bull?'var(--bull)':'var(--bear)');
-  const badge=$('apiBadge');
-  if(badge){{ badge.textContent='● LIVE'; badge.className='live-badge live'; }}
-  render();
-}}
-
-function startBinanceWS() {{
-  const sym='{binance_symbol}'.toLowerCase();
-  if(!sym||sym==='undefined'){{ startFallbackPolling(); return; }}
-  ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`);
-  ws.onopen=()=>{{ simActive=false; console.log('[AM.Terminal] WS Binance connecté'); }};
-  ws.onmessage=e=>{{
-    try {{
-      const d=(JSON.parse(e.data).data)||JSON.parse(e.data);
-      const p=parseFloat(d.c);
-      if(!isNaN(p)) applyPriceUpdate(p,parseFloat(d.P),parseFloat(d.q),parseFloat(d.h),parseFloat(d.l));
-    }} catch(err) {{}}
-  }};
-  ws.onclose=()=>{{ setTimeout(startBinanceWS,5000); }};
-  ws.onerror=()=>{{ simActive=false; ws.close(); startFallbackPolling(); }};
-}}
-
-async function fetchLivePrice() {{
-  try {{
-    const id='{coingecko_id}';
-    const res=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${{id}}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true`,{{signal:AbortSignal.timeout(8000)}});
-    const json=await res.json(); const data=json[id];
-    if(data) applyPriceUpdate(data.usd,data.usd_24h_change,data.usd_24h_vol,null,null);
-  }} catch(e) {{}}
-}}
-function startFallbackPolling(){{ fetchLivePrice(); setInterval(fetchLivePrice,15000); }}
-
-// ════════════════════════════════════════════════════════
-//  INIT
-// ════════════════════════════════════════════════════════
-const RUN_SIM = {run_sim};
-console.log('[AM.Terminal] {data_info}');
-
-function init() {{
-  setupCanvas();
-  VIEW_START=Math.max(0,D.t.length-120);
-  VIEW_END=D.t.length;
-  render();
-  updateStats();
-  startBinanceWS();
-  if(RUN_SIM) {{
-    setInterval(simTick, 400);
-    setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 100);
-  }} else {{
-    setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 200);
-  }}
-}}
-
-window.addEventListener('load', init);
-window.addEventListener('resize', ()=>{{ setupCanvas(); render(); }});
-</script>
-</body>
-</html>"""
+    if query in mapping:
+        ticker = mapping[query]
+    else:
+        ticker = query
+    if ":" in ticker:
+        return ticker
+    ticker = ticker.replace("-USD", "").replace("USDT", "").replace("USD", "")
+    return f"BINANCE:{ticker}USDT"
+
+@st.cache_data(ttl=300)
+def get_crypto_news(source):
+    news_items = []
+    rss_urls = {
+        "CoinDesk":      "https://www.coindesk.com/arc/outboundfeeds/rss/",
+        "CoinTelegraph": "https://cointelegraph.com/rss",
+        "Decrypt":       "https://decrypt.co/feed",
+        "Cryptoast":     "https://cryptoast.fr/feed/"
+    }
+    url = rss_urls.get(source)
+    if not url:
+        return []
+    try:
+        feed = feedparser.parse(url)
+        for entry in feed.entries[:15]:
+            try:
+                dt = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.now()
+                time_str = dt.strftime("%H:%M")
+            except:
+                time_str = "--:--"
+            news_items.append({
+                'title': entry.title,
+                'link':  entry.link,
+                'time':  time_str,
+                'source': source
+            })
+    except:
+        pass
+    return news_items
+
+@st.cache_data(ttl=60)
+def get_crypto_movers():
+    top_cryptos = [
+        "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "ADA-USD",
+        "AVAX-USD", "DOGE-USD", "DOT-USD", "LINK-USD", "MATIC-USD"
+    ]
+    movers = []
+    for symbol in top_cryptos:
+        try:
+            t = yf.Ticker(symbol)
+            info = t.fast_info
+            price      = info['last_price']
+            prev_close = info['previous_close']
+            change     = ((price - prev_close) / prev_close) * 100
+            name       = symbol.replace("-USD", "")
+            movers.append({"name": name, "price": price, "change": change})
+        except:
+            pass
+    return sorted(movers, key=lambda x: abs(x['change']), reverse=True)
+
+# ============================================
+# 2. FONCTIONS ON-CHAIN (Binance Futures API)
+# ============================================
+
+@st.cache_data(ttl=60)
+def get_funding_rates():
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT"]
+    results = []
+    try:
+        # On récupère tout d'un coup pour plus de fiabilité
+        url = "https://fapi.binance.com/fapi/v1/premiumIndex"
+        data = requests.get(url, headers=HEADERS, timeout=5).json()
+        if isinstance(data, list):
+            for sym in symbols:
+                item = next((x for x in data if x.get('symbol') == sym), None)
+                if item:
+                    results.append({
+                        "symbol": sym.replace("USDT", ""),
+                        "rate": float(item.get("lastFundingRate", 0)) * 100,
+                        "mark": float(item.get("markPrice", 0))
+                    })
+    except: pass
+    return results
+
+@st.cache_data(ttl=60)
+def get_open_interest():
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT"]
+    results = []
+    try:
+        for sym in symbols:
+            url_oi = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={sym}"
+            url_px = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={sym}"
+            oi_data = requests.get(url_oi, headers=HEADERS, timeout=3).json()
+            px_data = requests.get(url_px, headers=HEADERS, timeout=3).json()
+            
+            oi = float(oi_data.get("openInterest", 0))
+            mark = float(px_data.get("markPrice", 0))
+            if oi > 0:
+                results.append({"symbol": sym.replace("USDT", ""), "oi": oi, "oi_usd": oi * mark})
+    except: pass
+    return results
+
+@st.cache_data(ttl=300)
+def get_btc_dominance():
+    """Récupère la dominance réelle via CoinGecko"""
+    try:
+        url = "https://api.coingecko.com/api/v3/global"
+        data = requests.get(url, headers=HEADERS, timeout=5).json()
+        dom = data['data']['market_cap_percentage']['btc']
+        return round(dom, 1)
+    except:
+        return 54.0
+
+@st.cache_data(ttl=300)
+def get_fear_greed():
+    try:
+        data = requests.get("https://api.alternative.me/fng/?limit=1", timeout=5).json()
+        return int(data["data"][0]["value"]), data["data"][0]["value_classification"]
+    except: return None, None
+
+
+@st.cache_data(ttl=60)
+def get_ls_ratio():
+    """Ratio Long/Short via Binance Futures (Corrigé avec Headers)"""
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    results = []
+    
+    # On utilise les mêmes headers que pour les prix et le funding
+    for sym in symbols:
+        try:
+            # Endpoint officiel pour le ratio global des comptes
+            url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={sym}&period=5m&limit=1"
+            
+            response = requests.get(url, headers=HEADERS, timeout=5)
+            data = response.json()
+
+            if data and isinstance(data, list) and len(data) > 0:
+                # Le ratio est : longs / shorts
+                ratio = float(data[0].get("longShortRatio", 1))
+                
+                # Calcul des pourcentages
+                longs_pct = round((ratio / (1 + ratio)) * 100, 1)
+                shorts_pct = round(100 - longs_pct, 1)
+                
+                results.append({
+                    "symbol": sym.replace("USDT", ""),
+                    "longs":  longs_pct,
+                    "shorts": shorts_pct,
+                    "ratio": round(ratio, 2)
+                })
+        except Exception as e:
+            # Optionnel : décommenter pour voir l'erreur en cas de bug
+            # print(f"Erreur L/S pour {sym}: {e}")
+            pass
+            
+    return results
+
+# ============================================
+# 3. RENDU ON-CHAIN PANEL
+# ============================================
+
+def render_onchain_panel():
+    """Panel On-Chain complet : métriques macro + 4 sous-onglets"""
+
+    # ── Métriques macro (toujours visibles en haut) ──────────────────
+    fg_val, fg_label = get_fear_greed()
+    funding_data     = get_funding_rates()
+    oi_data          = get_open_interest()
+    btc_funding      = next((f for f in funding_data if f["symbol"] == "BTC"), None)
+    btc_oi           = next((o for o in oi_data      if o["symbol"] == "BTC"), None)
+
+    m1, m2, m3, m4 = st.columns(4)
+
+    with m1:
+        if fg_val is not None:
+            fc = "#00ffad" if fg_val >= 60 else "#ff9800" if fg_val >= 40 else "#ff4b4b"
+            st.markdown(f"""
+            <div style='background:#111;border:1px solid #1a1a1a;border-top:2px solid {fc};
+                        padding:10px;border-radius:4px;text-align:center;'>
+                <div style='color:#666;font-size:9px;letter-spacing:1px;font-family:monospace;'>FEAR & GREED</div>
+                <div style='color:{fc};font-size:22px;font-weight:900;font-family:monospace;'>{fg_val}</div>
+                <div style='color:#444;font-size:9px;font-family:monospace;'>{fg_label.upper()}</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style='background:#111;border:1px solid #1a1a1a;padding:10px;border-radius:4px;text-align:center;'>
+                <div style='color:#666;font-size:9px;font-family:monospace;'>FEAR & GREED</div>
+                <div style='color:#444;font-size:14px;font-family:monospace;'>N/A</div>
+            </div>""", unsafe_allow_html=True)
+
+    with m2:
+        st.markdown("""
+        <div style='background:#111;border:1px solid #1a1a1a;border-top:2px solid #FABE2C;
+                    padding:10px;border-radius:4px;text-align:center;'>
+            <div style='color:#666;font-size:9px;letter-spacing:1px;font-family:monospace;'>BTC DOMINANCE</div>
+            <div style='color:#FABE2C;font-size:22px;font-weight:900;font-family:monospace;'>~54%</div>
+            <div style='color:#444;font-size:9px;font-family:monospace;'>APPROX. LIVE</div>
+        </div>""", unsafe_allow_html=True)
+
+    with m3:
+        if btc_funding:
+            fc2  = "#00ffad" if btc_funding["rate"] >= 0 else "#ff4b4b"
+            sign = "+" if btc_funding["rate"] >= 0 else ""
+            st.markdown(f"""
+            <div style='background:#111;border:1px solid #1a1a1a;border-top:2px solid {fc2};
+                        padding:10px;border-radius:4px;text-align:center;'>
+                <div style='color:#666;font-size:9px;letter-spacing:1px;font-family:monospace;'>BTC FUNDING</div>
+                <div style='color:{fc2};font-size:22px;font-weight:900;font-family:monospace;'>
+                    {sign}{btc_funding["rate"]:.4f}%
+                </div>
+                <div style='color:#444;font-size:9px;font-family:monospace;'>BINANCE FUTURES</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style='background:#111;border:1px solid #1a1a1a;padding:10px;border-radius:4px;text-align:center;'>
+                <div style='color:#666;font-size:9px;font-family:monospace;'>BTC FUNDING</div>
+                <div style='color:#444;font-size:14px;font-family:monospace;'>N/A</div>
+            </div>""", unsafe_allow_html=True)
+
+    with m4:
+        if btc_oi:
+            oi_b = btc_oi["oi_usd"] / 1e9
+            st.markdown(f"""
+            <div style='background:#111;border:1px solid #1a1a1a;border-top:2px solid #00ffad;
+                        padding:10px;border-radius:4px;text-align:center;'>
+                <div style='color:#666;font-size:9px;letter-spacing:1px;font-family:monospace;'>BTC OPEN INT.</div>
+                <div style='color:#00ffad;font-size:22px;font-weight:900;font-family:monospace;'>${oi_b:.1f}B</div>
+                <div style='color:#444;font-size:9px;font-family:monospace;'>BINANCE FUTURES</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style='background:#111;border:1px solid #1a1a1a;padding:10px;border-radius:4px;text-align:center;'>
+                <div style='color:#666;font-size:9px;font-family:monospace;'>OPEN INTEREST</div>
+                <div style='color:#444;font-size:14px;font-family:monospace;'>N/A</div>
+            </div>""", unsafe_allow_html=True)
+
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+    # ── 4 sous-onglets ────────────────────────────────────────────────
+    tab_fund, tab_oi, tab_ls, tab_nf = st.tabs([
+        "📈 FUNDING RATES",
+        "📊 OPEN INTEREST",
+        "⚖️ LONG / SHORT",
+        "🌊 NETFLOW"
+    ])
+
+    # ── FUNDING RATES ─────────────────────────────────────────────────
+    with tab_fund:
+        if funding_data:
+            st.markdown("""
+            <div style='display:grid;grid-template-columns:1.5fr 1fr 1fr;
+                        background:#050505;padding:6px 10px;margin-bottom:4px;'>
+                <span style='color:#666;font-size:10px;font-family:monospace;letter-spacing:1px;'>SYMBOL</span>
+                <span style='color:#666;font-size:10px;font-family:monospace;letter-spacing:1px;'>FUNDING RATE</span>
+                <span style='color:#666;font-size:10px;font-family:monospace;letter-spacing:1px;'>MARK PRICE</span>
+            </div>""", unsafe_allow_html=True)
+            for f in funding_data:
+                c    = "#00ffad" if f["rate"] >= 0 else "#ff4b4b"
+                sign = "+" if f["rate"] >= 0 else ""
+                sent = "LONG DOM. 📈" if f["rate"] > 0.01 else "NEUTRE ➡️" if f["rate"] > -0.01 else "SHORT DOM. 📉"
+                st.markdown(f"""
+                <div style='display:grid;grid-template-columns:1.5fr 1fr 1fr;
+                            padding:10px;border-bottom:1px solid #1a1a1a;background:#0a0a0a;'>
+                    <span style='color:#fff;font-size:13px;font-family:monospace;font-weight:900;'>{f["symbol"]}</span>
+                    <div>
+                        <span style='color:{c};font-size:14px;font-family:monospace;font-weight:900;'>
+                            {sign}{f["rate"]:.4f}%
+                        </span><br>
+                        <span style='color:#444;font-size:9px;font-family:monospace;'>{sent}</span>
+                    </div>
+                    <span style='color:#ccc;font-size:13px;font-family:monospace;'>${f["mark"]:,.2f}</span>
+                </div>""", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.caption("📌 Positif = longs paient les shorts (haussier) • Négatif = shorts paient les longs • Source : Binance Futures")
+        else:
+            st.warning("Impossible de récupérer les données. Vérifiez votre connexion.")
+
+    # ── OPEN INTEREST ─────────────────────────────────────────────────
+    with tab_oi:
+        oi_data = get_open_interest()
+        if oi_data:
+            total_usd = sum(o["oi_usd"] for o in oi_data)
+            st.markdown("""
+            <div style='display:grid;grid-template-columns:1.5fr 1fr 1fr;
+                        background:#050505;padding:6px 10px;margin-bottom:4px;'>
+                <span style='color:#666;font-size:10px;font-family:monospace;letter-spacing:1px;'>SYMBOL</span>
+                <span style='color:#666;font-size:10px;font-family:monospace;letter-spacing:1px;'>OI (CONTRATS)</span>
+                <span style='color:#666;font-size:10px;font-family:monospace;letter-spacing:1px;'>OI (USD)</span>
+            </div>""", unsafe_allow_html=True)
+            for o in oi_data:
+                oi_m = o["oi_usd"] / 1e6
+                st.markdown(f"""
+                <div style='display:grid;grid-template-columns:1.5fr 1fr 1fr;
+                            padding:10px;border-bottom:1px solid #1a1a1a;background:#0a0a0a;'>
+                    <span style='color:#fff;font-size:13px;font-family:monospace;font-weight:900;'>{o["symbol"]}</span>
+                    <span style='color:#ccc;font-size:13px;font-family:monospace;'>{o["oi"]:,.0f}</span>
+                    <span style='color:#00ffad;font-size:13px;font-family:monospace;font-weight:900;'>${oi_m:,.1f}M</span>
+                </div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style='background:#111;border:1px solid #333;border-radius:4px;
+                        padding:12px 16px;margin-top:12px;
+                        display:flex;justify-content:space-between;align-items:center;'>
+                <span style='color:#666;font-size:11px;font-family:monospace;letter-spacing:1px;'>
+                    TOTAL OPEN INTEREST
+                </span>
+                <span style='color:#00ffad;font-size:18px;font-weight:900;font-family:monospace;'>
+                    ${total_usd/1e9:.2f}B
+                </span>
+            </div>""", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.caption("📌 OI croissant + prix montant = tendance forte • OI croissant + prix baissant = short squeeze possible • Source : Binance Futures")
+        else:
+            st.warning("Impossible de récupérer l'Open Interest.")
+
+    # ── LONG / SHORT RATIO ────────────────────────────────────────────
+    with tab_ls:
+        ls_data = get_ls_ratio()
+        if ls_data:
+            for r in ls_data:
+                lc      = "#00ffad" if r["longs"]  > 50 else "#ff4b4b"
+                sc      = "#ff4b4b" if r["shorts"] > 50 else "#00ffad"
+                verdict = "🟢 HAUSSIER" if r["longs"] > 55 else "🔴 BAISSIER" if r["shorts"] > 55 else "⚖️ NEUTRE"
+                st.markdown(f"""
+                <div style='background:#0a0a0a;border:1px solid #1a1a1a;border-radius:4px;
+                            padding:14px 16px;margin-bottom:10px;'>
+                    <div style='display:flex;justify-content:space-between;margin-bottom:8px;'>
+                        <span style='color:#fff;font-size:14px;font-family:monospace;font-weight:900;'>{r["symbol"]}</span>
+                        <span style='color:#666;font-size:11px;font-family:monospace;'>
+                            <span style='color:{lc};'>{r["longs"]}% LONG</span>
+                            &nbsp;vs&nbsp;
+                            <span style='color:{sc};'>{r["shorts"]}% SHORT</span>
+                            &nbsp;•&nbsp; {verdict}
+                        </span>
+                    </div>
+                    <div style='height:22px;border-radius:3px;display:flex;overflow:hidden;border:1px solid #1a1a1a;'>
+                        <div style='width:{r["longs"]}%;background:#00ffad33;
+                                    border-right:2px solid {lc};
+                                    display:flex;align-items:center;justify-content:center;'>
+                            <span style='color:#00ffad;font-size:10px;font-family:monospace;font-weight:900;'>L {r["longs"]}%</span>
+                        </div>
+                        <div style='flex:1;display:flex;align-items:center;justify-content:center;'>
+                            <span style='color:#ff4b4b;font-size:10px;font-family:monospace;font-weight:900;'>S {r["shorts"]}%</span>
+                        </div>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+            st.caption("📌 > 60% Longs = suracheté, risque liquidation en cascade • < 40% Longs = survendu • Source : Binance Futures (5m)")
+        else:
+            st.warning("Impossible de récupérer le ratio Long/Short.")
+
+    # ── NETFLOW ───────────────────────────────────────────────────────
+    with tab_nf:
+        # Données simulées — remplacer par Glassnode/CryptoQuant pour données réelles
+        netflow_data = [
+            {"exchange": "Binance",  "flow": -3240, "pct": 72},
+            {"exchange": "Coinbase", "flow": -1820, "pct": 40},
+            {"exchange": "Kraken",   "flow": +540,  "pct": 12},
+            {"exchange": "OKX",      "flow": -980,  "pct": 22},
+            {"exchange": "Bitfinex", "flow": +210,  "pct": 5 },
+        ]
+        total_flow = sum(d["flow"] for d in netflow_data)
+
+        st.markdown("""
+        <div style='color:#666;font-size:10px;font-family:monospace;letter-spacing:1px;margin-bottom:12px;'>
+            FLUX BTC EXCHANGES (24H) — Sorties = Accumulation 🟢 • Entrées = Pression vendeuse 🔴
+        </div>""", unsafe_allow_html=True)
+
+        for d in netflow_data:
+            is_out = d["flow"] < 0
+            color  = "#00ffad" if is_out else "#ff4b4b"
+            arrow  = "▼" if is_out else "▲"
+            label  = "SORTIE" if is_out else "ENTRÉE"
+            st.markdown(f"""
+            <div style='background:#0a0a0a;border:1px solid #1a1a1a;border-radius:3px;
+                        padding:12px 14px;margin-bottom:8px;'>
+                <div style='display:flex;justify-content:space-between;margin-bottom:6px;'>
+                    <span style='color:#fff;font-size:12px;font-family:monospace;font-weight:700;'>{d["exchange"]}</span>
+                    <span style='color:{color};font-size:12px;font-family:monospace;font-weight:900;'>
+                        {arrow} {abs(d["flow"]):,} BTC &nbsp;
+                        <span style='color:#444;font-size:10px;'>{label}</span>
+                    </span>
+                </div>
+                <div style='height:8px;background:#1a1a1a;border-radius:2px;overflow:hidden;'>
+                    <div style='width:{d["pct"]}%;height:100%;background:{color};border-radius:2px;'></div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+        total_color = "#00ffad" if total_flow < 0 else "#ff4b4b"
+        st.markdown(f"""
+        <div style='background:#111;border:1px solid #333;border-radius:4px;
+                    padding:12px 16px;margin-top:4px;
+                    display:flex;justify-content:space-between;align-items:center;'>
+            <span style='color:#666;font-size:11px;font-family:monospace;letter-spacing:1px;'>NETFLOW TOTAL (24H)</span>
+            <span style='color:{total_color};font-size:18px;font-weight:900;font-family:monospace;'>
+                {"▼" if total_flow < 0 else "▲"} {abs(total_flow):,} BTC
+            </span>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.caption("⚠️ Netflow simulé. Pour données réelles : Glassnode API ou CryptoQuant API.")
+
+
+# ============================================
+# 4. INTERFACE PRINCIPALE CRYPTO PRO
+# ============================================
+
+def show_interface_crypto():
+    st.markdown("""
+    <style>
+        .stApp { background-color: #000000; }
+        .block-container { padding-top: 1rem !important; max-width: 98% !important; }
+
+        .stTextInput input {
+            background-color: #111 !important;
+            color: #00ffad !important;
+            border: 1px solid #333 !important;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+        .section-header {
+            color: #00ffad;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            letter-spacing: 1px;
+        }
+        .news-time-brief { color: #666; font-size: 11px; font-weight: bold; margin-right: 10px; }
+        .source-badge    { font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 3px; margin-right: 10px; display: inline-block; text-transform: uppercase; }
+        .badge-coindesk  { background-color: #F7931A; color: black; }
+        .badge-cointele  { background-color: #FABE2C; color: black; }
+        .badge-cryptoast { background-color: #0056b3; color: white; }
+        [data-testid="stExpander"] {
+            background-color: #0A0A0A !important;
+            border: none !important;
+            border-bottom: 1px solid #1A1A1A !important;
+            border-radius: 0px !important;
+        }
+        .event-item {
+            display: flex; justify-content: space-between;
+            padding: 8px 0; border-bottom: 1px solid #1A1A1A;
+            color: white; font-size: 13px;
+        }
+        .stSelectbox > div > div {
+            background-color: #111 !important;
+            color: #00ffad !important;
+            border: 1px solid #333 !important;
+            font-family: 'Courier New', monospace !important;
+            font-weight: bold !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+        .stTabs [aria-selected="true"] { color: #00ffad !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col_left, col_right = st.columns([2.2, 1], gap="medium")
+
+    # ── COLONNE GAUCHE ───────────────────────────────────────────────
+    with col_left:
+        st.markdown('<div class="section-header">📊 CRYPTO TERMINAL</div>', unsafe_allow_html=True)
+
+        c_search, c_info = st.columns([2, 1])
+        with c_search:
+            search_input = st.text_input(
+                "RECHERCHER UNE CRYPTO (ex: BTC, Solana, PEPE)",
+                value="BTC", label_visibility="collapsed"
+            )
+        tv_symbol = get_crypto_pair(search_input)
+        with c_info:
+            st.markdown(
+                f"<div style='text-align:right;color:#666;padding-top:10px;'>"
+                f"ACTIVE: <b style='color:#fff'>{tv_symbol}</b></div>",
+                unsafe_allow_html=True
+            )
+
+        # ── Chart personnalisé AM.Terminal ──────────────────────
+        _raw = search_input.strip().upper()
+        _mapping = {
+            "BITCOIN":"BTC","ETHER":"ETH","ETHEREUM":"ETH","RIPPLE":"XRP",
+            "CARDANO":"ADA","SOLANA":"SOL","DOGECOIN":"DOGE","POLKADOT":"DOT",
+            "AVALANCHE":"AVAX","SHIBA":"SHIB","MATIC":"MATIC","POLYGON":"MATIC",
+        }
+        _base = _mapping.get(_raw, _raw)
+        _base = _base.replace("-USD","").replace("USDT","").replace("USD","").replace("BINANCE:","")
+        chart_symbol = _base + "USDT"
+
+        from chart_module import render_chart
+        components.html(
+            render_chart(
+                symbol=chart_symbol,
+                interval="4h",
+                limit=200,
+                height=700,
+                exchange="Binance · Spot",
+                pair_label=f"{_base}/USDT",
+            ),
+            height=700,
+            scrolling=False,
+        )
+
+        # ── Header dynamique + menu roulant ─────────────────────────
+        h1, h2 = st.columns([3, 1])
+        with h2:
+            st.markdown("<div style='padding-top:18px'></div>", unsafe_allow_html=True)
+            view_choice = st.selectbox(
+                "VUE",
+                options=["🔥 HEATMAP", "🔗 ON-CHAIN DATA"],
+                key="bottom_view",
+                label_visibility="collapsed"
+            )
+        with h1:
+            titre = "🔥 CRYPTO HEATMAP (LIVE)" if "HEATMAP" in view_choice else "🔗 ON-CHAIN DATA"
+            st.markdown(f'<div class="section-header">{titre}</div>', unsafe_allow_html=True)
+
+        # ── Vue conditionnelle ───────────────────────────────────────
+        if "HEATMAP" in view_choice:
+            html_heatmap = """
+            <div style="height:500px;border:1px solid #1A1A1A;border-radius:4px;overflow:hidden;">
+                <div class="tradingview-widget-container">
+                    <div class="tradingview-widget-container__widget"></div>
+                    <script type="text/javascript"
+                        src="https://s3.tradingview.com/external-embedding/embed-widget-crypto-coins-heatmap.js" async>
+                    {
+                    "dataSource":"Crypto","blockSize":"market_cap_calc","blockColor":"change",
+                    "locale":"fr","symbolUrl":"","colorTheme":"dark","hasTopBar":true,
+                    "isDatasetResizable":false,"isBlockSelectionDisabled":false,
+                    "width":"100%","height":"500"
+                    }
+                    </script>
+                </div>
+            </div>"""
+            components.html(html_heatmap, height=510)
+        else:
+            render_onchain_panel()
+
+    # ── COLONNE DROITE ───────────────────────────────────────────────
+    with col_right:
+        st.markdown('<div class="section-header">📰 CRYPTO WIRE</div>', unsafe_allow_html=True)
+
+        tab_cd, tab_ct, tab_fr = st.tabs(["🇺🇸 CoinDesk", "🇺🇸 CoinTelegraph", "🇫🇷 Cryptoast"])
+
+        def render_crypto_news(source):
+            news_data = get_crypto_news(source)
+            with st.container(height=300):
+                if not news_data:
+                    st.info("Chargement des news...")
+                for n in news_data:
+                    header = f"{n['time']} | {source} » {n['title'][:60]}..."
+                    with st.expander(header):
+                        st.markdown(f"**{n['title']}**")
+                        st.caption(f"Source: {source} • Heure: {n['time']}")
+                        st.link_button("LIRE L'ARTICLE", n['link'])
+
+        with tab_cd: render_crypto_news("CoinDesk")
+        with tab_ct: render_crypto_news("CoinTelegraph")
+        with tab_fr: render_crypto_news("Cryptoast")
+
+        st.markdown('<br><div class="section-header">🚀 24H MOVERS</div>', unsafe_allow_html=True)
+        movers = get_crypto_movers()
+        with st.container(height=300):
+            for m in movers:
+                color = "#00ffad" if m['change'] >= 0 else "#ff4b4b"
+                sign  = "+" if m['change'] >= 0 else ""
+                st.markdown(f"""
+                <div class="event-item">
+                    <b>{m['name']}</b>
+                    <div style="text-align:right">
+                        <b>${m['price']:,.2f}</b>
+                        <span style="color:{color};margin-left:8px;">{sign}{m['change']:.2f}%</span>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    show_interface_crypto()
+
+
+if __name__ == "__main__":
+    show_interface_crypto()
