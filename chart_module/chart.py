@@ -189,39 +189,8 @@ html,body{{
 ::-webkit-scrollbar-track{{background:var(--bg);}}
 ::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:2px;}}
 
-/* ── SEARCHBAR INTÉGRÉE ── */
-.search-wrap{{display:flex;align-items:center;gap:6px;margin-left:auto;margin-right:8px;position:relative;}}
-.search-input{{
-  background:#0d0d0d;border:1px solid var(--border2);border-bottom:1px solid var(--orange);
-  color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;
-  padding:4px 10px;width:110px;outline:none;letter-spacing:1px;text-transform:uppercase;
-  transition:border-color .15s,width .2s;
-}}
-.search-input:focus{{border-bottom-color:var(--orange);width:150px;}}
-.search-input::placeholder{{color:var(--faint);font-size:10px;letter-spacing:1px;text-transform:uppercase;}}
-.search-btn{{
-  background:var(--orange);color:#000;border:none;
-  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;
-  padding:4px 10px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;
-  transition:background .1s;
-}}
-.search-btn:hover{{background:#ff8800;}}
-.search-suggestions{{
-  position:absolute;top:100%;right:0;background:var(--surface);
-  border:1px solid var(--border2);border-top:1px solid var(--orange);
-  min-width:160px;z-index:99999;display:none;
-}}
-.search-suggestions.open{{display:block;}}
-.sugg-item{{
-  padding:6px 12px;cursor:pointer;font-size:11px;
-  border-bottom:1px solid var(--border);letter-spacing:1px;
-  display:flex;justify-content:space-between;
-}}
-.sugg-item:hover{{background:var(--surface2);color:var(--orange);}}
-.sugg-item span{{color:var(--faint);font-size:9px;}}
-
 /* ── MODE DROPDOWN ── */
-.mode-wrap{{position:relative;}}
+.mode-wrap{{position:relative;margin-left:auto;}}
 .mode-btn{{
   display:flex;align-items:center;gap:8px;padding:0 12px;height:34px;
   cursor:pointer;background:transparent;border:none;
@@ -276,9 +245,9 @@ html,body{{
 <!-- HEADER -->
 <div class="hdr" style="display:{hdr_display}">
   <div class="logo">AM<span style="color:#fff">.</span>TERMINAL</div>
-  <div class="pair" id="pairLabel">{pair_disp}</div>
-  <div class="exch" id="exchLabel">{exchange}</div>
-  <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:1px;" id="srcLabel">{DATA_SOURCE.upper()}</div>
+  <div class="pair">{pair_disp}</div>
+  <div class="exch">{exchange}</div>
+  <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:1px;">{DATA_SOURCE.upper()}</div>
   <div class="price-big" id="curPrice">—</div>
   <div class="price-chg up" id="curChg">—</div>
   <div class="ohlc-row">
@@ -287,18 +256,7 @@ html,body{{
     <div class="ohlc-item"><div class="ohlc-lbl">L</div><div class="ohlc-val" id="hl" style="color:var(--bear)">—</div></div>
     <div class="ohlc-item"><div class="ohlc-lbl">C</div><div class="ohlc-val" id="hc">—</div></div>
   </div>
-  <!-- SEARCHBAR INTÉGRÉE — change de paire sans recharger -->
-  <div class="search-wrap">
-    <div style="position:relative;">
-      <input id="pairSearch" class="search-input" type="text"
-        placeholder="BTC, ETH, SOL..."
-        onkeydown="if(event.key==='Enter')changePair()"
-        oninput="showSuggestions(this.value)"
-        onblur="setTimeout(()=>hideSuggestions(),150)"
-      >
-      <div class="search-suggestions" id="suggestions"></div>
-    </div>
-    <button class="search-btn" onclick="changePair()">GO</button>
+  <div class="hdr-right">
     <span class="live-badge {status_cls}" id="apiBadge">{status_txt}</span>
   </div>
 </div>
@@ -415,11 +373,12 @@ let isDragging = false, dragStartX = 0, dragStartView = 0;
 // ════════════════════════════════════════════════════════
 //  SIMULATION
 // ════════════════════════════════════════════════════════
-let simActive   = true;
+let simActive   = false;  // JAMAIS actif par défaut — attend live
 let simPrice    = D.c[D.c.length-1] || 100;
 let candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
 let prevPrice   = simPrice;
 const VOLATILITY = 0.0006;
+let wsConnected = false;
 
 function simTick() {{
   if(!simActive) return;
@@ -428,7 +387,8 @@ function simTick() {{
   const momentum = (simPrice-prevPrice)*0.12;
   const noise    = (Math.random()-0.5)*simPrice*VOLATILITY*0.4;
   prevPrice = simPrice;
-  simPrice  = Math.max(simPrice*(1+drift)+momentum+noise, 0.01);
+  const priceFloor = D.c[0] * 0.5 || 1;  // plancher = 50% du premier prix
+  simPrice  = Math.max(simPrice*(1+drift)+momentum+noise, priceFloor);
 
   if(now >= candleStart+IV_SEC) {{
     candleStart = now;
@@ -882,12 +842,18 @@ async function setTF(btn, tf) {{
   btn.classList.add('active');
   CURRENT_TF = tf;
 
+  // Fermer WS actuel
+  if(ws && ws.readyState===WebSocket.OPEN) ws.close();
+
+  // Loader visuel
   const badge = $('apiBadge');
   if(badge) {{ badge.textContent='⟳ CHARGEMENT'; badge.className='live-badge sim'; }}
 
-  // Recharger avec le symbole ACTUEL (pas le hardcodé Python)
-  await reloadOHLCVForSymbol(CURRENT_SYMBOL, tf);
-  startBinanceWSForSymbol(CURRENT_SYMBOL);
+  // Recharger les données OHLCV
+  await reloadOHLCV(tf);
+
+  // Redémarrer le WS avec la même paire
+  startBinanceWS();
 }}
 
 async function reloadOHLCV(tf) {{
@@ -916,11 +882,13 @@ async function reloadOHLCV(tf) {{
       D.v.push(parseFloat(c[5]));
     }});
 
-    // Reset vue
-    VIEW_START = Math.max(0, D.t.length-120);
-    VIEW_END   = D.t.length;
+    // Reset vue — propre, sans bougie parasite
+    VIEW_START  = Math.max(0, D.t.length-120);
+    VIEW_END    = D.t.length;
     candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
     simPrice    = D.c[D.c.length-1] || simPrice;
+    prevPrice   = simPrice;
+    simActive   = false;  // Stoppe toute sim pendant le chargement
 
     render();
     updateStats();
@@ -1042,8 +1010,19 @@ function applyPriceUpdate(price, chg24, vol24, high24, low24) {{
 }}
 
 function startBinanceWS() {{
-  // Délègue à la fonction dynamique avec le symbole courant
-  startBinanceWSForSymbol(CURRENT_SYMBOL);
+  const sym='{binance_symbol}'.toLowerCase();
+  if(!sym||sym==='undefined'){{ startFallbackPolling(); return; }}
+  ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`);
+  ws.onopen=()=>{{ simActive=false; wsConnected=true; console.log('[AM.Terminal] WS Binance connecté'); }};
+  ws.onmessage=e=>{{
+    try {{
+      const d=(JSON.parse(e.data).data)||JSON.parse(e.data);
+      const p=parseFloat(d.c);
+      if(!isNaN(p)) applyPriceUpdate(p,parseFloat(d.P),parseFloat(d.q),parseFloat(d.h),parseFloat(d.l));
+    }} catch(err) {{}}
+  }};
+  ws.onclose=()=>{{ setTimeout(startBinanceWS,5000); }};
+  ws.onerror=()=>{{ wsConnected=false; ws.close(); startFallbackPolling(); }};
 }}
 
 async function fetchLivePrice() {{
@@ -1055,155 +1034,6 @@ async function fetchLivePrice() {{
   }} catch(e) {{}}
 }}
 function startFallbackPolling(){{ fetchLivePrice(); setInterval(fetchLivePrice,15000); }}
-
-// ════════════════════════════════════════════════════════
-//  CHANGEMENT DE PAIRE — SANS RECHARGER L'IFRAME
-// ════════════════════════════════════════════════════════
-const KNOWN_PAIRS = [
-  'BTC','ETH','SOL','BNB','XRP','ADA','DOGE','AVAX','LINK','DOT',
-  'MATIC','UNI','LTC','ATOM','NEAR','APT','ARB','OP','PEPE','WIF',
-  'SUI','TIA','INJ','FET','RNDR','IMX','SAND','MANA','AXS','GALA',
-];
-
-const COINGECKO_MAP = {{
-  'BTC':'bitcoin','ETH':'ethereum','SOL':'solana','BNB':'binancecoin',
-  'XRP':'ripple','ADA':'cardano','DOGE':'dogecoin','AVAX':'avalanche-2',
-  'LINK':'chainlink','DOT':'polkadot','MATIC':'matic-network','UNI':'uniswap',
-  'LTC':'litecoin','ATOM':'cosmos','NEAR':'near','APT':'aptos',
-  'ARB':'arbitrum','OP':'optimism','PEPE':'pepe','WIF':'dogwifcoin',
-}};
-
-let CURRENT_SYMBOL = '{binance_symbol}'; // ex: BTCUSDT
-
-function showSuggestions(val) {{
-  const box = $('suggestions');
-  if(!val || val.length<1) {{ box.classList.remove('open'); return; }}
-  const q = val.toUpperCase();
-  const matches = KNOWN_PAIRS.filter(p=>p.startsWith(q)).slice(0,6);
-  if(!matches.length) {{ box.classList.remove('open'); return; }}
-  box.innerHTML = matches.map(p=>
-    `<div class="sugg-item" onmousedown="selectPair('${{p}}')">${{p}}<span>USDT</span></div>`
-  ).join('');
-  box.classList.add('open');
-}}
-
-function hideSuggestions() {{
-  const box = $('suggestions');
-  if(box) box.classList.remove('open');
-}}
-
-function selectPair(base) {{
-  $('pairSearch').value = base;
-  hideSuggestions();
-  changePair();
-}}
-
-async function changePair() {{
-  const input = $('pairSearch');
-  if(!input) return;
-  const raw   = input.value.trim().toUpperCase()
-    .replace('USDT','').replace('-USD','').replace('USD','');
-  if(!raw) return;
-
-  const newSym = raw + 'USDT';
-  CURRENT_SYMBOL = newSym;
-
-  // UI feedback
-  const badge = $('apiBadge');
-  if(badge) {{ badge.textContent='⟳ CHARGEMENT'; badge.className='live-badge sim'; }}
-  const pairLbl = $('pairLabel');
-  if(pairLbl) pairLbl.textContent = raw + '/USDT';
-  hideSuggestions();
-
-  // Fermer WS actuel
-  if(ws && ws.readyState < 2) {{ ws.onclose=null; ws.close(); }}
-  simActive = false;
-
-  // Charger les nouvelles données
-  await reloadOHLCVForSymbol(newSym, CURRENT_TF);
-
-  // Reconnecter WS sur nouvelle paire
-  startBinanceWSForSymbol(newSym);
-}}
-
-async function reloadOHLCVForSymbol(sym, tf) {{
-  const cfg   = TF_MAP[tf] || TF_MAP['4h'];
-  window.IV_SEC_CURRENT = cfg.sec;
-  try {{
-    const url = `https://api.binance.com/api/v3/klines?symbol=${{sym}}&interval=${{cfg.iv}}&limit=200`;
-    const res  = await fetch(url);
-    if(!res.ok) throw new Error('Binance ' + res.status);
-    const raw = await res.json();
-    D.t.length=0; D.o.length=0; D.h.length=0; D.l.length=0; D.c.length=0; D.v.length=0;
-    raw.forEach(c=>{{
-      D.t.push(Math.floor(c[0]/1000));
-      D.o.push(parseFloat(c[1]));
-      D.h.push(parseFloat(c[2]));
-      D.l.push(parseFloat(c[3]));
-      D.c.push(parseFloat(c[4]));
-      D.v.push(parseFloat(c[5]));
-    }});
-    VIEW_START = Math.max(0, D.t.length-120);
-    VIEW_END   = D.t.length;
-    candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
-    simPrice    = D.c[D.c.length-1] || simPrice;
-    prevPrice   = simPrice;
-    simActive   = false;
-    render(); updateStats();
-    console.log(`[AM.Terminal] Paire → ${{sym}} (${{D.t.length}} bougies)`);
-  }} catch(e) {{
-    console.warn('[AM.Terminal] Binance échoué, fallback CoinGecko:', e.message);
-    const base = sym.replace('USDT','');
-    const cgId = COINGECKO_MAP[base] || base.toLowerCase();
-    await reloadOHLCVCoinGeckoForSymbol(cgId, tf);
-  }}
-}}
-
-async function reloadOHLCVCoinGeckoForSymbol(coinId, tf) {{
-  const daysMap = {{'1m':1,'5m':1,'15m':1,'1h':7,'4h':30,'1d':365,'1w':1825}};
-  const days = daysMap[tf] || 30;
-  try {{
-    const url = `https://api.coingecko.com/api/v3/coins/${{coinId}}/ohlc?vs_currency=usd&days=${{days}}`;
-    const res  = await fetch(url, {{signal: AbortSignal.timeout(10000)}});
-    const raw  = await res.json();
-    if(!Array.isArray(raw)||!raw.length) throw new Error('vide');
-    D.t.length=0; D.o.length=0; D.h.length=0; D.l.length=0; D.c.length=0; D.v.length=0;
-    raw.forEach(c=>{{
-      D.t.push(Math.floor(c[0]/1000));
-      D.o.push(parseFloat(c[1]));
-      D.h.push(parseFloat(c[2]));
-      D.l.push(parseFloat(c[3]));
-      D.c.push(parseFloat(c[4]));
-      D.v.push(0);
-    }});
-    VIEW_START=Math.max(0,D.t.length-120);
-    VIEW_END=D.t.length;
-    candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
-    simPrice = D.c[D.c.length-1] || simPrice;
-    prevPrice = simPrice;
-    render(); updateStats();
-    const badge=$('apiBadge');
-    if(badge){{badge.textContent='CoinGecko';badge.className='live-badge sim';}}
-  }} catch(e) {{
-    console.warn('[AM.Terminal] CoinGecko aussi échoué:', e.message);
-  }}
-}}
-
-function startBinanceWSForSymbol(sym) {{
-  const streamSym = sym.toLowerCase();
-  if(ws && ws.readyState < 2) {{ ws.onclose=null; ws.close(); }}
-  ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${{streamSym}}@ticker`);
-  ws.onopen  = ()=>{{ simActive=false; console.log('[AM.Terminal] WS →', sym); }};
-  ws.onmessage = e=>{{
-    try {{
-      const d=(JSON.parse(e.data).data)||JSON.parse(e.data);
-      const p=parseFloat(d.c);
-      if(!isNaN(p)&&p>0) applyPriceUpdate(p,parseFloat(d.P),parseFloat(d.q),parseFloat(d.h),parseFloat(d.l));
-    }} catch(err){{}}
-  }};
-  ws.onclose = ()=>{{ if(D.t.length>0) setTimeout(()=>startBinanceWSForSymbol(sym),5000); }};
-  ws.onerror = ()=>{{ ws.onclose=null; ws.close(); startFallbackPolling(); }};
-}}
 
 // ════════════════════════════════════════════════════════
 //  INIT
@@ -1219,6 +1049,13 @@ function init() {{
   updateStats();
   startBinanceWS();
   if(RUN_SIM) {{
+    // Sim activée UNIQUEMENT si après 6s le WS n'est toujours pas connecté
+    setTimeout(()=>{{
+      if(!wsConnected) {{
+        simActive=true;
+        console.log('[AM.Terminal] WS absent → simulation activée');
+      }}
+    }}, 6000);
     setInterval(simTick, 400);
     setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 100);
   }} else {{
