@@ -102,22 +102,22 @@ def render_chart(
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@700&display=swap');
 :root{{
-  --bg:#131722;--surface:#1e222d;--surface2:#2a2e39;
-  --border:#2a2e39;--border2:#363a45;
-  --text:#d1d4dc;--text2:#b2b5be;--muted:#787b86;
-  --faint:#50535e;--fainter:#363a45;
-  --orange:#ff9800;--yellow:#f0b429;
-  --green:#26a69a;--green2:#00e676;
-  --red:#ef5350;--red2:#ff5252;
-  --bull:#26a69a;--bear:#ef5350;
-  --bull-bg:rgba(38,166,154,0.15);--bear-bg:rgba(239,83,80,0.15);
+  --bg:#000000;--surface:#0a0a0a;--surface2:#111111;
+  --border:#1a1a1a;--border2:#1e1e1e;
+  --text:#e8e8e8;--text2:#aaaaaa;--muted:#555555;
+  --faint:#333333;--fainter:#1e1e1e;
+  --orange:#ff6600;--yellow:#ffcc00;
+  --green:#00ff41;--green2:#00cc33;
+  --red:#ff2222;--red2:#cc0000;
+  --bull:#00ff41;--bear:#ff2222;
+  --bull-bg:rgba(0,255,65,0.08);--bear-bg:rgba(255,34,34,0.08);
 }}
 *{{margin:0;padding:0;box-sizing:border-box;}}
 html,body{{
   background:var(--bg);color:var(--text);
-  font-family:'IBM Plex Mono',monospace;font-size:12px;
+  font-family:'Share Tech Mono',monospace;font-size:12px;
   width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column;
 }}
 
@@ -146,13 +146,13 @@ html,body{{
 .toolbar{{display:flex;align-items:center;background:var(--surface);
   border-bottom:1px solid var(--border2);height:34px;padding:0 8px;gap:2px;flex-shrink:0;}}
 .tf-btn{{padding:3px 9px;border:none;background:transparent;color:var(--muted);
-  font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
+  font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
   border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.5px;}}
 .tf-btn:hover{{background:var(--surface2);color:var(--text);}}
 .tf-btn.active{{background:rgba(255,152,0,0.12);color:var(--orange);}}
 .tb-sep{{width:1px;height:18px;background:var(--border2);margin:0 4px;}}
 .indicator-btn{{padding:3px 9px;border:1px solid var(--border2);background:transparent;
-  color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;
+  color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;
   border-radius:3px;transition:all .1s;}}
 .indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
@@ -195,7 +195,7 @@ html,body{{
   display:flex;align-items:center;gap:8px;padding:0 12px;height:34px;
   cursor:pointer;background:transparent;border:none;
   border-left:1px solid var(--border2);
-  font-family:'IBM Plex Mono',monospace;
+  font-family:'Share Tech Mono',monospace;
   transition:background .12s;
 }}
 .mode-btn:hover{{background:var(--surface2);}}
@@ -244,7 +244,7 @@ html,body{{
 
 <!-- HEADER -->
 <div class="hdr" style="display:{hdr_display}">
-  <div class="logo">AM<span style="color:#fff">.</span>TERMINAL</div>
+  <div class="logo" style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:3px;">AM<span style="color:#ff6600">.</span>TERMINAL</div>
   <div class="pair">{pair_disp}</div>
   <div class="exch">{exchange}</div>
   <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:1px;">{DATA_SOURCE.upper()}</div>
@@ -373,12 +373,11 @@ let isDragging = false, dragStartX = 0, dragStartView = 0;
 // ════════════════════════════════════════════════════════
 //  SIMULATION
 // ════════════════════════════════════════════════════════
-let simActive   = false;  // JAMAIS actif par défaut — attend live
+let simActive   = true;
 let simPrice    = D.c[D.c.length-1] || 100;
 let candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
 let prevPrice   = simPrice;
 const VOLATILITY = 0.0006;
-let wsConnected = false;
 
 function simTick() {{
   if(!simActive) return;
@@ -387,8 +386,7 @@ function simTick() {{
   const momentum = (simPrice-prevPrice)*0.12;
   const noise    = (Math.random()-0.5)*simPrice*VOLATILITY*0.4;
   prevPrice = simPrice;
-  const priceFloor = D.c[0] * 0.5 || 1;  // plancher = 50% du premier prix
-  simPrice  = Math.max(simPrice*(1+drift)+momentum+noise, priceFloor);
+  simPrice  = Math.max(simPrice*(1+drift)+momentum+noise, 0.01);
 
   if(now >= candleStart+IV_SEC) {{
     candleStart = now;
@@ -494,7 +492,7 @@ function drawMain() {{
   const toY=p=>PAD.t+(hi-p)/rng*(H-PAD.t-PAD.b);
 
   // ── FOND ──
-  ctx.fillStyle='#131722';
+  ctx.fillStyle='#000000';
   ctx.fillRect(0,0,W,H);
 
   // ── GRILLE HORIZONTALE ──
@@ -502,22 +500,22 @@ function drawMain() {{
   for(let s=0;s<=gridSteps;s++) {{
     const y=PAD.t+s*(H-PAD.t-PAD.b)/gridSteps;
     const price=hi-s*rng/gridSteps;
-    ctx.strokeStyle='#1e222d'; ctx.lineWidth=1;
+    ctx.strokeStyle='#111111'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     // Prix axe droit
-    ctx.fillStyle='#787b86'; ctx.font='10px IBM Plex Mono,monospace';
+    ctx.fillStyle='#444444'; ctx.font='10px Share Tech Mono,monospace';
     ctx.textAlign='left'; ctx.fillText(fmt(price), W-PAD.r+6, y+4);
   }}
 
   // ── GRILLE VERTICALE + AXE TEMPS ──
-  ctx.fillStyle='#787b86'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#444444'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='center';
   const nTicks=Math.min(10,Math.max(3,Math.floor(N/15)));
   const prevMonth={{val:-1}};
   for(let t=0;t<=nTicks;t++) {{
     const i=Math.floor(t*(N-1)/Math.max(nTicks,1));
     const x=toX(i);
     const d=new Date(ts[i]*1000);
-    ctx.strokeStyle='#1e222d'; ctx.lineWidth=1;
+    ctx.strokeStyle='#111111'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H-PAD.b); ctx.stroke();
     // Label : heure si intraday, date si daily+
     let lbl;
@@ -555,7 +553,7 @@ function drawMain() {{
         started?ctx.lineTo(toX(i),toY(band[i])):ctx.moveTo(toX(i),toY(band[i]));
         started=true;
       }}
-      ctx.strokeStyle='rgba(255,152,0,0.4)'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle='rgba(255,102,0,0.35)'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
     }});
     ctx.beginPath(); let s2=false;
     for(let i=0;i<N;i++) {{
@@ -563,15 +561,15 @@ function drawMain() {{
       s2?ctx.lineTo(toX(i),toY(bbM[i])):ctx.moveTo(toX(i),toY(bbM[i]));
       s2=true;
     }}
-    ctx.strokeStyle='rgba(255,152,0,0.5)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.strokeStyle='rgba(255,102,0,0.45)'; ctx.lineWidth=1; ctx.stroke();
   }}
 
   // ── MOVING AVERAGES ──
   if(showMA) {{
     const maConf=[
-      {{p:20,  color:'rgba(255,200,50,0.85)',  w:1.2}},
-      {{p:50,  color:'rgba(33,150,243,0.85)',  w:1.2}},
-      {{p:200, color:'rgba(255,82,82,0.85)',   w:1.5}},
+      {{p:20,  color:'rgba(255,102,0,0.90)',   w:1.3}},   // Orange Bloomberg
+      {{p:50,  color:'rgba(255,204,0,0.85)',   w:1.3}},   // Jaune
+      {{p:200, color:'rgba(100,180,255,0.80)', w:1.6}},   // Bleu clair
     ];
     maConf.forEach(mc=>{{
       const ma=calcMA(D.c,mc.p).slice(VIEW_START,VIEW_END);
@@ -585,8 +583,8 @@ function drawMain() {{
       ctx.strokeStyle=mc.color; ctx.lineWidth=mc.w; ctx.stroke();
     }});
     // Légende MA
-    ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='left';
-    [{{'p':20,'c':'rgba(255,200,50,0.85)'}},{{'p':50,'c':'rgba(33,150,243,0.85)'}},{{'p':200,'c':'rgba(255,82,82,0.85)'}}].forEach((m,i)=>{{
+    ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
+    [{{'p':20,'c':'rgba(255,102,0,0.90)'}},{{'p':50,'c':'rgba(255,204,0,0.85)'}},{{'p':200,'c':'rgba(100,180,255,0.80)'}}].forEach((m,i)=>{{
       ctx.fillStyle=m.c;
       ctx.fillText(`MA${{m.p}}`, 8+i*52, 18);
     }});
@@ -597,7 +595,7 @@ function drawMain() {{
     const x=toX(i);
     const oy=toY(os[i]), hy=toY(hs[i]), ly=toY(ls[i]), cy=toY(cs[i]);
     const bull=cs[i]>=os[i];
-    const bullCol='#26a69a', bearCol='#ef5350';
+    const bullCol='#00ff41', bearCol='#ff2222';
     const col=bull?bullCol:bearCol;
 
     // Mèche
@@ -617,7 +615,7 @@ function drawMain() {{
     // Dernière bougie — halo pulsant
     if(i===N-1) {{
       const glow=1.5+Math.sin(Date.now()/300)*1;
-      ctx.strokeStyle=bull?'rgba(38,166,154,0.6)':'rgba(239,83,80,0.6)';
+      ctx.strokeStyle=bull?'rgba(0,255,65,0.4)':'rgba(255,34,34,0.4)';
       ctx.lineWidth=1;
       ctx.strokeRect(x-hw-glow, top-glow, hw*2+glow*2, bH+glow*2);
     }}
@@ -628,33 +626,33 @@ function drawMain() {{
   const lastBull=lastC>=lastO;
   const py=toY(lastC);
   // Ligne pointillée
-  ctx.strokeStyle=lastBull?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)';
+  ctx.strokeStyle=lastBull?'rgba(0,255,65,0.4)':'rgba(255,34,34,0.4)';
   ctx.lineWidth=1; ctx.setLineDash([4,4]);
   ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(W-PAD.r,py); ctx.stroke();
   ctx.setLineDash([]);
   // Tag prix
-  const tagCol=lastBull?'#26a69a':'#ef5350';
+  const tagCol=lastBull?'#00ff41':'#ff2222';
   ctx.fillStyle=tagCol;
   ctx.beginPath();
   ctx.roundRect(W-PAD.r+2, py-9, PAD.r-4, 18, 2);
   ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#000'; ctx.font='bold 9px Share Tech Mono,monospace'; ctx.textAlign='left';
   ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
 
   // ── CROSSHAIR ──
   if(HOVER_IDX>=0 && HOVER_IDX<N) {{
     const x=toX(HOVER_IDX);
     // Ligne verticale
-    ctx.strokeStyle='rgba(132,142,156,0.4)'; ctx.lineWidth=1; ctx.setLineDash([]);
+    ctx.strokeStyle='rgba(255,102,0,0.25)'; ctx.lineWidth=1; ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H); ctx.stroke();
     // Ligne horizontale
     if(HOVER_Y>0) {{
       ctx.beginPath(); ctx.moveTo(0,HOVER_Y); ctx.lineTo(W-PAD.r,HOVER_Y); ctx.stroke();
       // Tag prix crosshair à droite
       const hp=hi-(HOVER_Y-PAD.t)/((H-PAD.t-PAD.b))*rng;
-      ctx.fillStyle='#363a45';
+      ctx.fillStyle='#1a0800';
       ctx.beginPath(); ctx.roundRect(W-PAD.r+2,HOVER_Y-9,PAD.r-4,18,2); ctx.fill();
-      ctx.fillStyle='#d1d4dc'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='left';
+      ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
       ctx.fillText(fmt(hp), W-PAD.r+5, HOVER_Y+4);
     }}
     // Label date en bas
@@ -663,7 +661,7 @@ function drawMain() {{
     ctx.fillStyle='#363a45'; ctx.textAlign='center';
     const tw=ctx.measureText(dateLbl).width+12;
     ctx.beginPath(); ctx.roundRect(x-tw/2, H-PAD.b+2, tw, 16, 2); ctx.fill();
-    ctx.fillStyle='#d1d4dc'; ctx.font='9px IBM Plex Mono,monospace';
+    ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace';
     ctx.fillText(dateLbl, x, H-PAD.b+13);
 
     // Mise à jour OHLC header
@@ -681,7 +679,7 @@ function drawVol() {{
   const W=cvVol.width, H=cvVol.height;
   const ctx=ctxV;
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#131722'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#000000'; ctx.fillRect(0,0,W,H);
 
   const N=VIEW_END-VIEW_START;
   if(!N||H<4) return;
@@ -707,10 +705,10 @@ function drawVol() {{
     const y=H-(maV[i]/maxV)*(H-4);
     s?ctx.lineTo(x,y):ctx.moveTo(x,y); s=true;
   }}
-  ctx.strokeStyle='rgba(255,152,0,0.7)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.strokeStyle='rgba(255,102,0,0.70)'; ctx.lineWidth=1; ctx.stroke();
 
   // Label
-  ctx.fillStyle='#50535e'; ctx.font='8px IBM Plex Mono,monospace';
+  ctx.fillStyle='#333333'; ctx.font='8px Share Tech Mono,monospace';
   ctx.textAlign='left'; ctx.fillText('VOLUME', 4, 10);
 }}
 
@@ -882,13 +880,11 @@ async function reloadOHLCV(tf) {{
       D.v.push(parseFloat(c[5]));
     }});
 
-    // Reset vue — propre, sans bougie parasite
-    VIEW_START  = Math.max(0, D.t.length-120);
-    VIEW_END    = D.t.length;
+    // Reset vue
+    VIEW_START = Math.max(0, D.t.length-120);
+    VIEW_END   = D.t.length;
     candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
     simPrice    = D.c[D.c.length-1] || simPrice;
-    prevPrice   = simPrice;
-    simActive   = false;  // Stoppe toute sim pendant le chargement
 
     render();
     updateStats();
@@ -1013,7 +1009,7 @@ function startBinanceWS() {{
   const sym='{binance_symbol}'.toLowerCase();
   if(!sym||sym==='undefined'){{ startFallbackPolling(); return; }}
   ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`);
-  ws.onopen=()=>{{ simActive=false; wsConnected=true; console.log('[AM.Terminal] WS Binance connecté'); }};
+  ws.onopen=()=>{{ simActive=false; console.log('[AM.Terminal] WS Binance connecté'); }};
   ws.onmessage=e=>{{
     try {{
       const d=(JSON.parse(e.data).data)||JSON.parse(e.data);
@@ -1022,7 +1018,7 @@ function startBinanceWS() {{
     }} catch(err) {{}}
   }};
   ws.onclose=()=>{{ setTimeout(startBinanceWS,5000); }};
-  ws.onerror=()=>{{ wsConnected=false; ws.close(); startFallbackPolling(); }};
+  ws.onerror=()=>{{ simActive=false; ws.close(); startFallbackPolling(); }};
 }}
 
 async function fetchLivePrice() {{
@@ -1049,13 +1045,6 @@ function init() {{
   updateStats();
   startBinanceWS();
   if(RUN_SIM) {{
-    // Sim activée UNIQUEMENT si après 6s le WS n'est toujours pas connecté
-    setTimeout(()=>{{
-      if(!wsConnected) {{
-        simActive=true;
-        console.log('[AM.Terminal] WS absent → simulation activée');
-      }}
-    }}, 6000);
     setInterval(simTick, 400);
     setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 100);
   }} else {{
