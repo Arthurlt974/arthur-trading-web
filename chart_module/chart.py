@@ -210,9 +210,9 @@ html,body{{
 .mode-btn[data-mode="normal"] .mode-lbl{{color:var(--text2);}}
 .mode-btn[data-mode="pro"]    .mode-lbl{{color:var(--orange);}}
 .mode-btn[data-mode="quant"]  .mode-lbl{{color:var(--yellow);}}
-.mode-btn[data-mode="normal"] {{border-bottom:2px solid var(--border2);}}
-.mode-btn[data-mode="pro"]    {{border-bottom:2px solid var(--orange);}}
-.mode-btn[data-mode="quant"]  {{border-bottom:2px solid var(--yellow);}}
+.mode-btn[data-mode="normal"] {{border-bottom:none;}}
+.mode-btn[data-mode="pro"]    {{border-bottom:none;}}
+.mode-btn[data-mode="quant"]  {{border-bottom:none;}}
 
 .mode-dd{{
   display:none;position:absolute;top:100%;right:0;
