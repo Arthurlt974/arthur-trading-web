@@ -500,9 +500,47 @@ def show_interface_crypto():
                 unsafe_allow_html=True
             )
 
-        # Graphique TradingView
+        # ── Sélecteur d'intervalle ──────────────────────────────
+        tf_cols = st.columns([1,1,1,1,1,1,1,4])
+        intervals = ["1m","5m","15m","1h","4h","1d","1w"]
+        if "chart_interval" not in st.session_state:
+            st.session_state.chart_interval = "4h"
+        for idx, tf in enumerate(intervals):
+            with tf_cols[idx]:
+                active = st.session_state.chart_interval == tf
+                if st.button(
+                    f"**{tf.upper()}**" if active else tf.upper(),
+                    key=f"tf_{tf}",
+                    use_container_width=True
+                ):
+                    st.session_state.chart_interval = tf
+                    st.rerun()
+
+        # ── Chart personnalisé AM.Terminal ──────────────────────
+        # Convertir le symbol de recherche au format Binance (BTCUSDT)
+        _raw = search_input.strip().upper()
+        _mapping = {
+            "BITCOIN":"BTC","ETHER":"ETH","ETHEREUM":"ETH","RIPPLE":"XRP",
+            "CARDANO":"ADA","SOLANA":"SOL","DOGECOIN":"DOGE","POLKADOT":"DOT",
+            "AVALANCHE":"AVAX","SHIBA":"SHIB","MATIC":"MATIC","POLYGON":"MATIC",
+        }
+        _base = _mapping.get(_raw, _raw)
+        _base = _base.replace("-USD","").replace("USDT","").replace("USD","").replace("BINANCE:","")
+        chart_symbol = _base + "USDT"
+
         from chart_module import render_chart
-        components.html(render_chart(symbol="BTC-USD", interval="4h"), height=700)
+        components.html(
+            render_chart(
+                symbol=chart_symbol,
+                interval=st.session_state.chart_interval,
+                limit=200,
+                height=700,
+                exchange="Binance · Spot",
+                pair_label=f"{_base}/USDT",
+            ),
+            height=700,
+            scrolling=False,
+        )
 
         # ── Header dynamique + menu roulant ─────────────────────────
         h1, h2 = st.columns([3, 1])
