@@ -279,11 +279,13 @@ const D = {{
 const SIM_SPEED  = 400;       // ms entre chaque tick (0.4s ≈ fluide)
 const VOLATILITY = 0.0008;    // volatilité par tick (~0.08%)
 
-let simPrice  = D.c[D.c.length-1];   // prix courant
-let candleStart = D.t[D.t.length-1]; // timestamp début bougie courante
-let prevPrice = simPrice;
+let simPrice    = D.c[D.c.length-1];   // prix courant
+let candleStart = D.t[D.t.length-1];   // timestamp début bougie courante
+let prevPrice   = simPrice;
+let simActive   = true;   // désactivé dès que le WS Binance est connecté
 
 function simTick() {{
+  if(!simActive) return;   // WS Binance actif → simulation OFF
   const now = Math.floor(Date.now()/1000);
 
   // ── Calcul du nouveau prix (mouvement brownien) ──
@@ -701,7 +703,10 @@ function startBinanceWS() {{
   const wsUrl = `wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`;
   ws = new WebSocket(wsUrl);
 
-  ws.onopen = () => console.log('[AM.Terminal] Binance WS connecté :', sym);
+  ws.onopen = () => {{
+    simActive = false;   // WS OK → on coupe la simulation
+    console.log('[AM.Terminal] Binance WS connecté :', sym, '— simulation désactivée');
+  }};
 
   ws.onmessage = e => {{
     try {{
@@ -718,15 +723,18 @@ function startBinanceWS() {{
     }} catch(err) {{}}
   }};
 
-  ws.onerror = () => {{
-    console.warn('[AM.Terminal] Binance WS erreur — fallback CoinGecko');
-    ws.close();
-    startFallbackPolling();
-  }};
+
 
   ws.onclose = () => {{
     console.warn('[AM.Terminal] Binance WS fermé — reconnexion dans 5s');
     setTimeout(startBinanceWS, 5000);
+  }};
+
+  ws.onerror = () => {{
+    simActive = false;   // même en cas d'erreur, pas de sim — on attend le fallback
+    console.warn('[AM.Terminal] Binance WS erreur — fallback CoinGecko');
+    ws.close();
+    startFallbackPolling();
   }};
 }}
 
