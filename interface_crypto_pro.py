@@ -486,38 +486,36 @@ def show_interface_crypto():
     with col_left:
         st.markdown('<div class="section-header">📊 CRYPTO TERMINAL</div>', unsafe_allow_html=True)
 
-        # ── Recherche avec bouton VALIDER — évite le rerun à chaque frappe ──
+        # ── Init session state ──
         if "chart_symbol" not in st.session_state:
             st.session_state.chart_symbol = "BTCUSDT"
             st.session_state.chart_base   = "BTC"
 
-        c_search, c_btn, c_info = st.columns([3, 1, 1.5])
-        with c_search:
-            search_input = st.text_input(
-                "CRYPTO", value=st.session_state.chart_base,
-                label_visibility="collapsed",
-                placeholder="BTC, ETH, SOL, PEPE..."
-            )
-        with c_btn:
-            if st.button("VALIDER", use_container_width=True, key="btn_chart_search"):
-                _mapping = {
-                    "BITCOIN":"BTC","ETHER":"ETH","ETHEREUM":"ETH","RIPPLE":"XRP",
-                    "CARDANO":"ADA","SOLANA":"SOL","DOGECOIN":"DOGE","POLKADOT":"DOT",
-                    "AVALANCHE":"AVAX","SHIBA":"SHIB","MATIC":"MATIC","POLYGON":"MATIC",
-                }
-                _raw  = search_input.strip().upper()
-                _base = _mapping.get(_raw, _raw)
-                _base = _base.replace("-USD","").replace("USDT","").replace("USD","").replace("BINANCE:","")
-                st.session_state.chart_symbol = _base + "USDT"
-                st.session_state.chart_base   = _base
-        with c_info:
-            st.markdown(
-                f"<div style='text-align:right;color:#666;padding-top:10px;font-family:monospace;font-size:11px;'>"
-                f"ACTIF : <b style='color:#ff6600'>{st.session_state.chart_base}/USDT</b></div>",
-                unsafe_allow_html=True
-            )
+        # ── Barre de recherche via st.form — rerun UNIQUEMENT sur submit ──
+        with st.form(key="form_chart_search", clear_on_submit=False):
+            c_search, c_btn = st.columns([5, 1])
+            with c_search:
+                search_input = st.text_input(
+                    "🔍 PAIRE", value=st.session_state.chart_base,
+                    placeholder="BTC · ETH · SOL · PEPE · MATIC...",
+                    label_visibility="collapsed"
+                )
+            with c_btn:
+                submitted = st.form_submit_button("GO ▶", use_container_width=True)
 
-        # ── Chart — ne se recharge QUE quand VALIDER est pressé ──
+        if submitted:
+            _mapping = {
+                "BITCOIN":"BTC","ETHER":"ETH","ETHEREUM":"ETH","RIPPLE":"XRP",
+                "CARDANO":"ADA","SOLANA":"SOL","DOGECOIN":"DOGE","POLKADOT":"DOT",
+                "AVALANCHE":"AVAX","SHIBA":"SHIB","MATIC":"MATIC","POLYGON":"MATIC",
+            }
+            _raw  = search_input.strip().upper()
+            _base = _mapping.get(_raw, _raw)
+            _base = _base.replace("-USD","").replace("USDT","").replace("USD","").replace("BINANCE:","")
+            st.session_state.chart_symbol = _base + "USDT"
+            st.session_state.chart_base   = _base
+
+        # ── Chart — ne se recharge QUE sur GO ──
         from chart_module import render_chart
         components.html(
             render_chart(
