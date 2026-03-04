@@ -486,41 +486,16 @@ def show_interface_crypto():
     with col_left:
         st.markdown('<div class="section-header">📊 CRYPTO TERMINAL</div>', unsafe_allow_html=True)
 
-        c_search, c_info = st.columns([2, 1])
-        with c_search:
-            search_input = st.text_input(
-                "RECHERCHER UNE CRYPTO (ex: BTC, Solana, PEPE)",
-                value="BTC", label_visibility="collapsed"
-            )
-        tv_symbol = get_crypto_pair(search_input)
-        with c_info:
-            st.markdown(
-                f"<div style='text-align:right;color:#666;padding-top:10px;'>"
-                f"ACTIVE: <b style='color:#fff'>{tv_symbol}</b></div>",
-                unsafe_allow_html=True
-            )
-
-        # ── Chart personnalisé AM.Terminal ──────────────────────
-        # Convertir le symbol de recherche au format Binance (BTCUSDT)
-        _raw = search_input.strip().upper()
-        _mapping = {
-            "BITCOIN":"BTC","ETHER":"ETH","ETHEREUM":"ETH","RIPPLE":"XRP",
-            "CARDANO":"ADA","SOLANA":"SOL","DOGECOIN":"DOGE","POLKADOT":"DOT",
-            "AVALANCHE":"AVAX","SHIBA":"SHIB","MATIC":"MATIC","POLYGON":"MATIC",
-        }
-        _base = _mapping.get(_raw, _raw)
-        _base = _base.replace("-USD","").replace("USDT","").replace("USD","").replace("BINANCE:","")
-        chart_symbol = _base + "USDT"
-
+        # ── Chart AM.Terminal — recherche gérée directement dans le graphique ──
         from chart_module import render_chart
         components.html(
             render_chart(
-                symbol=chart_symbol,
-                interval="4h",  # Géré directement dans la toolbar du graphique
+                symbol="BTCUSDT",
+                interval="4h",
                 limit=200,
                 height=700,
                 exchange="Binance · Spot",
-                pair_label=f"{_base}/USDT",
+                pair_label="BTC/USDT",
             ),
             height=700,
             scrolling=False,
