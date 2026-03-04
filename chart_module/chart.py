@@ -11,42 +11,77 @@ def render_chart(
     interval: str     = DEFAULT_INTERVAL,
     limit: int        = DEFAULT_LIMIT,
     height: int       = 700,
-    show_header: bool = True,
-    show_volume: bool = True,
-    show_bottom: bool = True,
-    pair_label: str   = None,
-    exchange: str     = "CoinGecko · Spot",
-    live_sim: bool    = True,   # simulation temps réel si pas d'API live
+    show_header: bool = True,   # afficher le header avec prix/OHLC
+    show_volume: bool = True,   # afficher le panneau volume
+    show_bottom: bool = True,   # afficher la barre du bas (24H stats)
+    pair_label: str   = None,   # label affiché (ex: "BTC/USDT")
+    exchange: str     = "Binance · Spot",  # source affichée
+    live_sim: bool    = True,   # simulation si pas de données live
+    show_ma: bool     = True,   # afficher MA20/50/200
+    show_bb: bool     = False,  # afficher Bollinger Bands
+    default_tf: str   = None,   # timeframe actif par défaut (ex: "4h")
 ) -> str:
+
+    from .config import COINGECKO_IDS, DATA_SOURCE
 
     try:
         candles, is_live = fetch_ohlcv(symbol=symbol, interval=interval, limit=limit)
     except Exception as e:
-        print(f"[chart_module] {e}")
+        print(f"[chart_module] Erreur fetch ({symbol} {interval}): {e}")
         candles, is_live = [], False
 
-    pair_disp  = pair_label or (
-        symbol.upper() + "/USD" if symbol.lower() in ["bitcoin","ethereum","solana","dogecoin","cardano","ripple","polkadot","avalanche-2","chainlink","litecoin","cosmos","near","uniswap","binancecoin","matic-network"]
+    # ── Affichage du nom de la paire ──
+    pair_disp = pair_label or (
+        symbol.upper() + "/USD"
+        if symbol.lower() in ["bitcoin","ethereum","solana","dogecoin","cardano",
+                               "ripple","polkadot","avalanche-2","chainlink",
+                               "litecoin","cosmos","near","uniswap","binancecoin","matic-network"]
         else symbol.replace("USDT","/USDT").replace("-USD","/USD")
     )
-    # Résoudre l'ID CoinGecko + symbol Binance pour le fetch live côté JS
-    from .config import COINGECKO_IDS
+
+    # ── ID CoinGecko (pour fallback prix live) ──
     _s = symbol.upper().replace("USDT","").replace("USD","").replace("-","")
-    coingecko_id  = COINGECKO_IDS.get(_s, symbol.lower())
-    # Symbol Binance : si déjà format BTCUSDT on garde, sinon on ajoute USDT
+    coingecko_id = COINGECKO_IDS.get(_s, symbol.lower())
+
+    # ── Symbol Binance (pour WebSocket) ──
     _sym_up = symbol.upper().replace("-","").replace("/","")
     binance_symbol = _sym_up if _sym_up.endswith("USDT") or _sym_up.endswith("BUSD") else _sym_up + "USDT"
 
+    # ── Exchange affiché selon source ──
+    src_labels = {
+        "binance":   "Binance · Spot",
+        "bybit":     "Bybit · Spot",
+        "coingecko": "CoinGecko · Spot",
+        "yfinance":  "Yahoo Finance",
+        "kraken":    "Kraken · Spot",
+        "mock":      "Simulation",
+    }
+    if exchange == "Binance · Spot":  # valeur par défaut → auto-detect
+        exchange = src_labels.get(DATA_SOURCE.lower(), DATA_SOURCE)
+
+    # ── Timeframe actif par défaut ──
+    active_tf = default_tf or interval.lower()
+
     c          = COLORS
     cd         = json.dumps(candles)
+    n_candles  = len(candles)
     status_txt = "● LIVE" if is_live else "◎ SIM"
     status_cls = "live"   if is_live else "sim"
-    run_sim    = "true"   if not is_live else "false"  # simulation seulement si pas live
+    run_sim    = "true"   if (not is_live and live_sim) else "false"
 
-    # Diagnostic affiché dans la console du navigateur
-    data_info  = f"CoinGecko · {len(candles)} bougies · is_live={is_live}" if is_live else f"MOCK DATA · {len(candles)} bougies (CoinGecko indisponible)"
+    # ── Visibilité des sections ──
+    hdr_display  = "flex"   if show_header else "none"
+    bbar_display = "flex"   if show_bottom else "none"
+    vol_init_js  = "true"   if show_volume else "false"
+    ma_init_js   = "true"   if show_ma     else "false"
+    bb_init_js   = "true"   if show_bb     else "false"
 
-    # Interval en secondes pour la simulation
+    data_info = (
+        f"{DATA_SOURCE.upper()} · {n_candles} bougies · LIVE"
+        if is_live else
+        f"MOCK · {n_candles} bougies ({DATA_SOURCE} indisponible)"
+    )
+
     iv_sec = {
         "1m":60,"5m":300,"15m":900,"30m":1800,
         "1h":3600,"4h":14400,"1d":86400,"1w":604800
@@ -148,10 +183,11 @@ html,body{{
 <body>
 
 <!-- HEADER -->
-<div class="hdr">
+<div class="hdr" style="display:{hdr_display}">
   <div class="logo">AM<span style="color:#fff">.</span>TERMINAL</div>
   <div class="pair">{pair_disp}</div>
   <div class="exch">{exchange}</div>
+  <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:1px;">{DATA_SOURCE.upper()}</div>
   <div class="price-big" id="curPrice">—</div>
   <div class="price-chg up" id="curChg">—</div>
   <div class="ohlc-row">
@@ -167,17 +203,17 @@ html,body{{
 
 <!-- TOOLBAR -->
 <div class="toolbar">
-  <button class="tf-btn" onclick="setTF(this,'1m')">1m</button>
-  <button class="tf-btn" onclick="setTF(this,'5m')">5m</button>
-  <button class="tf-btn" onclick="setTF(this,'15m')">15m</button>
-  <button class="tf-btn" onclick="setTF(this,'1h')">1h</button>
-  <button class="tf-btn active" id="tfActive" onclick="setTF(this,'4h')">4h</button>
-  <button class="tf-btn" onclick="setTF(this,'1d')">1D</button>
-  <button class="tf-btn" onclick="setTF(this,'1w')">1W</button>
+  <button class="tf-btn {'active' if active_tf=='1m' else ''}" onclick="setTF(this,'1m')">1m</button>
+  <button class="tf-btn {'active' if active_tf=='5m' else ''}" onclick="setTF(this,'5m')">5m</button>
+  <button class="tf-btn {'active' if active_tf=='15m' else ''}" onclick="setTF(this,'15m')">15m</button>
+  <button class="tf-btn {'active' if active_tf=='1h' else ''}" onclick="setTF(this,'1h')">1h</button>
+  <button class="tf-btn {'active' if active_tf=='4h' else ''}" onclick="setTF(this,'4h')">4h</button>
+  <button class="tf-btn {'active' if active_tf=='1d' else ''}" onclick="setTF(this,'1D')">1D</button>
+  <button class="tf-btn {'active' if active_tf=='1w' else ''}" onclick="setTF(this,'1W')">1W</button>
   <div class="tb-sep"></div>
-  <button class="indicator-btn on" id="btnMA" onclick="toggleMA()">MA</button>
-  <button class="indicator-btn on" id="btnVol" onclick="toggleVol()">Vol</button>
-  <button class="indicator-btn" id="btnBB" onclick="toggleBB()">BB</button>
+  <button class="indicator-btn {'on' if show_ma else ''}" id="btnMA" onclick="toggleMA()">MA</button>
+  <button class="indicator-btn {'on' if show_volume else ''}" id="btnVol" onclick="toggleVol()">Vol</button>
+  <button class="indicator-btn {'on' if show_bb else ''}" id="btnBB" onclick="toggleBB()">BB</button>
 </div>
 
 <!-- ZONE CHART -->
@@ -198,7 +234,7 @@ html,body{{
 </div>
 
 <!-- BOTTOM BAR -->
-<div class="bbar">
+<div class="bbar" style="display:{bbar_display}">
   <div class="bstat"><span class="lbl">24H HIGH</span><span class="val" id="b_hi" style="color:var(--bull)">—</span></div>
   <div class="bstat"><span class="lbl">24H LOW</span> <span class="val" id="b_lo" style="color:var(--bear)">—</span></div>
   <div class="bstat"><span class="lbl">CHANGE</span>  <span class="val" id="b_chg">—</span></div>
@@ -226,9 +262,9 @@ const D = {{
 // ════════════════════════════════════════════════════════
 const PAD  = {{l:0, r:72, t:8, b:24}};
 const VPAH = 80;   // hauteur volume
-let showMA  = true;
-let showVol = true;
-let showBB  = false;
+let showMA  = {ma_init_js};
+let showVol = {vol_init_js};
+let showBB  = {bb_init_js};
 
 let VIEW_START = 0, VIEW_END = 0;
 let HOVER_IDX  = -1, HOVER_Y = -1;
