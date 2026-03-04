@@ -57,211 +57,161 @@ def render_chart(
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 :root{{
-  --bg:{c['bg']};--surface:{c['surface']};--surface2:{c['surface2']};
-  --border:{c['border']};--border2:{c['border2']};--border3:#333;
-  --text:{c['text']};--text2:{c['text2']};--muted:{c['muted']};
-  --faint:{c['faint']};--fainter:{c['fainter']};
-  --orange:{c['orange']};--yellow:{c['yellow']};
-  --green:{c['green']};--green2:{c['green2']};
-  --red:{c['red']};--red2:{c['red2']};
+  --bg:#131722;--surface:#1e222d;--surface2:#2a2e39;
+  --border:#2a2e39;--border2:#363a45;
+  --text:#d1d4dc;--text2:#b2b5be;--muted:#787b86;
+  --faint:#50535e;--fainter:#363a45;
+  --orange:#ff9800;--yellow:#f0b429;
+  --green:#26a69a;--green2:#00e676;
+  --red:#ef5350;--red2:#ff5252;
+  --bull:#26a69a;--bear:#ef5350;
+  --bull-bg:rgba(38,166,154,0.15);--bear-bg:rgba(239,83,80,0.15);
 }}
 *{{margin:0;padding:0;box-sizing:border-box;}}
-html,body{{background:var(--bg);color:var(--text);
+html,body{{
+  background:var(--bg);color:var(--text);
   font-family:'IBM Plex Mono',monospace;font-size:12px;
-  width:100%;overflow:hidden;}}
+  width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column;
+}}
 
-/* ── HEADER 1 ── */
-.hdr1{{display:flex;align-items:stretch;background:var(--surface);
-  border-bottom:1px solid var(--border2);height:52px;overflow:hidden;}}
-.logo{{font-weight:700;font-size:13px;letter-spacing:2px;padding:0 18px;
-  border-right:1px solid var(--border2);text-transform:uppercase;
-  display:flex;align-items:center;white-space:nowrap;}}
-.logo span{{color:var(--orange);}}
-.hdr-pair{{display:flex;flex-direction:column;justify-content:center;
-  padding:0 18px;border-right:1px solid var(--border2);}}
-.pair-name{{font-size:14px;font-weight:700;letter-spacing:1px;}}
-.pair-exch{{font-size:9px;color:var(--faint);letter-spacing:1px;margin-top:2px;}}
-.hdr-price{{display:flex;flex-direction:column;justify-content:center;
-  padding:0 18px;border-right:1px solid var(--border2);min-width:170px;}}
-.price-val{{font-size:20px;font-weight:700;letter-spacing:-0.5px;transition:color .2s;}}
-.price-chg{{font-size:10px;margin-top:2px;}}
-.hdr-ohlc{{display:flex;gap:22px;padding:0 18px;align-items:center;
-  border-right:1px solid var(--border2);}}
+/* ── HEADER ── */
+.hdr{{display:flex;align-items:center;background:var(--surface);
+  border-bottom:1px solid var(--border2);height:46px;padding:0 12px;gap:0;flex-shrink:0;}}
+.logo{{font-weight:700;font-size:12px;letter-spacing:2px;color:var(--orange);
+  padding-right:14px;border-right:1px solid var(--border2);margin-right:14px;white-space:nowrap;}}
+.pair{{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.5px;margin-right:8px;}}
+.exch{{font-size:9px;color:var(--faint);letter-spacing:1px;margin-right:16px;}}
+.price-big{{font-size:20px;font-weight:700;letter-spacing:-0.5px;transition:color .15s;margin-right:6px;}}
+.price-chg{{font-size:11px;padding:2px 7px;border-radius:3px;font-weight:600;margin-right:16px;}}
+.price-chg.up{{background:rgba(38,166,154,0.15);color:var(--bull);}}
+.price-chg.dn{{background:rgba(239,83,80,0.15);color:var(--bear);}}
+.ohlc-row{{display:flex;gap:16px;align-items:center;}}
 .ohlc-item{{display:flex;flex-direction:column;gap:1px;}}
-.ohlc-lbl{{font-size:8px;color:var(--faint);letter-spacing:1.5px;text-transform:uppercase;}}
+.ohlc-lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
 .ohlc-val{{font-size:11px;font-weight:600;}}
-
-/* ── HEADER 2 ── */
-.hdr2{{display:flex;align-items:stretch;background:var(--surface);
-  border-bottom:1px solid var(--border2);height:36px;}}
-.tf-group{{display:flex;padding:0 8px;border-right:1px solid var(--border2);
-  align-items:center;gap:1px;}}
-.tf-btn{{padding:3px 8px;border:none;background:transparent;color:var(--faint);
-  font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;
-  text-transform:uppercase;border-bottom:2px solid transparent;transition:all .12s;height:100%;}}
-.tf-btn:hover{{color:var(--text);background:rgba(255,255,255,0.04);}}
-.tf-btn.active{{color:var(--orange);border-bottom-color:var(--orange);}}
-.hdr2-right{{margin-left:auto;display:flex;align-items:stretch;}}
-.stat-pill{{padding:0 14px;border-left:1px solid var(--border2);
-  display:flex;flex-direction:column;justify-content:center;gap:1px;}}
-.stat-pill .lbl{{font-size:8px;color:var(--faint);letter-spacing:1.5px;text-transform:uppercase;}}
-.stat-pill .val{{font-size:11px;font-weight:600;color:var(--yellow);}}
-
-/* ── MODE DROPDOWN ── */
-.mode-wrap{{position:relative;border-left:1px solid var(--border2);}}
-.mode-btn{{display:flex;align-items:center;gap:8px;padding:0 14px;height:100%;
-  cursor:pointer;background:transparent;border:none;border-bottom:2px solid var(--text2);
-  font-family:'IBM Plex Mono',monospace;min-width:110px;transition:background .12s;}}
-.mode-btn:hover{{background:var(--surface2);}}
-.mode-info{{display:flex;flex-direction:column;gap:1px;text-align:left;}}
-.mode-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);}}
-.mode-sub{{font-size:8px;color:var(--faint);}}
-.mode-caret{{margin-left:auto;font-size:8px;color:var(--faint);transition:transform .15s;}}
-.mode-caret.open{{transform:rotate(180deg);}}
-.mode-btn[data-mode="pro"]  .mode-lbl{{color:var(--orange);}}
-.mode-btn[data-mode="quant"].mode-lbl{{color:var(--yellow);}}
-.mode-btn[data-mode="pro"]  {{border-bottom-color:var(--orange);}}
-.mode-btn[data-mode="quant"]{{border-bottom-color:var(--yellow);}}
-.mode-dd{{display:none;position:absolute;top:100%;right:0;
-  background:var(--surface);border:1px solid var(--border2);
-  min-width:155px;z-index:9999;box-shadow:0 8px 20px rgba(0,0,0,0.8);}}
-.mode-dd.open{{display:block;}}
-.mode-opt{{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;
-  border-bottom:1px solid var(--border);transition:background .1s;}}
-.mode-opt:last-child{{border-bottom:none;}}
-.mode-opt:hover{{background:var(--surface2);}}
-.mode-opt.active{{background:rgba(255,149,0,0.06);}}
-.mo-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;flex:1;}}
-.mo-desc{{font-size:9px;color:var(--faint);}}
-.mo-check{{font-size:10px;color:var(--orange);opacity:0;}}
-.mode-opt.active .mo-check{{opacity:1;}}
-
-/* ── LABEL BAR ── */
-.lbar{{display:flex;align-items:center;gap:14px;padding:0 14px;
-  background:var(--surface);border-bottom:1px solid var(--border);
-  font-size:10px;color:var(--faint);height:28px;flex-shrink:0;}}
-.lbar b{{color:var(--text2);font-weight:600;}}
-.lbar .tag{{margin-left:auto;color:var(--orange);font-size:9px;
-  letter-spacing:1px;text-transform:uppercase;}}
-.api-badge{{font-size:8px;padding:1px 7px;border-radius:2px;letter-spacing:1px;}}
-.api-badge.sim{{color:var(--orange);background:rgba(255,149,0,0.08);border:1px solid rgba(255,149,0,0.3);}}
-.api-badge.live{{color:var(--green2);background:rgba(0,255,173,0.07);border:1px solid var(--green2);}}
-.pulse{{animation:pulse 1.5s infinite;}}
+.hdr-right{{margin-left:auto;display:flex;align-items:center;gap:12px;}}
+.live-badge{{font-size:9px;padding:2px 8px;border-radius:2px;letter-spacing:1px;font-weight:700;}}
+.live-badge.live{{color:#00e676;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);animation:pulse 1.5s infinite;}}
+.live-badge.sim{{color:var(--orange);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.3);}}
 @keyframes pulse{{0%,100%{{opacity:1;}}50%{{opacity:0.4;}}}}
 
-/* ── CANVAS ── */
-#cvMain{{display:block;background:var(--bg);cursor:crosshair;}}
-#cvVol {{display:block;background:var(--bg);}}
+/* ── TOOLBAR (timeframes) ── */
+.toolbar{{display:flex;align-items:center;background:var(--surface);
+  border-bottom:1px solid var(--border2);height:34px;padding:0 8px;gap:2px;flex-shrink:0;}}
+.tf-btn{{padding:3px 9px;border:none;background:transparent;color:var(--muted);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
+  border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.5px;}}
+.tf-btn:hover{{background:var(--surface2);color:var(--text);}}
+.tf-btn.active{{background:rgba(255,152,0,0.12);color:var(--orange);}}
+.tb-sep{{width:1px;height:18px;background:var(--border2);margin:0 4px;}}
+.indicator-btn{{padding:3px 9px;border:1px solid var(--border2);background:transparent;
+  color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;
+  border-radius:3px;transition:all .1s;}}
+.indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
+.indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
+
+/* ── CHART ZONE ── */
+.chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
+#cvMain{{display:block;cursor:crosshair;}}
+.vol-sep{{height:1px;background:var(--border);flex-shrink:0;}}
+#cvVol{{display:block;background:var(--bg);flex-shrink:0;}}
+
+/* ── TOOLTIP FLOTTANT ── */
+#tooltip{{
+  position:fixed;pointer-events:none;z-index:9999;
+  background:var(--surface);border:1px solid var(--border2);
+  padding:8px 12px;border-radius:4px;font-size:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.6);display:none;
+  min-width:160px;
+}}
+#tooltip .tt-date{{color:var(--muted);font-size:9px;margin-bottom:6px;letter-spacing:1px;}}
+#tooltip .tt-row{{display:flex;justify-content:space-between;gap:16px;margin:2px 0;}}
+#tooltip .tt-lbl{{color:var(--faint);font-size:9px;}}
+#tooltip .tt-val{{font-weight:600;font-size:10px;}}
 
 /* ── BOTTOM BAR ── */
-.bbar{{display:flex;border-top:1px solid var(--border2);background:var(--surface);height:52px;}}
+.bbar{{display:flex;background:var(--surface);border-top:1px solid var(--border2);
+  height:36px;flex-shrink:0;}}
 .bstat{{flex:1;padding:0 14px;border-right:1px solid var(--border);
-  display:flex;flex-direction:column;justify-content:center;gap:2px;}}
+  display:flex;align-items:center;gap:8px;}}
 .bstat:last-child{{border-right:none;}}
-.bstat .lbl{{font-size:8px;color:var(--faint);letter-spacing:1.5px;text-transform:uppercase;}}
-.bstat .val{{font-size:13px;font-weight:700;}}
-.bstat .sub{{font-size:9px;color:var(--fainter);}}
+.bstat .lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
+.bstat .val{{font-size:12px;font-weight:700;}}
+
 ::-webkit-scrollbar{{width:4px;}}
 ::-webkit-scrollbar-track{{background:var(--bg);}}
-::-webkit-scrollbar-thumb{{background:var(--border3);border-radius:2px;}}
+::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:2px;}}
 </style>
 </head>
 <body>
 
-<!-- HEADER 1 -->
-<div class="hdr1">
-  <div class="logo">AM<span>.</span>Terminal</div>
-  <div class="hdr-pair">
-    <div class="pair-name">{pair_disp}</div>
-    <div class="pair-exch">{exchange}</div>
+<!-- HEADER -->
+<div class="hdr">
+  <div class="logo">AM<span style="color:#fff">.</span>TERMINAL</div>
+  <div class="pair">{pair_disp}</div>
+  <div class="exch">{exchange}</div>
+  <div class="price-big" id="curPrice">—</div>
+  <div class="price-chg up" id="curChg">—</div>
+  <div class="ohlc-row">
+    <div class="ohlc-item"><div class="ohlc-lbl">O</div><div class="ohlc-val" id="ho">—</div></div>
+    <div class="ohlc-item"><div class="ohlc-lbl">H</div><div class="ohlc-val" id="hh" style="color:var(--bull)">—</div></div>
+    <div class="ohlc-item"><div class="ohlc-lbl">L</div><div class="ohlc-val" id="hl" style="color:var(--bear)">—</div></div>
+    <div class="ohlc-item"><div class="ohlc-lbl">C</div><div class="ohlc-val" id="hc">—</div></div>
   </div>
-  <div class="hdr-price">
-    <div class="price-val" id="curPrice" style="color:var(--green2)">—</div>
-    <div class="price-chg" id="curChg"   style="color:var(--green2)">—</div>
-  </div>
-  <div class="hdr-ohlc">
-    <div class="ohlc-item"><div class="ohlc-lbl">Open</div> <div class="ohlc-val" id="ho" style="color:var(--text2)">—</div></div>
-    <div class="ohlc-item"><div class="ohlc-lbl">High</div> <div class="ohlc-val" id="hh" style="color:var(--green2)">—</div></div>
-    <div class="ohlc-item"><div class="ohlc-lbl">Low</div>  <div class="ohlc-val" id="hl" style="color:var(--red2)">—</div></div>
-    <div class="ohlc-item"><div class="ohlc-lbl">Close</div><div class="ohlc-val" id="hc" style="color:var(--text2)">—</div></div>
-  </div>
-</div>
-
-<!-- HEADER 2 -->
-<div class="hdr2">
-  <div class="tf-group">
-    <button class="tf-btn" onclick="setTF(this,'1m')">1M</button>
-    <button class="tf-btn" onclick="setTF(this,'5m')">5M</button>
-    <button class="tf-btn" onclick="setTF(this,'15m')">15M</button>
-    <button class="tf-btn" onclick="setTF(this,'1h')">1H</button>
-    <button class="tf-btn active" onclick="setTF(this,'4h')">4H</button>
-    <button class="tf-btn" onclick="setTF(this,'1d')">1D</button>
-    <button class="tf-btn" onclick="setTF(this,'1w')">1W</button>
-  </div>
-  <div class="hdr2-right">
-    <div class="stat-pill"><div class="lbl">24H Vol</div><div class="val" id="statVol">—</div></div>
-    <div class="stat-pill"><div class="lbl">24H High</div><div class="val" id="stat24h" style="color:var(--green2)">—</div></div>
-    <div class="stat-pill"><div class="lbl">24H Low</div> <div class="val" id="stat24l" style="color:var(--red2)">—</div></div>
-    <div class="mode-wrap">
-      <button class="mode-btn" id="modeBtn" data-mode="normal" onclick="toggleDD()">
-        <div class="mode-info">
-          <div class="mode-lbl" id="modeLbl">Normal</div>
-          <div class="mode-sub" id="modeSub">Standard</div>
-        </div>
-        <span class="mode-caret" id="modeCaret">&#9660;</span>
-      </button>
-      <div class="mode-dd" id="modeDD">
-        <div class="mode-opt active" onclick="pickMode('normal','Normal','Standard')">
-          <div><div class="mo-lbl" style="color:var(--text2)">Normal</div><div class="mo-desc">Vue standard</div></div>
-          <span class="mo-check">&#10003;</span>
-        </div>
-        <div class="mode-opt" onclick="pickMode('pro','Pro','Avancée')">
-          <div><div class="mo-lbl" style="color:var(--orange)">Pro</div><div class="mo-desc">Vue avancée</div></div>
-          <span class="mo-check">&#10003;</span>
-        </div>
-        <div class="mode-opt" onclick="pickMode('quant','Quant','Algorithmique')">
-          <div><div class="mo-lbl" style="color:var(--yellow)">Quant</div><div class="mo-desc">Algorithmique</div></div>
-          <span class="mo-check">&#10003;</span>
-        </div>
-      </div>
-    </div>
+  <div class="hdr-right">
+    <span class="live-badge {status_cls}" id="apiBadge">{status_txt}</span>
   </div>
 </div>
 
-<!-- LABEL BAR -->
-<div class="lbar">
-  <span>O <b id="co">—</b></span>
-  <span>H <b id="ch">—</b></span>
-  <span>L <b id="cl">—</b></span>
-  <span>C <b id="cc">—</b></span>
-  <span class="api-badge {status_cls} pulse" id="apiBadge">{status_txt}</span>
-  <span class="tag">Canvas · {pair_disp} · {interval.upper()}</span>
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <button class="tf-btn" onclick="setTF(this,'1m')">1m</button>
+  <button class="tf-btn" onclick="setTF(this,'5m')">5m</button>
+  <button class="tf-btn" onclick="setTF(this,'15m')">15m</button>
+  <button class="tf-btn" onclick="setTF(this,'1h')">1h</button>
+  <button class="tf-btn active" id="tfActive" onclick="setTF(this,'4h')">4h</button>
+  <button class="tf-btn" onclick="setTF(this,'1d')">1D</button>
+  <button class="tf-btn" onclick="setTF(this,'1w')">1W</button>
+  <div class="tb-sep"></div>
+  <button class="indicator-btn on" id="btnMA" onclick="toggleMA()">MA</button>
+  <button class="indicator-btn on" id="btnVol" onclick="toggleVol()">Vol</button>
+  <button class="indicator-btn" id="btnBB" onclick="toggleBB()">BB</button>
 </div>
 
-<!-- CANVAS PRINCIPAL -->
-<canvas id="cvMain"></canvas>
+<!-- ZONE CHART -->
+<div class="chart-zone">
+  <canvas id="cvMain"></canvas>
+  <div class="vol-sep"></div>
+  <canvas id="cvVol"></canvas>
+</div>
 
-<!-- VOLUME -->
-<canvas id="cvVol"></canvas>
+<!-- TOOLTIP -->
+<div id="tooltip">
+  <div class="tt-date" id="ttDate">—</div>
+  <div class="tt-row"><span class="tt-lbl">Open</span><span class="tt-val" id="ttO">—</span></div>
+  <div class="tt-row"><span class="tt-lbl">High</span><span class="tt-val" id="ttH" style="color:var(--bull)">—</span></div>
+  <div class="tt-row"><span class="tt-lbl">Low</span> <span class="tt-val" id="ttL" style="color:var(--bear)">—</span></div>
+  <div class="tt-row"><span class="tt-lbl">Close</span><span class="tt-val" id="ttC">—</span></div>
+  <div class="tt-row"><span class="tt-lbl">Vol</span><span class="tt-val" id="ttV" style="color:var(--muted)">—</span></div>
+</div>
 
 <!-- BOTTOM BAR -->
 <div class="bbar">
-  <div class="bstat"><div class="lbl">24H High</div><div class="val" id="b_hi" style="color:var(--green2)">—</div></div>
-  <div class="bstat"><div class="lbl">24H Low</div> <div class="val" id="b_lo" style="color:var(--red2)">—</div></div>
-  <div class="bstat"><div class="lbl">Variation</div><div class="val" id="b_chg">—</div></div>
-  <div class="bstat"><div class="lbl">Volume total</div><div class="val" id="b_vol">—</div></div>
+  <div class="bstat"><span class="lbl">24H HIGH</span><span class="val" id="b_hi" style="color:var(--bull)">—</span></div>
+  <div class="bstat"><span class="lbl">24H LOW</span> <span class="val" id="b_lo" style="color:var(--bear)">—</span></div>
+  <div class="bstat"><span class="lbl">CHANGE</span>  <span class="val" id="b_chg">—</span></div>
+  <div class="bstat"><span class="lbl">VOLUME</span>  <span class="val" id="b_vol" style="color:var(--muted)">—</span></div>
 </div>
 
 <script>
 // ════════════════════════════════════════════════════════
-//  DONNÉES HISTORIQUES (injectées depuis Python)
+//  DONNÉES
 // ════════════════════════════════════════════════════════
 const HISTORICAL = {cd};
-const IV_SEC     = {iv_sec};   // durée d'une bougie en secondes
+const IV_SEC     = {iv_sec};
 
-// Copie mutable des données
 const D = {{
   t: HISTORICAL.map(r=>r.t),
   o: HISTORICAL.map(r=>r.o),
@@ -272,117 +222,116 @@ const D = {{
 }};
 
 // ════════════════════════════════════════════════════════
-//  SIMULATION TEMPS RÉEL
-//  Met à jour la dernière bougie en continu ET
-//  crée une nouvelle bougie à chaque fin d'intervalle
+//  CONFIG RENDU
 // ════════════════════════════════════════════════════════
-const SIM_SPEED  = 400;       // ms entre chaque tick (0.4s ≈ fluide)
-const VOLATILITY = 0.0008;    // volatilité par tick (~0.08%)
+const PAD  = {{l:0, r:72, t:8, b:24}};
+const VPAH = 80;   // hauteur volume
+let showMA  = true;
+let showVol = true;
+let showBB  = false;
 
-let simPrice    = D.c[D.c.length-1];   // prix courant
-let candleStart = D.t[D.t.length-1];   // timestamp début bougie courante
+let VIEW_START = 0, VIEW_END = 0;
+let HOVER_IDX  = -1, HOVER_Y = -1;
+let isDragging = false, dragStartX = 0, dragStartView = 0;
+
+// ════════════════════════════════════════════════════════
+//  SIMULATION
+// ════════════════════════════════════════════════════════
+let simActive   = true;
+let simPrice    = D.c[D.c.length-1] || 100;
+let candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
 let prevPrice   = simPrice;
-let simActive   = true;   // désactivé dès que le WS Binance est connecté
+const VOLATILITY = 0.0006;
 
 function simTick() {{
-  if(!simActive) return;   // WS Binance actif → simulation OFF
+  if(!simActive) return;
   const now = Math.floor(Date.now()/1000);
+  const drift    = (Math.random()-0.499)*VOLATILITY;
+  const momentum = (simPrice-prevPrice)*0.12;
+  const noise    = (Math.random()-0.5)*simPrice*VOLATILITY*0.4;
+  prevPrice = simPrice;
+  simPrice  = Math.max(simPrice*(1+drift)+momentum+noise, 0.01);
 
-  // ── Calcul du nouveau prix (mouvement brownien) ──
-  const drift     = (Math.random() - 0.499) * VOLATILITY;
-  const momentum  = (simPrice - prevPrice) * 0.15;  // légère inertie
-  const noise     = (Math.random() - 0.5) * simPrice * VOLATILITY * 0.5;
-  prevPrice       = simPrice;
-  simPrice        = Math.max(simPrice * (1 + drift) + momentum + noise, 1);
-
-  const last = D.t.length - 1;
-
-  // ── Nouvelle bougie si l'intervalle est écoulé ──
-  const nextCandleTime = candleStart + IV_SEC;
-  if(now >= nextCandleTime) {{
+  if(now >= candleStart+IV_SEC) {{
     candleStart = now;
-    D.t.push(now);
-    D.o.push(simPrice);
-    D.h.push(simPrice);
-    D.l.push(simPrice);
-    D.c.push(simPrice);
-    D.v.push(0);
-    // Fenêtre glissante : garder max 300 bougies
-    if(D.t.length > 300) {{
-      D.t.shift(); D.o.shift(); D.h.shift();
-      D.l.shift(); D.c.shift(); D.v.shift();
-      if(VIEW_START > 0) VIEW_START--;
-    }}
-    // Avancer la vue si on était sur la dernière bougie
-    if(VIEW_END >= D.t.length-1) VIEW_END = D.t.length;
+    D.t.push(now); D.o.push(simPrice); D.h.push(simPrice);
+    D.l.push(simPrice); D.c.push(simPrice); D.v.push(0);
+    if(D.t.length>350){{D.t.shift();D.o.shift();D.h.shift();D.l.shift();D.c.shift();D.v.shift();if(VIEW_START>0)VIEW_START--;}}
+    if(VIEW_END>=D.t.length-1) VIEW_END=D.t.length;
   }} else {{
-    // ── Mise à jour de la bougie courante ──
-    const i = D.t.length - 1;
-    D.c[i] = simPrice;
-    if(simPrice > D.h[i]) D.h[i] = simPrice;
-    if(simPrice < D.l[i]) D.l[i] = simPrice;
-    D.v[i] += Math.random() * 0.5;  // volume qui monte
+    const i=D.t.length-1;
+    D.c[i]=simPrice;
+    if(simPrice>D.h[i])D.h[i]=simPrice;
+    if(simPrice<D.l[i])D.l[i]=simPrice;
+    D.v[i]+=Math.random()*0.3;
   }}
-
-  // ── Mise à jour header prix ──
-  const priceEl = document.getElementById('curPrice');
-  const chgEl   = document.getElementById('curChg');
-  const open0   = D.o[0];
-  const pct     = ((simPrice - open0) / open0 * 100).toFixed(2);
-  const bull     = simPrice >= open0;
-
-  if(priceEl) {{
-    priceEl.textContent = fmt(simPrice);
-    priceEl.style.color = bull ? 'var(--green2)' : 'var(--red2)';
-    // Flash sur changement de direction
-    priceEl.style.textShadow = simPrice > prevPrice
-      ? '0 0 8px rgba(0,200,83,0.6)'
-      : '0 0 8px rgba(255,59,48,0.6)';
-    setTimeout(()=>{{ if(priceEl) priceEl.style.textShadow='none'; }}, 300);
-  }}
-  if(chgEl) {{
-    chgEl.textContent = (pct>=0?'▲ +':'▼ ')+pct+'%';
-    chgEl.style.color = bull ? 'var(--green2)' : 'var(--red2)';
-  }}
-
-  updateStats();
+  applyHeaderPrice(simPrice, ((simPrice-D.o[0])/D.o[0]*100));
   render();
 }}
 
 // ════════════════════════════════════════════════════════
-//  RENDU CANVAS
+//  CANVAS
 // ════════════════════════════════════════════════════════
 const cvMain = document.getElementById('cvMain');
 const cvVol  = document.getElementById('cvVol');
 const ctxM   = cvMain.getContext('2d');
 const ctxV   = cvVol.getContext('2d');
-
-const PAD = {{l:10, r:74, t:10, b:26}};
-let VIEW_START = 0;
-let VIEW_END   = 0;
-let HOVER_IDX  = -1;
-let isDragging = false, dragStartX = 0, dragStartView = 0;
-
-const $   = id => document.getElementById(id);
-const fmt = v => {{
-  if(v==null||isNaN(v)) return '—';
-  return v>=1000
-    ? v.toLocaleString('en-US',{{minimumFractionDigits:2,maximumFractionDigits:2}})
-    : v.toFixed(v<1?4:2);
-}};
-const fmtV = v => v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v.toFixed(0);
+const $      = id => document.getElementById(id);
 const setTxt = (id,v) => {{ const e=$(id); if(e) e.textContent=v; }};
 const setCol = (id,c) => {{ const e=$(id); if(e) e.style.color=c; }};
 
+const fmt = v => {{
+  if(v==null||isNaN(v)) return '—';
+  if(v>=10000) return v.toLocaleString('en-US',{{minimumFractionDigits:2,maximumFractionDigits:2}});
+  if(v>=100)   return v.toFixed(2);
+  if(v>=1)     return v.toFixed(4);
+  return v.toFixed(6);
+}};
+const fmtV = v => v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v.toFixed(0);
+const fmtDate = ts => {{
+  const d=new Date(ts*1000);
+  return d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}})
+    +' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}};
+
 function setupCanvas() {{
-  const W = window.innerWidth || document.documentElement.clientWidth || 900;
-  const totalH  = window.innerHeight || {height};
-  const usedH   = 52+36+28+52+70;
-  const mainH   = Math.max(totalH - usedH, 180);
-  cvMain.width  = W; cvMain.height = mainH;
-  cvVol.width   = W; cvVol.height  = 70;
+  const W  = window.innerWidth  || 900;
+  const fullH = window.innerHeight || 600;
+  // Hauteurs fixes des zones UI
+  const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
+  const volH  = showVol ? VPAH : 0;
+  const mainH = Math.max(fullH - hdrH - tbH - bbarH - volH - sepH, 150);
+
+  cvMain.width=W; cvMain.height=mainH;
+  cvVol.width=W;  cvVol.height=volH;
   cvMain.style.width=W+'px'; cvMain.style.height=mainH+'px';
-  cvVol.style.width =W+'px'; cvVol.style.height ='70px';
+  cvVol.style.width=W+'px';  cvVol.style.height=volH+'px';
+  cvVol.style.display=showVol?'block':'none';
+  document.querySelector('.vol-sep').style.display=showVol?'block':'none';
+}}
+
+// ── Calcul MA ──
+function calcMA(data, period) {{
+  const out=[];
+  for(let i=0;i<data.length;i++) {{
+    if(i<period-1){{out.push(null);continue;}}
+    let s=0;for(let j=i-period+1;j<=i;j++) s+=data[j];
+    out.push(s/period);
+  }}
+  return out;
+}}
+
+// ── Calcul Bollinger Bands ──
+function calcBB(data, period=20, mult=2) {{
+  const ma=calcMA(data,period);
+  const upper=[],lower=[];
+  for(let i=0;i<data.length;i++) {{
+    if(ma[i]===null){{upper.push(null);lower.push(null);continue;}}
+    let v=0;for(let j=i-period+1;j<=i;j++) v+=Math.pow(data[j]-ma[i],2);
+    const sd=Math.sqrt(v/period);
+    upper.push(ma[i]+mult*sd);lower.push(ma[i]-mult*sd);
+  }}
+  return {{ma,upper,lower}};
 }}
 
 function drawMain() {{
@@ -390,197 +339,346 @@ function drawMain() {{
   const ctx=ctxM;
   ctx.clearRect(0,0,W,H);
 
-  const N = VIEW_END - VIEW_START;
+  const N=VIEW_END-VIEW_START;
   if(N<1) return;
 
-  const ts=D.t.slice(VIEW_START,VIEW_END);
-  const os=D.o.slice(VIEW_START,VIEW_END);
-  const hs=D.h.slice(VIEW_START,VIEW_END);
-  const ls=D.l.slice(VIEW_START,VIEW_END);
-  const cs=D.c.slice(VIEW_START,VIEW_END);
+  const slice=(arr)=>arr.slice(VIEW_START,VIEW_END);
+  const ts=slice(D.t), os=slice(D.o), hs=slice(D.h), ls=slice(D.l), cs=slice(D.c);
 
-  const minP = Math.min(...ls)*0.9995;
-  const maxP = Math.max(...hs)*1.0005;
-  const rng  = maxP-minP || 1;
+  const minP=Math.min(...ls);
+  const maxP=Math.max(...hs);
+  const pad =Math.max((maxP-minP)*0.05, maxP*0.001);
+  const lo=minP-pad, hi=maxP+pad, rng=hi-lo||1;
 
-  const cw  = (W-PAD.l-PAD.r)/N;
-  const gap = Math.max(0.08, Math.min(0.3, 2/N));
-  const bw  = Math.max(1.5, cw*(1-gap));
+  const CW=(W-PAD.l-PAD.r)/N;
+  const BW=Math.max(1, CW*0.75);
+  const toX=i=>PAD.l+i*CW+CW/2;
+  const toY=p=>PAD.t+(hi-p)/rng*(H-PAD.t-PAD.b);
 
-  const toX = i => PAD.l + i*cw + cw/2;
-  const toY = p => PAD.t + (maxP-p)/rng*(H-PAD.t-PAD.b);
+  // ── FOND ──
+  ctx.fillStyle='#131722';
+  ctx.fillRect(0,0,W,H);
 
-  // ── Grille ──────────────────────────────────────────
-  const steps=6;
-  for(let s=0;s<=steps;s++) {{
-    const y = PAD.t + s*(H-PAD.t-PAD.b)/steps;
-    ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
-    const price = maxP - s*rng/steps;
-    ctx.fillStyle='#555'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='left';
-    ctx.fillText(fmt(price), W-PAD.r+4, y+3);
+  // ── GRILLE HORIZONTALE ──
+  const gridSteps=6;
+  for(let s=0;s<=gridSteps;s++) {{
+    const y=PAD.t+s*(H-PAD.t-PAD.b)/gridSteps;
+    const price=hi-s*rng/gridSteps;
+    ctx.strokeStyle='#1e222d'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
+    // Prix axe droit
+    ctx.fillStyle='#787b86'; ctx.font='10px IBM Plex Mono,monospace';
+    ctx.textAlign='left'; ctx.fillText(fmt(price), W-PAD.r+6, y+4);
   }}
 
-  // ── Axe temps ───────────────────────────────────────
-  const ticks=Math.min(8,Math.floor(N/10));
-  ctx.fillStyle='#555'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='center';
-  for(let t=0;t<=ticks;t++) {{
-    const i=Math.floor(t*(N-1)/Math.max(ticks,1));
+  // ── GRILLE VERTICALE + AXE TEMPS ──
+  ctx.fillStyle='#787b86'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='center';
+  const nTicks=Math.min(10,Math.max(3,Math.floor(N/15)));
+  const prevMonth={{val:-1}};
+  for(let t=0;t<=nTicks;t++) {{
+    const i=Math.floor(t*(N-1)/Math.max(nTicks,1));
+    const x=toX(i);
     const d=new Date(ts[i]*1000);
-    const lbl=`${{d.getMonth()+1}}/${{d.getDate()}} ${{String(d.getHours()).padStart(2,'0')}}h`;
-    ctx.fillText(lbl, toX(i), H-4);
+    ctx.strokeStyle='#1e222d'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H-PAD.b); ctx.stroke();
+    // Label : heure si intraday, date si daily+
+    let lbl;
+    if(IV_SEC<86400) {{
+      lbl=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+      if(d.getDate()!==prevMonth.val) {{
+        lbl=d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}});
+        prevMonth.val=d.getDate();
+      }}
+    }} else {{
+      lbl=d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}});
+    }}
+    ctx.fillText(lbl, x, H-6);
   }}
 
-  // ── Ligne de prix courant (last price) ─────────────
-  const lastClose = cs[N-1];
-  const py = toY(lastClose);
-  const bull_last = cs[N-1] >= os[N-1];
-  ctx.strokeStyle = bull_last ? 'rgba(0,200,83,0.4)' : 'rgba(255,59,48,0.4)';
-  ctx.lineWidth=1; ctx.setLineDash([4,4]);
-  ctx.beginPath(); ctx.moveTo(PAD.l,py); ctx.lineTo(W-PAD.r,py); ctx.stroke();
-  ctx.setLineDash([]);
-  // Label prix à droite
-  const lblCol = bull_last ? '#00C853' : '#FF3B30';
-  ctx.fillStyle=lblCol;
-  ctx.fillRect(W-PAD.r+2, py-8, PAD.r-4, 16);
-  ctx.fillStyle='#000'; ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='left';
-  ctx.fillText(fmt(lastClose), W-PAD.r+4, py+3);
+  // ── BOLLINGER BANDS ──
+  if(showBB) {{
+    const bbAll=calcBB(D.c,20,2);
+    const bbU=bbAll.upper.slice(VIEW_START,VIEW_END);
+    const bbL=bbAll.lower.slice(VIEW_START,VIEW_END);
+    const bbM=bbAll.ma.slice(VIEW_START,VIEW_END);
 
-  // ── Bougies ─────────────────────────────────────────
+    // Fill entre upper et lower
+    ctx.beginPath();
+    for(let i=0;i<N;i++) {{ if(bbU[i]!==null){{ const x=toX(i);i===0?ctx.moveTo(x,toY(bbU[i])):ctx.lineTo(x,toY(bbU[i])); }} }}
+    for(let i=N-1;i>=0;i--) {{ if(bbL[i]!==null){{ ctx.lineTo(toX(i),toY(bbL[i])); }} }}
+    ctx.closePath();
+    ctx.fillStyle='rgba(255,152,0,0.04)'; ctx.fill();
+
+    // Lignes upper/lower/middle
+    [bbU,bbL].forEach((band,bi)=>{{
+      ctx.beginPath(); let started=false;
+      for(let i=0;i<N;i++) {{
+        if(band[i]===null) continue;
+        started?ctx.lineTo(toX(i),toY(band[i])):ctx.moveTo(toX(i),toY(band[i]));
+        started=true;
+      }}
+      ctx.strokeStyle='rgba(255,152,0,0.4)'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+    }});
+    ctx.beginPath(); let s2=false;
+    for(let i=0;i<N;i++) {{
+      if(bbM[i]===null) continue;
+      s2?ctx.lineTo(toX(i),toY(bbM[i])):ctx.moveTo(toX(i),toY(bbM[i]));
+      s2=true;
+    }}
+    ctx.strokeStyle='rgba(255,152,0,0.5)'; ctx.lineWidth=1; ctx.stroke();
+  }}
+
+  // ── MOVING AVERAGES ──
+  if(showMA) {{
+    const maConf=[
+      {{p:20,  color:'rgba(255,200,50,0.85)',  w:1.2}},
+      {{p:50,  color:'rgba(33,150,243,0.85)',  w:1.2}},
+      {{p:200, color:'rgba(255,82,82,0.85)',   w:1.5}},
+    ];
+    maConf.forEach(mc=>{{
+      const ma=calcMA(D.c,mc.p).slice(VIEW_START,VIEW_END);
+      ctx.beginPath(); let started=false;
+      for(let i=0;i<N;i++) {{
+        if(ma[i]===null) continue;
+        const x=toX(i), y=toY(ma[i]);
+        started?ctx.lineTo(x,y):ctx.moveTo(x,y);
+        started=true;
+      }}
+      ctx.strokeStyle=mc.color; ctx.lineWidth=mc.w; ctx.stroke();
+    }});
+    // Légende MA
+    ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='left';
+    [{{'p':20,'c':'rgba(255,200,50,0.85)'}},{{'p':50,'c':'rgba(33,150,243,0.85)'}},{{'p':200,'c':'rgba(255,82,82,0.85)'}}].forEach((m,i)=>{{
+      ctx.fillStyle=m.c;
+      ctx.fillText(`MA${{m.p}}`, 8+i*52, 18);
+    }});
+  }}
+
+  // ── BOUGIES ──
   for(let i=0;i<N;i++) {{
-    const x  = toX(i);
-    const oy = toY(os[i]), hy=toY(hs[i]), ly=toY(ls[i]), cy=toY(cs[i]);
-    const bull = cs[i]>=os[i];
+    const x=toX(i);
+    const oy=toY(os[i]), hy=toY(hs[i]), ly=toY(ls[i]), cy=toY(cs[i]);
+    const bull=cs[i]>=os[i];
+    const bullCol='#26a69a', bearCol='#ef5350';
+    const col=bull?bullCol:bearCol;
 
     // Mèche
-    ctx.strokeStyle = bull ? '#00C853' : '#FF3B30';
-    ctx.lineWidth   = Math.max(1, bw*0.08);
+    const wickW=Math.max(1, BW*0.1);
+    ctx.strokeStyle=col; ctx.lineWidth=wickW;
     ctx.beginPath(); ctx.moveTo(x,hy); ctx.lineTo(x,ly); ctx.stroke();
 
     // Corps
-    const bTop=Math.min(oy,cy), bH=Math.max(1.5,Math.abs(cy-oy));
+    const top=Math.min(oy,cy);
+    const bH =Math.max(1, Math.abs(cy-oy));
+    const hw =Math.max(1, BW/2);
+
     if(bull) {{
-      ctx.strokeStyle='#00C853'; ctx.lineWidth=1;
-      ctx.strokeRect(x-bw/2,bTop,bw,bH);
-      ctx.fillStyle='rgba(0,200,83,0.18)';
-      ctx.fillRect(x-bw/2,bTop,bw,bH);
+      // Haussier : contour + fill semi-transparent (style TradingView)
+      ctx.fillStyle='rgba(38,166,154,0.15)';
+      ctx.fillRect(x-hw, top, hw*2, bH);
+      ctx.strokeStyle=bullCol; ctx.lineWidth=1.5;
+      ctx.strokeRect(x-hw, top, hw*2, bH);
     }} else {{
-      ctx.fillStyle='#FF3B30';
-      ctx.fillRect(x-bw/2,bTop,bw,bH);
+      // Baissier : plein
+      ctx.fillStyle=bearCol;
+      ctx.fillRect(x-hw, top, hw*2, bH);
     }}
 
-    // Dernière bougie — halo animé
+    // Dernière bougie — halo pulsant
     if(i===N-1) {{
-      ctx.strokeStyle=bull?'rgba(0,200,83,0.5)':'rgba(255,59,48,0.5)';
-      ctx.lineWidth=1.5;
-      const glow=2+Math.sin(Date.now()/200)*1;
-      ctx.strokeRect(x-bw/2-glow, bTop-glow, bw+glow*2, bH+glow*2);
+      const glow=1.5+Math.sin(Date.now()/300)*1;
+      ctx.strokeStyle=bull?'rgba(38,166,154,0.6)':'rgba(239,83,80,0.6)';
+      ctx.lineWidth=1;
+      ctx.strokeRect(x-hw-glow, top-glow, hw*2+glow*2, bH+glow*2);
     }}
   }}
 
-  // ── Crosshair hover ─────────────────────────────────
+  // ── LIGNE PRIX ACTUEL ──
+  const lastC=cs[N-1], lastO=os[N-1];
+  const lastBull=lastC>=lastO;
+  const py=toY(lastC);
+  // Ligne pointillée
+  ctx.strokeStyle=lastBull?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)';
+  ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(W-PAD.r,py); ctx.stroke();
+  ctx.setLineDash([]);
+  // Tag prix
+  const tagCol=lastBull?'#26a69a':'#ef5350';
+  ctx.fillStyle=tagCol;
+  ctx.beginPath();
+  ctx.roundRect(W-PAD.r+2, py-9, PAD.r-4, 18, 2);
+  ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='left';
+  ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
+
+  // ── CROSSHAIR ──
   if(HOVER_IDX>=0 && HOVER_IDX<N) {{
     const x=toX(HOVER_IDX);
+    // Ligne verticale
+    ctx.strokeStyle='rgba(132,142,156,0.4)'; ctx.lineWidth=1; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H); ctx.stroke();
+    // Ligne horizontale
+    if(HOVER_Y>0) {{
+      ctx.beginPath(); ctx.moveTo(0,HOVER_Y); ctx.lineTo(W-PAD.r,HOVER_Y); ctx.stroke();
+      // Tag prix crosshair à droite
+      const hp=hi-(HOVER_Y-PAD.t)/((H-PAD.t-PAD.b))*rng;
+      ctx.fillStyle='#363a45';
+      ctx.beginPath(); ctx.roundRect(W-PAD.r+2,HOVER_Y-9,PAD.r-4,18,2); ctx.fill();
+      ctx.fillStyle='#d1d4dc'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='left';
+      ctx.fillText(fmt(hp), W-PAD.r+5, HOVER_Y+4);
+    }}
+    // Label date en bas
+    const d=new Date(ts[HOVER_IDX]*1000);
+    const dateLbl=fmtDate(ts[HOVER_IDX]);
+    ctx.fillStyle='#363a45'; ctx.textAlign='center';
+    const tw=ctx.measureText(dateLbl).width+12;
+    ctx.beginPath(); ctx.roundRect(x-tw/2, H-PAD.b+2, tw, 16, 2); ctx.fill();
+    ctx.fillStyle='#d1d4dc'; ctx.font='9px IBM Plex Mono,monospace';
+    ctx.fillText(dateLbl, x, H-PAD.b+13);
+
+    // Mise à jour OHLC header
     const ri=VIEW_START+HOVER_IDX;
-    ctx.strokeStyle='rgba(255,149,0,0.6)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-    ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H-PAD.b); ctx.stroke();
-    ctx.setLineDash([]);
-    // Tooltip
-    const tp={{
-      o:fmt(D.o[ri]), h:fmt(D.h[ri]),
-      l:fmt(D.l[ri]), c:fmt(D.c[ri]),
-    }};
-    setTxt('co',tp.o); setTxt('ch',tp.h);
-    setTxt('cl',tp.l); setTxt('cc',tp.c);
-    setTxt('ho',tp.o); setTxt('hh',tp.h);
-    setTxt('hl',tp.l); setTxt('hc',tp.c);
+    const bull2=D.c[ri]>=D.o[ri];
+    setTxt('ho',fmt(D.o[ri])); setCol('ho',bull2?'var(--bull)':'var(--bear)');
+    setTxt('hh',fmt(D.h[ri])); setCol('hh','var(--bull)');
+    setTxt('hl',fmt(D.l[ri])); setCol('hl','var(--bear)');
+    setTxt('hc',fmt(D.c[ri])); setCol('hc',bull2?'var(--bull)':'var(--bear)');
   }}
 }}
 
 function drawVol() {{
+  if(!showVol) return;
   const W=cvVol.width, H=cvVol.height;
   const ctx=ctxV;
   ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#131722'; ctx.fillRect(0,0,W,H);
+
   const N=VIEW_END-VIEW_START;
-  if(!N) return;
+  if(!N||H<4) return;
   const vs=D.v.slice(VIEW_START,VIEW_END);
   const maxV=Math.max(...vs)||1;
-  const cw=(W-PAD.l-PAD.r)/N;
-  ctx.fillStyle='#333'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='left';
-  ctx.fillText('VOLUME',4,10);
+  const CW=(W-PAD.l-PAD.r)/N;
+
+  // MA volume (20)
+  const maV=calcMA(D.v,20).slice(VIEW_START,VIEW_END);
+
   for(let i=0;i<N;i++) {{
-    const bh=(vs[i]/maxV)*(H-14);
-    ctx.fillStyle=D.c[VIEW_START+i]>=D.o[VIEW_START+i]
-      ?'rgba(0,200,83,0.5)':'rgba(255,59,48,0.5)';
-    ctx.fillRect(PAD.l+i*cw+1, H-bh, Math.max(1,cw-2), bh);
+    const bh=Math.max(1,(vs[i]/maxV)*(H-4));
+    const bull=D.c[VIEW_START+i]>=D.o[VIEW_START+i];
+    ctx.fillStyle=bull?'rgba(38,166,154,0.5)':'rgba(239,83,80,0.5)';
+    ctx.fillRect(PAD.l+i*CW+1, H-bh, Math.max(1,CW-2), bh);
   }}
+
+  // MA volume line
+  ctx.beginPath(); let s=false;
+  for(let i=0;i<N;i++) {{
+    if(maV[i]===null) continue;
+    const x=PAD.l+i*CW+CW/2;
+    const y=H-(maV[i]/maxV)*(H-4);
+    s?ctx.lineTo(x,y):ctx.moveTo(x,y); s=true;
+  }}
+  ctx.strokeStyle='rgba(255,152,0,0.7)'; ctx.lineWidth=1; ctx.stroke();
+
+  // Label
+  ctx.fillStyle='#50535e'; ctx.font='8px IBM Plex Mono,monospace';
+  ctx.textAlign='left'; ctx.fillText('VOLUME', 4, 10);
 }}
 
 function render() {{ drawMain(); drawVol(); }}
 
+function applyHeaderPrice(price, pct) {{
+  const bull=parseFloat(pct)>=0;
+  const clr=bull?'var(--bull)':'var(--bear)';
+  const pe=$('curPrice'), ce=$('curChg');
+  if(pe) {{ pe.textContent=fmt(price); pe.style.color=clr; }}
+  if(ce) {{
+    ce.textContent=(bull?'▲ +':'▼ ')+Math.abs(parseFloat(pct)).toFixed(2)+'%';
+    ce.className='price-chg '+(bull?'up':'dn');
+  }}
+}}
+
 function updateStats() {{
   const N=D.c.length; if(!N) return;
-  const last  = D.c[N-1];
-  const h24   = Math.max(...D.h), l24=Math.min(...D.l);
-  const vol   = D.v.reduce((a,b)=>a+b,0);
-  const chg   = ((last-D.o[0])/D.o[0]*100).toFixed(2);
-  const bull   = parseFloat(chg)>=0;
-  const clr    = bull?'var(--green2)':'var(--red2)';
-
-  // Prix courant — depuis la dernière bougie (sera remplacé par fetchLivePrice)
-  setTxt('curPrice', fmt(last));
-  setTxt('curChg',   (bull?'▲ +':'▼ ')+chg+'%');
-  setCol('curPrice', clr);
-  setCol('curChg',   clr);
-
-  setTxt('statVol',  fmtV(vol));
-  setTxt('stat24h',  fmt(h24));
-  setTxt('stat24l',  fmt(l24));
-  setTxt('b_hi',     fmt(h24));
-  setTxt('b_lo',     fmt(l24));
-  setTxt('b_chg',    (bull?'+':'')+chg+'%');
-  setTxt('b_vol',    fmtV(vol));
-  setCol('b_chg',    clr);
+  const last=D.c[N-1];
+  const h24=Math.max(...D.h.slice(-96)), l24=Math.min(...D.l.slice(-96));
+  const vol=D.v.slice(-96).reduce((a,b)=>a+b,0);
+  const chg=((last-D.o[Math.max(0,N-96)])/D.o[Math.max(0,N-96)]*100);
+  const bull=chg>=0;
+  applyHeaderPrice(last,chg);
+  setTxt('statVol',fmtV(vol));
+  setTxt('b_hi',fmt(h24)); setTxt('b_lo',fmt(l24));
+  setTxt('b_chg',(bull?'+':'')+chg.toFixed(2)+'%'); setCol('b_chg',bull?'var(--bull)':'var(--bear)');
+  setTxt('b_vol',fmtV(vol));
+  // OHLC header = dernière bougie
+  setTxt('ho',fmt(D.o[N-1])); setTxt('hh',fmt(D.h[N-1]));
+  setTxt('hl',fmt(D.l[N-1])); setTxt('hc',fmt(D.c[N-1]));
 }}
 
 // ════════════════════════════════════════════════════════
 //  INTERACTIONS SOURIS
 // ════════════════════════════════════════════════════════
-cvMain.addEventListener('mousemove',e=>{{
+cvMain.addEventListener('mousemove', e => {{
+  const rect=cvMain.getBoundingClientRect();
+  const mx=e.clientX-rect.left;
+  const my=e.clientY-rect.top;
+  HOVER_Y=my;
+
   if(isDragging) {{
-    const dx=e.clientX-dragStartX;
     const N=VIEW_END-VIEW_START;
-    const cw=(cvMain.width-PAD.l-PAD.r)/N;
-    const shift=Math.round(-dx/cw);
+    const CW=(cvMain.width-PAD.l-PAD.r)/N;
+    const shift=Math.round(-(e.clientX-dragStartX)/CW);
     const totalN=D.t.length;
-    let s=Math.max(0,Math.min(totalN-N, dragStartView+shift));
+    let s=Math.max(0,Math.min(totalN-N,dragStartView+shift));
     VIEW_START=s; VIEW_END=s+N;
     render(); return;
   }}
-  const rect=cvMain.getBoundingClientRect();
-  const x=e.clientX-rect.left;
+
   const N=VIEW_END-VIEW_START;
-  const cw=(cvMain.width-PAD.l-PAD.r)/N;
-  HOVER_IDX=Math.max(0,Math.min(N-1,Math.floor((x-PAD.l)/cw)));
+  const CW=(cvMain.width-PAD.l-PAD.r)/N;
+  HOVER_IDX=Math.max(0,Math.min(N-1,Math.floor((mx-PAD.l)/CW)));
+
+  // Tooltip flottant
+  const ri=VIEW_START+HOVER_IDX;
+  const tt=$('tooltip');
+  if(tt && ri>=0 && ri<D.t.length) {{
+    const bull2=D.c[ri]>=D.o[ri];
+    tt.style.display='block';
+    // Position : éviter bords
+    let tx=e.clientX+16, ty=e.clientY-80;
+    if(tx+180>window.innerWidth) tx=e.clientX-196;
+    if(ty<0) ty=e.clientY+10;
+    tt.style.left=tx+'px'; tt.style.top=ty+'px';
+    setTxt('ttDate', fmtDate(D.t[ri]));
+    setTxt('ttO', fmt(D.o[ri])); setCol('ttO', bull2?'var(--bull)':'var(--bear)');
+    setTxt('ttH', fmt(D.h[ri]));
+    setTxt('ttL', fmt(D.l[ri]));
+    setTxt('ttC', fmt(D.c[ri])); setCol('ttC', bull2?'var(--bull)':'var(--bear)');
+    setTxt('ttV', fmtV(D.v[ri]));
+  }}
   drawMain();
 }});
 
-cvMain.addEventListener('mousedown',e=>{{
+cvMain.addEventListener('mousedown', e => {{
   isDragging=true; dragStartX=e.clientX; dragStartView=VIEW_START;
   cvMain.style.cursor='grabbing';
 }});
-window.addEventListener('mouseup',()=>{{
+window.addEventListener('mouseup', () => {{
   isDragging=false; cvMain.style.cursor='crosshair';
 }});
-cvMain.addEventListener('mouseleave',()=>{{
-  HOVER_IDX=-1; drawMain();
+cvMain.addEventListener('mouseleave', () => {{
+  HOVER_IDX=-1; HOVER_Y=-1;
+  const tt=$('tooltip'); if(tt) tt.style.display='none';
+  // Remettre OHLC de la dernière bougie
+  const N=D.c.length;
+  if(N) {{ setTxt('ho',fmt(D.o[N-1])); setTxt('hh',fmt(D.h[N-1])); setTxt('hl',fmt(D.l[N-1])); setTxt('hc',fmt(D.c[N-1])); }}
+  drawMain();
 }});
 
-// Scroll zoom
-cvMain.addEventListener('wheel',e=>{{
+// Scroll = zoom
+cvMain.addEventListener('wheel', e => {{
   e.preventDefault();
   const N=VIEW_END-VIEW_START;
-  const factor=e.deltaY>0?1.12:0.88;
+  const factor=e.deltaY>0?1.1:0.9;
   const newN=Math.max(20,Math.min(D.t.length,Math.round(N*factor)));
   const center=HOVER_IDX>=0?VIEW_START+HOVER_IDX:Math.floor((VIEW_START+VIEW_END)/2);
   let s=Math.max(0,center-Math.floor(newN/2));
@@ -591,177 +689,94 @@ cvMain.addEventListener('wheel',e=>{{
 }},{{passive:false}});
 
 // ════════════════════════════════════════════════════════
-//  TIMEFRAME
+//  TIMEFRAME & INDICATEURS
 // ════════════════════════════════════════════════════════
 function setTF(btn,tf) {{
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  // Avec une vraie API : recharger les données ici
-  console.log('TF →',tf);
+  console.log('[AM.Terminal] TF →', tf);
+}}
+function toggleMA() {{
+  showMA=!showMA; $('btnMA').classList.toggle('on',showMA); render();
+}}
+function toggleVol() {{
+  showVol=!showVol; $('btnVol').classList.toggle('on',showVol);
+  setupCanvas(); render();
+}}
+function toggleBB() {{
+  showBB=!showBB; $('btnBB').classList.toggle('on',showBB); render();
 }}
 
 // ════════════════════════════════════════════════════════
-//  MODE DROPDOWN
+//  PRIX TEMPS RÉEL
 // ════════════════════════════════════════════════════════
-function toggleDD(){{
-  $('modeDD').classList.toggle('open');
-  $('modeCaret').classList.toggle('open');
+let ws=null;
+
+function applyPriceUpdate(price, chg24, vol24, high24, low24) {{
+  const bull=parseFloat(chg24)>=0;
+  const last=D.t.length-1;
+  if(last>=0){{ D.c[last]=price; if(price>D.h[last])D.h[last]=price; if(price<D.l[last])D.l[last]=price; }}
+  applyHeaderPrice(price, chg24);
+  const fV=v=>v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':(v||0).toFixed(0);
+  if(vol24){{ setTxt('b_vol',fV(vol24)); }}
+  if(high24){{ setTxt('b_hi',fmt(high24)); }}
+  if(low24) {{ setTxt('b_lo',fmt(low24)); }}
+  setTxt('b_chg',(bull?'+':'')+parseFloat(chg24).toFixed(2)+'%');
+  setCol('b_chg',bull?'var(--bull)':'var(--bear)');
+  const badge=$('apiBadge');
+  if(badge){{ badge.textContent='● LIVE'; badge.className='live-badge live'; }}
+  render();
 }}
-function pickMode(key,lbl,sub){{
-  const btn=$('modeBtn'); btn.setAttribute('data-mode',key);
-  $('modeLbl').textContent=lbl; $('modeSub').textContent=sub;
-  document.querySelectorAll('.mode-opt').forEach((el,i)=>{{
-    el.classList.toggle('active',['normal','pro','quant'][i]===key);
-  }});
-  $('modeDD').classList.remove('open');
-  $('modeCaret').classList.remove('open');
+
+function startBinanceWS() {{
+  const sym='{binance_symbol}'.toLowerCase();
+  if(!sym||sym==='undefined'){{ startFallbackPolling(); return; }}
+  ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`);
+  ws.onopen=()=>{{ simActive=false; console.log('[AM.Terminal] WS Binance connecté'); }};
+  ws.onmessage=e=>{{
+    try {{
+      const d=(JSON.parse(e.data).data)||JSON.parse(e.data);
+      const p=parseFloat(d.c);
+      if(!isNaN(p)) applyPriceUpdate(p,parseFloat(d.P),parseFloat(d.q),parseFloat(d.h),parseFloat(d.l));
+    }} catch(err) {{}}
+  }};
+  ws.onclose=()=>{{ setTimeout(startBinanceWS,5000); }};
+  ws.onerror=()=>{{ simActive=false; ws.close(); startFallbackPolling(); }};
 }}
-document.addEventListener('click',e=>{{
-  const w=document.querySelector('.mode-wrap');
-  if(w&&!w.contains(e.target)){{
-    $('modeDD').classList.remove('open');
-    $('modeCaret').classList.remove('open');
-  }}
-}});
+
+async function fetchLivePrice() {{
+  try {{
+    const id='{coingecko_id}';
+    const res=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${{id}}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true`,{{signal:AbortSignal.timeout(8000)}});
+    const json=await res.json(); const data=json[id];
+    if(data) applyPriceUpdate(data.usd,data.usd_24h_change,data.usd_24h_vol,null,null);
+  }} catch(e) {{}}
+}}
+function startFallbackPolling(){{ fetchLivePrice(); setInterval(fetchLivePrice,15000); }}
 
 // ════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════
-const IS_LIVE  = {run_sim} === false;   // true = vraies données CoinGecko
-const RUN_SIM  = {run_sim};             // false = on ne simule pas si données réelles
-console.log('[Arthur Trading]', '{data_info}');
-console.log('[Arthur Trading] IS_LIVE =', IS_LIVE, '| Bougies =', D.t.length);
+const RUN_SIM = {run_sim};
+console.log('[AM.Terminal] {data_info}');
 
 function init() {{
   setupCanvas();
-  VIEW_START = Math.max(0, D.t.length-120);
-  VIEW_END   = D.t.length;
+  VIEW_START=Math.max(0,D.t.length-120);
+  VIEW_END=D.t.length;
   render();
   updateStats();
-
-  // Démarrer le prix temps réel : Binance WS en priorité, CoinGecko en fallback
   startBinanceWS();
-
   if(RUN_SIM) {{
-    console.log('[AM.Terminal] Mode simulation actif (données historiques indisponibles)');
     setInterval(simTick, 400);
     setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 100);
   }} else {{
-    console.log('[AM.Terminal] Mode LIVE — Binance WebSocket actif');
-    setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 150);
+    setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 200);
   }}
-}}
-
-// ── PRIX EN TEMPS RÉEL — Binance WebSocket + fallback CoinGecko ──────────
-let ws = null;
-let last24hData = {{}};
-
-function applyPriceUpdate(price, chg24, vol24, high24, low24) {{
-  const bull = parseFloat(chg24) >= 0;
-  const clr  = bull ? 'var(--green2)' : 'var(--red2)';
-
-  // Mettre à jour la dernière bougie
-  const last = D.t.length - 1;
-  if(last >= 0) {{
-    D.c[last] = price;
-    if(price > D.h[last]) D.h[last] = price;
-    if(price < D.l[last]) D.l[last] = price;
-  }}
-
-  // Header prix
-  const pe = document.getElementById('curPrice');
-  const ce = document.getElementById('curChg');
-  if(pe) {{
-    const prev = parseFloat(pe.textContent.replace(/,/g,'')) || price;
-    pe.textContent = fmt(price);
-    pe.style.color = clr;
-    pe.style.textShadow = price > prev
-      ? '0 0 10px rgba(0,200,83,0.6)'
-      : '0 0 10px rgba(255,59,48,0.6)';
-    setTimeout(()=>{{ if(pe) pe.style.textShadow='none'; }}, 300);
-  }}
-  if(ce) {{ ce.textContent = (bull?'▲ +':'▼ ')+parseFloat(chg24).toFixed(2)+'%'; ce.style.color=clr; }}
-
-  const fV = v => v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':(v||0).toFixed(0);
-  if(vol24)  {{ setTxt('statVol',fV(vol24));  setTxt('b_vol',fV(vol24)); }}
-  if(high24) {{ setTxt('stat24h',fmt(high24)); setTxt('b_hi',fmt(high24)); setCol('stat24h','var(--green2)'); }}
-  if(low24)  {{ setTxt('stat24l',fmt(low24));  setTxt('b_lo',fmt(low24));  setCol('stat24l','var(--red2)'); }}
-  setTxt('b_chg',(bull?'+':'')+parseFloat(chg24).toFixed(2)+'%');
-  setCol('b_chg',clr);
-
-  const badge = document.getElementById('apiBadge');
-  if(badge) {{ badge.textContent='● LIVE'; badge.className='api-badge live pulse'; }}
-
-  render();
-}}
-
-// ── 1. Binance WebSocket (tick par tick, gratuit, sans clé API) ──
-function startBinanceWS() {{
-  const sym = '{binance_symbol}'.toLowerCase();
-  if(!sym || sym==='undefined') {{ startFallbackPolling(); return; }}
-
-  const wsUrl = `wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`;
-  ws = new WebSocket(wsUrl);
-
-  ws.onopen = () => {{
-    simActive = false;   // WS OK → on coupe la simulation
-    console.log('[AM.Terminal] Binance WS connecté :', sym, '— simulation désactivée');
-  }};
-
-  ws.onmessage = e => {{
-    try {{
-      const msg  = JSON.parse(e.data);
-      const d    = msg.data || msg;
-      const price  = parseFloat(d.c);   // close = dernier prix
-      const chg24  = parseFloat(d.P);   // % change 24h
-      const vol24  = parseFloat(d.q);   // volume quote 24h
-      const high24 = parseFloat(d.h);
-      const low24  = parseFloat(d.l);
-      if(isNaN(price)) return;
-      last24hData = {{chg24, vol24, high24, low24}};
-      applyPriceUpdate(price, chg24, vol24, high24, low24);
-    }} catch(err) {{}}
-  }};
-
-
-
-  ws.onclose = () => {{
-    console.warn('[AM.Terminal] Binance WS fermé — reconnexion dans 5s');
-    setTimeout(startBinanceWS, 5000);
-  }};
-
-  ws.onerror = () => {{
-    simActive = false;   // même en cas d'erreur, pas de sim — on attend le fallback
-    console.warn('[AM.Terminal] Binance WS erreur — fallback CoinGecko');
-    ws.close();
-    startFallbackPolling();
-  }};
-}}
-
-// ── 2. Fallback CoinGecko polling (toutes les 15s si WS indispo) ──
-async function fetchLivePrice() {{
-  try {{
-    const coinId = '{coingecko_id}';
-    if(!coinId) return;
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${{coinId}}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true`;
-    const res  = await fetch(url, {{signal: AbortSignal.timeout(8000)}});
-    const json = await res.json();
-    const data = json[coinId];
-    if(!data) return;
-    applyPriceUpdate(data.usd, data.usd_24h_change, data.usd_24h_vol, null, null);
-    console.log(`[AM.Terminal] CoinGecko fallback: ${{fmt(data.usd)}}`);
-  }} catch(e) {{
-    console.warn('[AM.Terminal] CoinGecko indisponible:', e.message);
-  }}
-}}
-
-function startFallbackPolling() {{
-  fetchLivePrice();
-  setInterval(fetchLivePrice, 15000);
 }}
 
 window.addEventListener('load', init);
-window.addEventListener('resize',()=>{{ setupCanvas(); render(); }});
+window.addEventListener('resize', ()=>{{ setupCanvas(); render(); }});
 </script>
 </body>
 </html>"""
