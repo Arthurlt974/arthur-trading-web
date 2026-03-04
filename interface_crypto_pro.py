@@ -495,31 +495,14 @@ def show_interface_crypto():
         tv_symbol = get_crypto_pair(search_input)
         with c_info:
             st.markdown(
-                f"<div style='text-align:right;color:#00e676;padding-top:10px;'>"
+                f"<div style='text-align:right;color:#666;padding-top:10px;'>"
                 f"ACTIVE: <b style='color:#fff'>{tv_symbol}</b></div>",
                 unsafe_allow_html=True
             )
 
         # Graphique TradingView
-        html_chart = f"""
-        <div style="height:550px;border:1px solid #1A1A1A;border-radius:4px;overflow:hidden;margin-top:5px;">
-            <div id="tv_chart_crypto"></div>
-            <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-            <script type="text/javascript">
-            new TradingView.widget({{
-                "width":"100%","height":"550","symbol":"{tv_symbol}",
-                "interval":"60","timezone":"Europe/Paris","theme":"dark",
-                "style":"1","locale":"fr","toolbar_bg":"#000000",
-                "enable_publishing":false,"container_id":"tv_chart_crypto",
-                "overrides":{{
-                    "paneProperties.background":"#000000",
-                    "paneProperties.vertGridProperties.color":"#111",
-                    "paneProperties.horzGridProperties.color":"#111"
-                }}
-            }});
-            </script>
-        </div>"""
-        components.html(html_chart, height=560)
+        from chart_module import render_chart
+        components.html(render_chart(symbol="BTC-USD", interval="4h"), height=700)
 
         # ── Header dynamique + menu roulant ─────────────────────────
         h1, h2 = st.columns([3, 1])
@@ -592,6 +575,10 @@ def show_interface_crypto():
                         <span style="color:{color};margin-left:8px;">{sign}{m['change']:.2f}%</span>
                     </div>
                 </div>""", unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    show_interface_crypto()
+
 
 if __name__ == "__main__":
     show_interface_crypto()
