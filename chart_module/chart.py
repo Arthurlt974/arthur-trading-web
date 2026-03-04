@@ -178,6 +178,56 @@ html,body{{
 ::-webkit-scrollbar{{width:4px;}}
 ::-webkit-scrollbar-track{{background:var(--bg);}}
 ::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:2px;}}
+
+/* ── MODE DROPDOWN ── */
+.mode-wrap{{position:relative;margin-left:auto;}}
+.mode-btn{{
+  display:flex;align-items:center;gap:8px;padding:0 12px;height:34px;
+  cursor:pointer;background:transparent;border:none;
+  border-left:1px solid var(--border2);
+  font-family:'IBM Plex Mono',monospace;
+  transition:background .12s;
+}}
+.mode-btn:hover{{background:var(--surface2);}}
+.mode-icon{{font-size:13px;}}
+.mode-info{{display:flex;flex-direction:column;gap:1px;text-align:left;}}
+.mode-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);}}
+.mode-sub{{font-size:8px;color:var(--faint);}}
+.mode-caret{{font-size:8px;color:var(--faint);transition:transform .15s;margin-left:4px;}}
+.mode-caret.open{{transform:rotate(180deg);}}
+
+/* Couleur selon mode */
+.mode-btn[data-mode="normal"] .mode-lbl{{color:var(--text2);}}
+.mode-btn[data-mode="pro"]    .mode-lbl{{color:var(--orange);}}
+.mode-btn[data-mode="quant"]  .mode-lbl{{color:var(--yellow);}}
+.mode-btn[data-mode="normal"] {{border-bottom:2px solid var(--border2);}}
+.mode-btn[data-mode="pro"]    {{border-bottom:2px solid var(--orange);}}
+.mode-btn[data-mode="quant"]  {{border-bottom:2px solid var(--yellow);}}
+
+.mode-dd{{
+  display:none;position:absolute;top:100%;right:0;
+  background:var(--surface);border:1px solid var(--border2);
+  min-width:190px;z-index:9999;
+  box-shadow:0 8px 24px rgba(0,0,0,0.7);
+}}
+.mode-dd.open{{display:block;}}
+.mode-opt{{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;cursor:pointer;
+  border-bottom:1px solid var(--border);
+  transition:background .1s;
+}}
+.mode-opt:last-child{{border-bottom:none;}}
+.mode-opt:hover{{background:var(--surface2);}}
+.mode-opt.active{{background:rgba(255,152,0,0.05);}}
+.mo-icon{{font-size:16px;min-width:20px;}}
+.mo-text{{flex:1;}}
+.mo-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}}
+.mo-desc{{font-size:9px;color:var(--faint);margin-top:2px;}}
+.mo-check{{font-size:11px;color:var(--orange);opacity:0;}}
+.mode-opt.active .mo-check{{opacity:1;}}
+.mo-badge{{font-size:8px;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;
+  background:rgba(255,152,0,0.1);color:var(--orange);border:1px solid rgba(255,152,0,0.2);}}
 </style>
 </head>
 <body>
@@ -214,6 +264,46 @@ html,body{{
   <button class="indicator-btn {'on' if show_ma else ''}" id="btnMA" onclick="toggleMA()">MA</button>
   <button class="indicator-btn {'on' if show_volume else ''}" id="btnVol" onclick="toggleVol()">Vol</button>
   <button class="indicator-btn {'on' if show_bb else ''}" id="btnBB" onclick="toggleBB()">BB</button>
+
+  <!-- MODE DROPDOWN -->
+  <div class="mode-wrap">
+    <button class="mode-btn" id="modeBtn" data-mode="normal" onclick="toggleModeDD()">
+      <span class="mode-icon" id="modeIcon">📊</span>
+      <div class="mode-info">
+        <div class="mode-lbl" id="modeLbl">Normal</div>
+        <div class="mode-sub" id="modeSub">Vue standard</div>
+      </div>
+      <span class="mode-caret" id="modeCaret">&#9660;</span>
+    </button>
+    <div class="mode-dd" id="modeDD">
+      <div class="mode-opt active" onclick="pickMode('normal','Normal','Vue standard','📊')">
+        <span class="mo-icon">📊</span>
+        <div class="mo-text">
+          <div class="mo-lbl" style="color:var(--text2)">Normal</div>
+          <div class="mo-desc">Bougies · MA · Volume</div>
+        </div>
+        <span class="mo-check">✓</span>
+      </div>
+      <div class="mode-opt" onclick="pickMode('pro','Pro','Vue avancée','⚡')">
+        <span class="mo-icon">⚡</span>
+        <div class="mo-text">
+          <div class="mo-lbl" style="color:var(--orange)">Pro</div>
+          <div class="mo-desc">Indicateurs avancés · RSI · MACD</div>
+        </div>
+        <span class="mo-badge">Bientôt</span>
+        <span class="mo-check">✓</span>
+      </div>
+      <div class="mode-opt" onclick="pickMode('quant','Quant','Algorithmique','🤖')">
+        <span class="mo-icon">🤖</span>
+        <div class="mo-text">
+          <div class="mo-lbl" style="color:var(--yellow)">Quant</div>
+          <div class="mo-desc">Signaux algo · Patterns · AI</div>
+        </div>
+        <span class="mo-badge">Bientôt</span>
+        <span class="mo-check">✓</span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ZONE CHART -->
@@ -727,11 +817,61 @@ cvMain.addEventListener('wheel', e => {{
 // ════════════════════════════════════════════════════════
 //  TIMEFRAME & INDICATEURS
 // ════════════════════════════════════════════════════════
+// ── Variable globale mode ──
+let CHART_MODE = 'normal';  // 'normal' | 'pro' | 'quant'
+
 function setTF(btn,tf) {{
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   console.log('[AM.Terminal] TF →', tf);
 }}
+
+function toggleModeDD() {{
+  $('modeDD').classList.toggle('open');
+  $('modeCaret').classList.toggle('open');
+}}
+
+function pickMode(key, lbl, sub, icon) {{
+  CHART_MODE = key;
+  // Mettre à jour le bouton
+  const btn = $('modeBtn');
+  btn.setAttribute('data-mode', key);
+  $('modeLbl').textContent = lbl;
+  $('modeSub').textContent = sub;
+  $('modeIcon').textContent = icon;
+  // Coches
+  document.querySelectorAll('.mode-opt').forEach(el => {{
+    el.classList.remove('active');
+    el.querySelector('.mo-check').style.opacity = '0';
+  }});
+  const opts = document.querySelectorAll('.mode-opt');
+  const idx = ['normal','pro','quant'].indexOf(key);
+  if(idx>=0) {{
+    opts[idx].classList.add('active');
+    opts[idx].querySelector('.mo-check').style.opacity = '1';
+  }}
+  // Fermer le dropdown
+  $('modeDD').classList.remove('open');
+  $('modeCaret').classList.remove('open');
+
+  // ─────────────────────────────────────────────
+  //  TODO : logique par mode
+  //  CHART_MODE === 'normal' → bougies + MA + Vol
+  //  CHART_MODE === 'pro'    → + RSI + MACD + panels
+  //  CHART_MODE === 'quant'  → + signaux algo + patterns
+  // ─────────────────────────────────────────────
+  console.log('[AM.Terminal] Mode →', key);
+  render();
+}}
+
+// Fermer dropdown si clic extérieur
+document.addEventListener('click', e => {{
+  const w = document.querySelector('.mode-wrap');
+  if(w && !w.contains(e.target)) {{
+    $('modeDD').classList.remove('open');
+    $('modeCaret').classList.remove('open');
+  }}
+}});
 function toggleMA() {{
   showMA=!showMA; $('btnMA').classList.toggle('on',showMA); render();
 }}
