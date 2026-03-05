@@ -1,4 +1,5 @@
 import json
+import time as _time
 from .data import fetch_ohlcv
 from .config import (
     DEFAULT_SYMBOL, DEFAULT_INTERVAL, DEFAULT_LIMIT,
@@ -1056,4 +1057,5 @@ window.addEventListener('load', init);
 window.addEventListener('resize', ()=>{{ setupCanvas(); render(); }});
 </script>
 </body>
+<!-- RENDER_ID:{symbol}:{int(_time.time()*1000)} -->
 </html>"""
