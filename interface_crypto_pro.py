@@ -488,8 +488,10 @@ def show_interface_crypto():
 
         # ── Init session state ──
         if "chart_symbol" not in st.session_state:
-            st.session_state.chart_symbol = "BTCUSDT"
-            st.session_state.chart_base   = "BTC"
+            st.session_state.chart_symbol  = "BTCUSDT"
+            st.session_state.chart_base    = "BTC"
+            st.session_state.chart_prev    = None
+            st.session_state.chart_loading = False
 
         # ── Barre de recherche via st.form — rerun UNIQUEMENT sur submit ──
         with st.form(key="form_chart_search", clear_on_submit=False):
@@ -512,11 +514,25 @@ def show_interface_crypto():
             _raw  = search_input.strip().upper()
             _base = _mapping.get(_raw, _raw)
             _base = _base.replace("-USD","").replace("USDT","").replace("USD","").replace("BINANCE:","")
-            st.session_state.chart_symbol = _base + "USDT"
-            st.session_state.chart_base   = _base
+            _new_symbol = _base + "USDT"
+            # Si le symbole change → passer par un état vide intermédiaire
+            if _new_symbol != st.session_state.chart_symbol:
+                st.session_state.chart_prev    = st.session_state.chart_symbol
+                st.session_state.chart_symbol  = _new_symbol
+                st.session_state.chart_base    = _base
+                st.session_state.chart_loading = True
+                st.rerun()
 
-        # ── Chart — ne se recharge QUE sur GO ──
+        # ── Si on vient de changer de symbole → afficher placeholder vide 1 cycle ──
+        if st.session_state.chart_loading:
+            st.session_state.chart_loading = False
+            _chart_placeholder = st.empty()
+            _chart_placeholder.empty()
+            st.rerun()
+
+        # ── Chart ──
         from chart_module import render_chart
+        import time as _t
         _chart_html = render_chart(
             symbol=st.session_state.chart_symbol,
             interval="4h",
@@ -524,7 +540,7 @@ def show_interface_crypto():
             height=700,
             exchange="Binance · Spot",
             pair_label=f"{st.session_state.chart_base}/USDT",
-        ) + f"<!-- SYMBOL:{st.session_state.chart_symbol} -->"
+        ) + f"<!-- {st.session_state.chart_symbol}:{int(_t.time()*1000)} -->"
         components.html(
             _chart_html,
             height=700,
