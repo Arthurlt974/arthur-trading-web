@@ -1,5 +1,4 @@
 import json
-import time as _time
 from .data import fetch_ohlcv
 from .config import (
     DEFAULT_SYMBOL, DEFAULT_INTERVAL, DEFAULT_LIMIT,
@@ -245,7 +244,7 @@ html,body{{
 
 <!-- HEADER -->
 <div class="hdr" style="display:{hdr_display}">
-  <div class="logo" style="font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:3px;">AM<span style="color:#ff6600">.</span>TERMINAL</div>
+  <div class="logo">AM<span style="color:#fff">.</span>TERMINAL</div>
   <div class="pair">{pair_disp}</div>
   <div class="exch">{exchange}</div>
   <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:1px;">{DATA_SOURCE.upper()}</div>
@@ -344,19 +343,15 @@ html,body{{
 
 <script>
 // ════════════════════════════════════════════════════════
-//  DONNÉES
+//  DONNÉES — chargées 100% depuis Binance en JS
+//  (aucune donnée Python injectée pour éviter conflit au reload)
 // ════════════════════════════════════════════════════════
-const HISTORICAL = {cd};
-const IV_SEC     = {iv_sec};
+const SYMBOL_INIT = '{binance_symbol}';
+const IV_INIT     = '{active_tf}';
+const IV_SEC      = {iv_sec};
 
-const D = {{
-  t: HISTORICAL.map(r=>r.t),
-  o: HISTORICAL.map(r=>r.o),
-  h: HISTORICAL.map(r=>r.h),
-  l: HISTORICAL.map(r=>r.l),
-  c: HISTORICAL.map(r=>r.c),
-  v: HISTORICAL.map(r=>r.v),
-}};
+// D démarre VIDE — rempli par fetchInit()
+const D = {{ t:[], o:[], h:[], l:[], c:[], v:[] }};
 
 // ════════════════════════════════════════════════════════
 //  CONFIG RENDU
@@ -374,10 +369,11 @@ let isDragging = false, dragStartX = 0, dragStartView = 0;
 // ════════════════════════════════════════════════════════
 //  SIMULATION
 // ════════════════════════════════════════════════════════
-let simActive   = true;
-let simPrice    = D.c[D.c.length-1] || 100;
-let candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
-let prevPrice   = simPrice;
+let simActive   = false;
+let wsConnected = false;
+let simPrice    = 100;
+let candleStart = Math.floor(Date.now()/1000);
+let prevPrice   = 100;
 const VOLATILITY = 0.0006;
 
 function simTick() {{
@@ -568,9 +564,9 @@ function drawMain() {{
   // ── MOVING AVERAGES ──
   if(showMA) {{
     const maConf=[
-      {{p:20,  color:'rgba(255,102,0,0.90)',   w:1.3}},   // Orange Bloomberg
-      {{p:50,  color:'rgba(255,204,0,0.85)',   w:1.3}},   // Jaune
-      {{p:200, color:'rgba(100,180,255,0.80)', w:1.6}},   // Bleu clair
+      {{p:20,  color:'rgba(255,102,0,0.90)',  w:1.3}},
+      {{p:50,  color:'rgba(255,204,0,0.85)',  w:1.3}},
+      {{p:200, color:'rgba(100,180,255,0.80)',w:1.6}},
     ];
     maConf.forEach(mc=>{{
       const ma=calcMA(D.c,mc.p).slice(VIEW_START,VIEW_END);
@@ -616,7 +612,7 @@ function drawMain() {{
     // Dernière bougie — halo pulsant
     if(i===N-1) {{
       const glow=1.5+Math.sin(Date.now()/300)*1;
-      ctx.strokeStyle=bull?'rgba(0,255,65,0.4)':'rgba(255,34,34,0.4)';
+      ctx.strokeStyle=bull?'rgba(38,166,154,0.6)':'rgba(239,83,80,0.6)';
       ctx.lineWidth=1;
       ctx.strokeRect(x-hw-glow, top-glow, hw*2+glow*2, bH+glow*2);
     }}
@@ -637,7 +633,7 @@ function drawMain() {{
   ctx.beginPath();
   ctx.roundRect(W-PAD.r+2, py-9, PAD.r-4, 18, 2);
   ctx.fill();
-  ctx.fillStyle='#000'; ctx.font='bold 9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#fff'; ctx.font='bold 9px Share Tech Mono,monospace'; ctx.textAlign='left';
   ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
 
   // ── CROSSHAIR ──
@@ -659,7 +655,7 @@ function drawMain() {{
     // Label date en bas
     const d=new Date(ts[HOVER_IDX]*1000);
     const dateLbl=fmtDate(ts[HOVER_IDX]);
-    ctx.fillStyle='#363a45'; ctx.textAlign='center';
+    ctx.fillStyle='#1a0800'; ctx.textAlign='center';
     const tw=ctx.measureText(dateLbl).width+12;
     ctx.beginPath(); ctx.roundRect(x-tw/2, H-PAD.b+2, tw, 16, 2); ctx.fill();
     ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace';
@@ -1010,7 +1006,7 @@ function startBinanceWS() {{
   const sym='{binance_symbol}'.toLowerCase();
   if(!sym||sym==='undefined'){{ startFallbackPolling(); return; }}
   ws=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${{sym}}@ticker`);
-  ws.onopen=()=>{{ simActive=false; console.log('[AM.Terminal] WS Binance connecté'); }};
+  ws.onopen=()=>{{ simActive=false; wsConnected=true; console.log('[AM.Terminal] WS Binance connecté'); }};
   ws.onmessage=e=>{{
     try {{
       const d=(JSON.parse(e.data).data)||JSON.parse(e.data);
@@ -1038,24 +1034,81 @@ function startFallbackPolling(){{ fetchLivePrice(); setInterval(fetchLivePrice,1
 const RUN_SIM = {run_sim};
 console.log('[AM.Terminal] {data_info}');
 
+async function fetchInit() {{
+  // Charge les données OHLCV depuis Binance dès le départ
+  const TF_MAP = {{
+    '1m':{{iv:'1m',sec:60}},'5m':{{iv:'5m',sec:300}},'15m':{{iv:'15m',sec:900}},
+    '1h':{{iv:'1h',sec:3600}},'4h':{{iv:'4h',sec:14400}},
+    '1d':{{iv:'1d',sec:86400}},'1w':{{iv:'1w',sec:604800}},
+  }};
+  const cfg = TF_MAP[IV_INIT] || TF_MAP['4h'];
+  window.IV_SEC_CURRENT = cfg.sec;
+  window.CURRENT_TF = IV_INIT;
+  window.CURRENT_SYMBOL = SYMBOL_INIT;
+  try {{
+    const url = `https://api.binance.com/api/v3/klines?symbol=${{SYMBOL_INIT}}&interval=${{cfg.iv}}&limit=200`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Binance ' + res.status);
+    const raw = await res.json();
+    raw.forEach(c=>{{
+      D.t.push(Math.floor(c[0]/1000));
+      D.o.push(parseFloat(c[1]));
+      D.h.push(parseFloat(c[2]));
+      D.l.push(parseFloat(c[3]));
+      D.c.push(parseFloat(c[4]));
+      D.v.push(parseFloat(c[5]));
+    }});
+    simPrice  = D.c[D.c.length-1] || 100;
+    prevPrice = simPrice;
+    candleStart = D.t[D.t.length-1] || Math.floor(Date.now()/1000);
+    console.log(`[AM.Terminal] Init ${{SYMBOL_INIT}} ${{IV_INIT}} → ${{D.t.length}} bougies`);
+  }} catch(e) {{
+    console.warn('[AM.Terminal] fetchInit Binance échoué:', e.message);
+    // Fallback CoinGecko
+    try {{
+      const cgId = '{coingecko_id}';
+      const daysMap={{'1m':1,'5m':1,'15m':1,'1h':7,'4h':30,'1d':365,'1w':1825}};
+      const days = daysMap[IV_INIT]||30;
+      const r2 = await fetch(`https://api.coingecko.com/api/v3/coins/${{cgId}}/ohlc?vs_currency=usd&days=${{days}}`);
+      const raw2 = await r2.json();
+      if(Array.isArray(raw2)) raw2.forEach(c=>{{
+        D.t.push(Math.floor(c[0]/1000));
+        D.o.push(parseFloat(c[1]));
+        D.h.push(parseFloat(c[2]));
+        D.l.push(parseFloat(c[3]));
+        D.c.push(parseFloat(c[4]));
+        D.v.push(0);
+      }});
+      simPrice = D.c[D.c.length-1]||100;
+      prevPrice = simPrice;
+    }} catch(e2) {{ console.warn('[AM.Terminal] CoinGecko aussi échoué'); }}
+  }}
+}}
+
 function init() {{
   setupCanvas();
-  VIEW_START=Math.max(0,D.t.length-120);
-  VIEW_END=D.t.length;
+  // Afficher canvas vide pendant le chargement
+  VIEW_START=0; VIEW_END=0;
   render();
-  updateStats();
-  startBinanceWS();
-  if(RUN_SIM) {{
-    setInterval(simTick, 400);
-    setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 100);
-  }} else {{
+
+  // Charger les données PUIS démarrer
+  fetchInit().then(()=>{{
+    VIEW_START=Math.max(0,D.t.length-120);
+    VIEW_END=D.t.length;
+    render();
+    updateStats();
+    startBinanceWS();
+    // Sim seulement si WS mort après 6s
+    if(RUN_SIM) {{
+      setTimeout(()=>{{ if(!wsConnected) {{ simActive=true; }} }}, 6000);
+      setInterval(simTick, 400);
+    }}
     setInterval(()=>{{ if(HOVER_IDX<0) drawMain(); }}, 200);
-  }}
+  }});
 }}
 
 window.addEventListener('load', init);
 window.addEventListener('resize', ()=>{{ setupCanvas(); render(); }});
 </script>
 </body>
-<!-- RENDER_ID:{symbol}:{int(_time.time()*1000)} -->
 </html>"""
