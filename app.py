@@ -17,8 +17,7 @@ from websocket import create_connection
 from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
 import interface_economie
 import interface_forex
-import time
-from yfinance.exceptions import YFRateLimitError
+import interface_matieres_premieres
 
 
 # ══════════════════════════════════════════════
@@ -926,9 +925,9 @@ class ValuationCalculator:
 
     def _get_safe_info(self):
         try:
-            info = get_ticker_info(self.ticker.ticker)
+            info = self.ticker.info
             if info.get('currentPrice', 0) == 0 or info.get('currentPrice') is None:
-                hist = get_ticker_history(self.ticker.ticker, period="1d")
+                hist = self.ticker.history(period="1d")
                 if not hist.empty:
                     info['currentPrice'] = float(hist['Close'].iloc[-1])
             return info
@@ -964,7 +963,7 @@ class ValuationCalculator:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
                 try:
-                    hist = get_ticker_history(self.ticker.ticker, period="1d")
+                    hist = self.ticker.history(period="1d")
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -988,7 +987,7 @@ class ValuationCalculator:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
                 try:
-                    hist = get_ticker_history(self.ticker.ticker, period="1d")
+                    hist = self.ticker.history(period="1d")
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1028,7 +1027,7 @@ class ValuationCalculator:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
                 try:
-                    hist = get_ticker_history(self.ticker.ticker, period="1d")
+                    hist = self.ticker.history(period="1d")
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1054,7 +1053,7 @@ class ValuationCalculator:
 
     def nvt_valuation(self, window=90):
         try:
-            hist = get_ticker_history(self.ticker.ticker, period=f"{window}d")
+            hist = self.ticker.history(period=f"{window}d")
             if hist.empty:
                 return {"error": "Données historiques non disponibles"}
             market_cap = self.info.get('marketCap', 0)
@@ -1101,7 +1100,7 @@ class ValuationCalculator:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
                 try:
-                    hist = get_ticker_history(self.ticker.ticker, period="1d")
+                    hist = self.ticker.history(period="1d")
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1177,58 +1176,34 @@ class ValuationCalculator:
 #  FONCTIONS UTILITAIRES PARTAGÉES
 # ============================================================
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=5)
 def get_ticker_info(ticker):
-    for attempt in range(3):
-        try:
-            return yf.Ticker(ticker).info
-        except YFRateLimitError:
-            if attempt < 2:
-                time.sleep(3 + attempt * 3)
-        except Exception:
-            return None
-    return None
+    try:
+        data = yf.Ticker(ticker)
+        return data.info
+    except:
+        return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=5)
 def get_ticker_history(ticker, period="2d"):
-    for attempt in range(3):
-        try:
-            df = yf.Ticker(ticker).history(period=period)
-            if not df.empty:
-                return df
-        except YFRateLimitError:
-            if attempt < 2:
-                time.sleep(3 + attempt * 3)
-        except Exception:
-            pass
-    return pd.DataFrame()
-
-@st.cache_data(ttl=300)
-def safe_yf_download(ticker, period="1y", interval="1d"):
-    for attempt in range(3):
-        try:
-            df = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
-            if not df.empty:
-                return df
-        except YFRateLimitError:
-            if attempt < 2:
-                time.sleep(3 + attempt * 3)
-        except Exception:
-            pass
-    return pd.DataFrame()
+    try:
+        data = yf.Ticker(ticker)
+        return data.history(period=period)
+    except:
+        return pd.DataFrame()
 
 def trouver_ticker(nom):
     try:
         url = f"https://query2.finance.yahoo.com/v1/finance/search?q={nom}"
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=5).json()
+        response = requests.get(url, headers=headers).json()
         return response['quotes'][0]['symbol'] if response.get('quotes') else nom
     except:
         return nom
 
 def calculer_score_sentiment(ticker):
     try:
-        data = get_ticker_history(ticker, period="1y")
+        data = yf.Ticker(ticker).history(period="1y")
         if len(data) < 200:
             return 50, "NEUTRE", "gray"
         prix_actuel = data['Close'].iloc[-1]
@@ -1484,7 +1459,7 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
+    "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
 ])
 st.sidebar.markdown("---")
 
@@ -1508,6 +1483,9 @@ if categorie == "ÉCONOMIE":
     st.stop()
 elif categorie == "FOREX":
     interface_forex.show_forex()
+    st.stop()
+elif categorie == "MATIÈRES PREMIÈRES":
+    interface_matieres_premieres.show_matieres_premieres()
     st.stop()
 elif categorie == "ACTIONS & BOURSE":
     outil = st.sidebar.radio("MODULES ACTIONS :", [
@@ -1555,10 +1533,7 @@ if "watchlist" not in st.session_state:
 ticker_data_string = ""
 for tkr in st.session_state.watchlist:
     try:
-        try:
-            t_info = yf.Ticker(tkr).fast_info
-        except (YFRateLimitError, Exception):
-            continue
+        t_info = yf.Ticker(tkr).fast_info
         price = t_info['last_price']
         change = ((price - t_info['previous_close']) / t_info['previous_close']) * 100
         color = "#00ffad" if change >= 0 else "#ff4b4b"
@@ -1664,7 +1639,7 @@ elif outil == "CRYPTO WALLET":
             response = requests.get(url, headers=headers, timeout=5)
             if response.status_code == 200:
                 return float(response.json()['price'])
-            return yf.Ticker(f"{symbol}-USD").fast_info.get('last_price', None)
+            return yf.Ticker(f"{symbol}-USD").fast_info['last_price']
         except:
             return None
 
@@ -1897,7 +1872,7 @@ elif outil == "ANALYSEUR PRO":
 
         if prix == 0 or prix is None:
             try:
-                hist = get_ticker_history(ticker, period="1d")
+                hist = yf.Ticker(ticker).history(period="1d")
                 if not hist.empty:
                     prix = float(hist['Close'].iloc[-1])
             except:
@@ -2144,7 +2119,7 @@ elif outil == "ANALYSE TECHNIQUE PRO":
     if analyze_button:
         try:
             with st.spinner("Chargement et calcul des indicateurs..."):
-                df = safe_yf_download(ticker_tech, period=period_tech)
+                df = yf.download(ticker_tech, period=period_tech, progress=False)
                 if df.empty:
                     st.error("Aucune donnée disponible pour ce ticker")
                 else:
@@ -2352,7 +2327,7 @@ elif outil == "FIBONACCI CALCULATOR":
     if st.button("🚀 CALCULER FIBONACCI", key="fib_calc"):
         try:
             with st.spinner("Calcul des niveaux Fibonacci..."):
-                df_fib = safe_yf_download(ticker_fib, period=period_fib)
+                df_fib = yf.download(ticker_fib, period=period_fib, progress=False)
                 if df_fib.empty:
                     st.error("Aucune donnée disponible")
                 else:
@@ -2552,7 +2527,7 @@ elif outil == "BACKTESTING ENGINE":
     if st.button("🚀 LANCER LE BACKTEST", key="bt_launch"):
         try:
             with st.spinner("Backtesting en cours..."):
-                df_bt = safe_yf_download(ticker_bt, period=period_bt)
+                df_bt = yf.download(ticker_bt, period=period_bt, progress=False)
                 if df_bt.empty:
                     st.error("Aucune donnée disponible")
                 else:
@@ -3032,14 +3007,15 @@ elif outil == "EXPERT SYSTEM":
     if nom_entree:
         with st.spinner("Consultation des Maîtres en cours..."):
             ticker = trouver_ticker(nom_entree)
-            info = get_ticker_info(ticker)
+            action = yf.Ticker(ticker)
+            info = action.info
 
             if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                 nom = info.get('longName', ticker)
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                 if prix == 0 or prix is None:
                     try:
-                        hist = get_ticker_history(ticker, period="1d")
+                        hist = yf.Ticker(ticker).history(period="1d")
                         if not hist.empty: prix = float(hist['Close'].iloc[-1])
                     except: prix = 1
 
@@ -3126,13 +3102,14 @@ elif outil == "THE GRAND COUNCIL️":
         with st.spinner("⏳ Le Conseil délibère... Veuillez patienter."):
             try:
                 ticker = trouver_ticker(nom_entree)
-                info = get_ticker_info(ticker)
+                action = yf.Ticker(ticker)
+                info = action.info
 
                 if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                     p = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                     if p == 0 or p is None or p < 0.01:
                         try:
-                            hist = get_ticker_history(ticker, period="5d")
+                            hist = yf.Ticker(ticker).history(period="5d")
                             if not hist.empty: p = float(hist['Close'].iloc[-1])
                         except: p = 1
 
@@ -3379,14 +3356,14 @@ elif outil == "MODE DUEL":
 
     def get_full_data(t):
         ticker_id = trouver_ticker(t)
-        i = get_ticker_info(ticker_id)
-        hist = get_ticker_history(ticker_id, period="1y")
         ticker_obj = yf.Ticker(ticker_id)
+        i = ticker_obj.info
+        hist = ticker_obj.history(period="1y")
 
         p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
         if p == 0 or p is None or p < 0.01:
             try:
-                h = get_ticker_history(ticker_id, period="5d")
+                h = ticker_obj.history(period="5d")
                 p = float(h['Close'].iloc[-1]) if not h.empty else 1
             except: p = 1
 
@@ -3601,13 +3578,14 @@ elif outil == "SCREENER CAC 40":
             status_text.text(f"Analyse de {t} ({i+1}/40)...")
             progress_bar.progress((i + 1) / len(cac40_tickers))
             try:
-                info = get_ticker_info(t)
+                action = yf.Ticker(t)
+                info = action.info
                 if not info or 'currentPrice' not in info: continue
                 nom = info.get('shortName') or t
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                 if prix == 0 or prix is None:
                     try:
-                        hist = get_ticker_history(t, period="1d")
+                        hist = yf.Ticker(t).history(period="1d")
                         if not hist.empty: prix = float(hist['Close'].iloc[-1])
                     except: prix = 1
                 bpa = info.get('trailingEps') or info.get('forwardEps') or 0
@@ -3789,37 +3767,9 @@ elif outil == "DAILY BRIEF":
     st.markdown("---")
     tab_eco, tab_tech, tab_quotidien = st.tabs(["🌍 GLOBAL MACRO", "⚡ TECH & CRYPTO", "📅 DAILY (BOURSORAMA)"])
 
-    def afficher_flux_fusionne(sources):
-        """Récupère et fusionne plusieurs flux RSS triés par date décroissante."""
-        import time
-        all_articles = []
-        for url, source_label in sources:
-            try:
-                flux = feedparser.parse(url)
-                for entry in flux.entries[:15]:
-                    pub_time = time.mktime(entry.published_parsed) if 'published_parsed' in entry else 0
-                    all_articles.append({
-                        "title": entry.title.replace(" - Boursorama", "").split(" - ")[0],
-                        "link": entry.link,
-                        "published": entry.get("published", ""),
-                        "pub_time": pub_time,
-                        "source": source_label
-                    })
-            except Exception:
-                pass
-        if not all_articles:
-            st.info("NO DATA FOUND.")
-            return
-        all_articles.sort(key=lambda x: x["pub_time"], reverse=True)
-        for art in all_articles[:30]:
-            with st.expander(f"» {art['title']}"):
-                st.write(f"**SOURCE :** {art['source']}")
-                if art["published"]: st.caption(f"🕒 TIMESTAMP : {art['published']}")
-                st.link_button("READ FULL ARTICLE", art["link"])
-
-    def afficher_flux_daily(url, filtre_boursorama_24h=False, source_label="Boursorama / Google News"):
-        import time
+    def afficher_flux_daily(url, filtre_boursorama_24h=False):
         try:
+            import time
             flux = feedparser.parse(url)
             if not flux.entries: st.info("NO DATA FOUND."); return
             maintenant = time.time()
@@ -3832,7 +3782,7 @@ elif outil == "DAILY BRIEF":
                     trouve = True
                     clean_title = entry.title.replace(" - Boursorama", "").split(" - ")[0]
                     with st.expander(f"» {clean_title}"):
-                        st.write(f"**SOURCE :** {source_label}")
+                        st.write(f"**SOURCE :** Boursorama / Google News")
                         if 'published' in entry: st.caption(f"🕒 TIMESTAMP : {entry.published}")
                         st.link_button("READ FULL ARTICLE", entry.link)
             if not trouve and filtre_boursorama_24h:
@@ -3840,11 +3790,7 @@ elif outil == "DAILY BRIEF":
         except Exception: st.error("FEED ERROR.")
 
     with tab_eco:
-        afficher_flux_fusionne([
-            ("https://news.google.com/rss/search?q=bourse+economie+mondiale&hl=fr&gl=FR&ceid=FR:fr", "Google News / Macro"),
-            ("https://feeds.a.dj.com/rss/RSSMarketsMain.xml", "Wall Street Journal / Markets"),
-            ("https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml", "Wall Street Journal / Finance"),
-        ])
+        afficher_flux_daily("https://news.google.com/rss/search?q=bourse+economie+mondiale&hl=fr&gl=FR&ceid=FR:fr")
     with tab_tech:
         afficher_flux_daily("https://news.google.com/rss/search?q=crypto+nasdaq+nvidia&hl=fr&gl=FR&ceid=FR:fr")
     with tab_quotidien:
@@ -3959,11 +3905,7 @@ elif outil == "CORRÉLATION DASH":
     }
     with st.spinner('Calculating correlations...'):
         try:
-            data = safe_yf_download(list(assets.keys()), period="60d", interval="1d")
-            if not data.empty and isinstance(data.columns, pd.MultiIndex):
-                data = data['Close']
-            elif not data.empty:
-                data = data
+            data = yf.download(list(assets.keys()), period="60d", interval="1d")['Close']
             returns = data.pct_change().dropna()
             corr_matrix = returns.corr()
             corr_matrix.columns = [assets[c] for c in corr_matrix.columns]
@@ -4067,7 +4009,7 @@ elif outil == "HEATMAP MARCHÉ":
 
                 for ticker_item, sector in tickers_list:
                     try:
-                        df = safe_yf_download(ticker_item, period=period)
+                        df = yf.download(ticker_item, period=period, progress=False)
                         if not df.empty:
                             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
                             start_price = float(df['Close'].iloc[0])
@@ -4190,7 +4132,7 @@ elif outil == "ALERTS MANAGER":
                     for alert in st.session_state.alerts:
                         if not alert['active']: continue
                         try:
-                            df = safe_yf_download(alert['ticker'], period="2d")
+                            df = yf.download(alert['ticker'], period="2d", progress=False)
                             if df.empty: continue
                             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
                             current_price = float(df['Close'].iloc[-1])
