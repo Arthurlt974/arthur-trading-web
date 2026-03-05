@@ -4,6 +4,7 @@ Module MATIÈRES PREMIÈRES — AM Trading Terminal
 Métaux précieux, énergie, agricole, indices matières premières
 """
 
+import json
 import streamlit as st
 import streamlit.components.v1 as components
 import yfinance as yf
@@ -395,7 +396,6 @@ def _show_dashboard():
         sel_ticker = st.session_state.mp_selected
         sel_item   = next((i for _, i in all_items if i["ticker"] == sel_ticker), None)
         if sel_item:
-            tv_sym = _get_tv_symbol(sel_ticker)
             sel_d  = prices.get(sel_ticker, {"price": 0, "change": 0, "ok": False})
             up     = sel_d["change"] >= 0
             c      = "#00ff41" if up else "#ff2222"
@@ -415,17 +415,10 @@ def _show_dashboard():
                     <span style="color:#333;font-size:10px;">{sel_item["unit"]}</span>
                 </div>
             </div>""", unsafe_allow_html=True)
-            tv_html = f"""<div style="background:#000;border:1px solid #1a1a1a;">
-                <div class="tradingview-widget-container">
-                    <div class="tradingview-widget-container__widget"></div>
-                    <script type="text/javascript"
-                        src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                    {{"symbol":"{tv_sym}","interval":"D","timezone":"Europe/Paris","theme":"dark",
-                      "style":"1","locale":"fr","backgroundColor":"#000000","gridColor":"#0d0d0d",
-                      "width":"100%","height":"460","hide_top_toolbar":false,"save_image":false}}
-                    </script>
-                </div></div>"""
-            components.html(tv_html, height=470)
+            components.html(
+                render_commodity_chart(sel_ticker, pair_label=f"{sel_item['emoji']} {sel_item['name']}", height=460),
+                height=470, scrolling=False
+            )
             _show_commodity_info(sel_item, sel_d)
             st.markdown("<hr style=\'border:none;border-top:1px solid #111;margin:16px 0;\'>", unsafe_allow_html=True)
 
@@ -537,62 +530,266 @@ def _show_category(category):
 
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-        # Graphique TradingView
-        tv_sym = _get_tv_symbol(active_item["ticker"])
-        tv_html = f"""
-        <div style="background:#000;border:1px solid #1a1a1a;border-top:2px solid #ff6600;">
-            <div class="tradingview-widget-container" style="height:420px;">
-                <div class="tradingview-widget-container__widget"></div>
-                <script type="text/javascript"
-                    src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                {{
-                    "symbol": "{tv_sym}",
-                    "interval": "D",
-                    "timezone": "Europe/Paris",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "fr",
-                    "backgroundColor": "#000000",
-                    "gridColor": "#0d0d0d",
-                    "width": "100%",
-                    "height": "420",
-                    "hide_top_toolbar": false,
-                    "hide_legend": false,
-                    "save_image": false,
-                    "calendar": false,
-                    "support_host": "https://www.tradingview.com"
-                }}
-                </script>
-            </div>
-        </div>"""
-        components.html(tv_html, height=430)
+        # Graphique AM.Terminal
+        components.html(
+            render_commodity_chart(active_item["ticker"], pair_label=f"{active_item['emoji']} {active_item['name']}", height=420),
+            height=430, scrolling=False
+        )
 
         # Infos fondamentales
         d = prices[active_item["ticker"]]
         _show_commodity_info(active_item, d)
 
 
-def _get_tv_symbol(ticker):
-    """Convertit ticker yfinance → symbole TradingView"""
-    mapping = {
-        "GC=F":  "COMEX:GC1!",
-        "SI=F":  "COMEX:SI1!",
-        "PL=F":  "NYMEX:PL1!",
-        "PA=F":  "NYMEX:PA1!",
-        "CL=F":  "NYMEX:CL1!",
-        "BZ=F":  "NYMEX:BB1!",
-        "NG=F":  "NYMEX:NG1!",
-        "HG=F":  "COMEX:HG1!",
-        "ZW=F":  "CBOT:ZW1!",
-        "ZC=F":  "CBOT:ZC1!",
-        "ZS=F":  "CBOT:ZS1!",
-        "SB=F":  "ICEUS:SB1!",
-        "KC=F":  "ICEUS:KC1!",
-        "CC=F":  "ICEUS:CC1!",
-        "ALI=F": "COMEX:ALI1!",
-        "MTF=F": "ICEEUR:MTF1!",
-    }
-    return mapping.get(ticker, "COMEX:GC1!")
+# _get_tv_symbol remplacé par render_commodity_chart
+
+
+@st.cache_data(ttl=300)
+def _fetch_candles(ticker: str, period: str = "6mo", interval: str = "1d") -> list:
+    """Fetch OHLCV via yfinance — retourne [{t,o,h,l,c,v}, ...]"""
+    try:
+        df = yf.download(ticker, period=period, interval=interval,
+                         progress=False, auto_adjust=True)
+        if df.empty:
+            return []
+        if hasattr(df.columns, 'get_level_values'):
+            df.columns = df.columns.get_level_values(0)
+        df = df.tail(300).reset_index()
+        ts_col = "Datetime" if "Datetime" in df.columns else "Date"
+        out = []
+        for _, row in df.iterrows():
+            try:
+                out.append({
+                    "t": int(row[ts_col].timestamp()),
+                    "o": float(row["Open"]),
+                    "h": float(row["High"]),
+                    "l": float(row["Low"]),
+                    "c": float(row["Close"]),
+                    "v": float(row.get("Volume", 0) or 0),
+                })
+            except Exception:
+                continue
+        return out
+    except Exception as e:
+        print(f"[MP chart] {ticker}: {e}")
+        return []
+
+
+def render_commodity_chart(ticker: str, pair_label: str = "", height: int = 420) -> str:
+    """Graphique Canvas AM.Terminal pour matières premières (yfinance)."""
+    candles = _fetch_candles(ticker, period="6mo", interval="1d")
+
+    if not candles:
+        return (f'''<div style="background:#131722;height:{height}px;display:flex;'''
+                f'''align-items:center;justify-content:center;color:#50535e;'''
+                f'''font-family:IBM Plex Mono,monospace;font-size:12px;'''
+                f'''border:1px solid #1e222d;">Données indisponibles — {ticker}</div>''')
+
+    cd   = json.dumps(candles)
+    last = candles[-1]["c"]
+    frst = candles[0]["o"]
+    pct  = (last - frst) / frst * 100 if frst else 0
+    bull = last >= frst
+    pc   = "#26a69a" if bull else "#ef5350"
+    cc   = "up"      if bull else "dn"
+    arr  = "▲"       if bull else "▼"
+    oh   = candles[-1]["o"]
+    hh   = candles[-1]["h"]
+    lh   = candles[-1]["l"]
+    ch   = candles[-1]["c"]
+
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+*{{margin:0;padding:0;box-sizing:border-box;}}
+html,body{{background:#131722;color:#d1d4dc;font-family:'IBM Plex Mono',monospace;
+  font-size:11px;width:100%;height:{height}px;overflow:hidden;display:flex;flex-direction:column;}}
+.hdr{{display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:#1e222d;
+  border-bottom:1px solid #2a2e39;height:40px;padding:0 12px;flex-shrink:0;}}
+.pair{{font-size:13px;font-weight:700;}}
+.price{{font-size:16px;font-weight:700;}}
+.chg{{font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600;}}
+.chg.up{{background:rgba(38,166,154,0.15);color:#26a69a;}}
+.chg.dn{{background:rgba(239,83,80,0.15);color:#ef5350;}}
+.ohlc{{display:flex;gap:10px;margin-left:4px;}}
+.oi{{display:flex;flex-direction:column;gap:1px;}}
+.ol{{font-size:7px;color:#50535e;letter-spacing:1px;text-transform:uppercase;}}
+.ov{{font-size:10px;font-weight:600;}}
+.cz{{flex:1;position:relative;overflow:hidden;}}
+#cv{{display:block;cursor:crosshair;}}
+#tt{{position:fixed;pointer-events:none;z-index:9999;background:#1e222d;
+  border:1px solid #2a2e39;padding:7px 11px;border-radius:4px;font-size:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,.6);display:none;min-width:140px;}}
+.td{{color:#787b86;font-size:8px;margin-bottom:5px;letter-spacing:1px;}}
+.tr{{display:flex;justify-content:space-between;gap:14px;margin:2px 0;}}
+.tl{{color:#50535e;font-size:9px;}}.tv{{font-weight:600;font-size:10px;}}
+</style></head><body>
+<div class="hdr">
+  <div class="pair">{pair_label}</div>
+  <div class="price" id="prc" style="color:{pc}">{last:,.2f}</div>
+  <div class="chg {cc}">{arr} {abs(pct):.2f}%</div>
+  <div class="ohlc">
+    <div class="oi"><div class="ol">O</div><div class="ov" id="ho">{oh:,.2f}</div></div>
+    <div class="oi"><div class="ol">H</div><div class="ov" id="hh" style="color:#26a69a">{hh:,.2f}</div></div>
+    <div class="oi"><div class="ol">L</div><div class="ov" id="hl" style="color:#ef5350">{lh:,.2f}</div></div>
+    <div class="oi"><div class="ol">C</div><div class="ov" id="hc">{ch:,.2f}</div></div>
+  </div>
+</div>
+<div class="cz"><canvas id="cv"></canvas></div>
+<div id="tt">
+  <div class="td" id="ttD"></div>
+  <div class="tr"><span class="tl">Open</span><span class="tv" id="ttO"></span></div>
+  <div class="tr"><span class="tl">High</span><span class="tv" id="ttH" style="color:#26a69a"></span></div>
+  <div class="tr"><span class="tl">Low</span><span class="tv" id="ttL" style="color:#ef5350"></span></div>
+  <div class="tr"><span class="tl">Close</span><span class="tv" id="ttC"></span></div>
+</div>
+<script>
+const RAW={cd};
+const PAD={{l:0,r:70,t:8,b:22}};
+let D={{t:RAW.map(r=>r.t),o:RAW.map(r=>r.o),h:RAW.map(r=>r.h),l:RAW.map(r=>r.l),c:RAW.map(r=>r.c),v:RAW.map(r=>r.v)}};
+let VS=Math.max(0,D.t.length-120),VE=D.t.length;
+let HX=-1,HY=-1,MX=0,MY=0,drag=false,dragX=0,dragVS=0;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+const st=(id,v)=>{{const e=$(id);if(e)e.textContent=v;}};
+const sc=(id,c)=>{{const e=$(id);if(e)e.style.color=c;}};
+const fmt=v=>{{
+  if(v==null||isNaN(v))return'—';
+  if(v>=10000)return v.toLocaleString('en-US',{{minimumFractionDigits:2,maximumFractionDigits:2}});
+  if(v>=100)return v.toFixed(2);
+  if(v>=1)return v.toFixed(4);
+  return v.toFixed(6);
+}};
+const fmtD=ts=>new Date(ts*1000).toLocaleDateString('fr-FR',{{day:'2-digit',month:'short',year:'2-digit'}});
+const maCalc=(arr,p)=>arr.map((_,i)=>i<p-1?null:arr.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);
+
+function setup(){{
+  const W=cv.parentElement.clientWidth||700,H=cv.parentElement.clientHeight||{height}-40;
+  cv.width=W;cv.height=H;cv.style.width=W+'px';cv.style.height=H+'px';
+}}
+
+function draw(){{
+  const W=cv.width,H=cv.height;
+  ctx.fillStyle='#131722';ctx.fillRect(0,0,W,H);
+  const N=VE-VS;if(N<2)return;
+  const ts=D.t.slice(VS,VE),os=D.o.slice(VS,VE),hs=D.h.slice(VS,VE),ls=D.l.slice(VS,VE),cs=D.c.slice(VS,VE);
+  const mn=Math.min(...ls),mx2=Math.max(...hs),pd=(mx2-mn)*0.05||mx2*0.001;
+  const lo=mn-pd,hi=mx2+pd,rng=hi-lo||1;
+  const CW=(W-PAD.l-PAD.r)/N,BW=Math.max(1,CW*0.72);
+  const toX=i=>PAD.l+i*CW+CW/2;
+  const toY=p=>PAD.t+(hi-p)/rng*(H-PAD.t-PAD.b);
+
+  // Grille horizontale
+  for(let s=0;s<=5;s++){{
+    const y=PAD.t+s*(H-PAD.t-PAD.b)/5;
+    ctx.strokeStyle='#1e222d';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W-PAD.r,y);ctx.stroke();
+    ctx.fillStyle='#787b86';ctx.font='9px IBM Plex Mono,monospace';ctx.textAlign='left';
+    ctx.fillText(fmt(hi-s*rng/5),W-PAD.r+4,y+3);
+  }}
+  // Axe temps
+  const nT=Math.min(8,Math.max(3,Math.floor(N/15)));
+  ctx.fillStyle='#787b86';ctx.font='8px IBM Plex Mono,monospace';ctx.textAlign='center';
+  for(let t=0;t<=nT;t++){{
+    const i=Math.floor(t*(N-1)/Math.max(nT,1));
+    ctx.strokeStyle='#1e222d';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(toX(i),PAD.t);ctx.lineTo(toX(i),H-PAD.b);ctx.stroke();
+    ctx.fillText(new Date(ts[i]*1000).toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}}),toX(i),H-5);
+  }}
+  // MA 20/50/200
+  [{{'p':20,'c':'rgba(255,200,50,.8)'}},{{'p':50,'c':'rgba(33,150,243,.8)'}},{{'p':200,'c':'rgba(255,82,82,.8)'}}].forEach((m,mi)=>{{
+    const ma=maCalc(D.c,m.p).slice(VS,VE);
+    ctx.beginPath();let s=false;
+    for(let i=0;i<N;i++){{if(ma[i]==null)continue;s?ctx.lineTo(toX(i),toY(ma[i])):ctx.moveTo(toX(i),toY(ma[i]));s=true;}}
+    ctx.strokeStyle=m.c;ctx.lineWidth=1.2;ctx.stroke();
+    ctx.fillStyle=m.c;ctx.font='8px IBM Plex Mono,monospace';ctx.textAlign='left';
+    ctx.fillText('MA'+m.p,4+mi*46,16);
+  }});
+  // Bougies
+  for(let i=0;i<N;i++){{
+    const x=toX(i),oy=toY(os[i]),hy2=toY(hs[i]),ly=toY(ls[i]),cy2=toY(cs[i]);
+    const bull=cs[i]>=os[i],col=bull?'#26a69a':'#ef5350';
+    const hw=Math.max(1,BW/2),top=Math.min(oy,cy2),bH=Math.max(1,Math.abs(cy2-oy));
+    ctx.strokeStyle=col;ctx.lineWidth=Math.max(1,BW*.1);
+    ctx.beginPath();ctx.moveTo(x,hy2);ctx.lineTo(x,ly);ctx.stroke();
+    ctx.fillStyle=col;ctx.fillRect(x-hw,top,hw*2,bH);
+    if(i===N-1){{
+      const g=1.5+Math.sin(Date.now()/300);
+      ctx.strokeStyle=bull?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)';ctx.lineWidth=1;
+      ctx.strokeRect(x-hw-g,top-g,hw*2+g*2,bH+g*2);
+    }}
+  }}
+  // Ligne dernier prix
+  const lc=cs[N-1],lb=cs[N-1]>=os[N-1];
+  const py=toY(lc);
+  ctx.strokeStyle=lb?'rgba(38,166,154,.4)':'rgba(239,83,80,.4)';
+  ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W-PAD.r,py);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=lb?'#26a69a':'#ef5350';
+  ctx.beginPath();ctx.roundRect(W-PAD.r+2,py-8,PAD.r-4,16,2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 8px IBM Plex Mono,monospace';ctx.textAlign='left';
+  ctx.fillText(fmt(lc),W-PAD.r+5,py+4);
+  // Crosshair
+  if(HX>=0&&HX<N){{
+    const x=toX(HX);
+    ctx.strokeStyle='rgba(132,142,156,.35)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,PAD.t);ctx.lineTo(x,H);ctx.stroke();
+    if(HY>0){{
+      ctx.beginPath();ctx.moveTo(0,HY);ctx.lineTo(W-PAD.r,HY);ctx.stroke();
+      const hp=hi-(HY-PAD.t)/((H-PAD.t-PAD.b))*rng;
+      ctx.fillStyle='#363a45';ctx.beginPath();ctx.roundRect(W-PAD.r+2,HY-8,PAD.r-4,16,2);ctx.fill();
+      ctx.fillStyle='#d1d4dc';ctx.font='8px IBM Plex Mono,monospace';ctx.textAlign='left';
+      ctx.fillText(fmt(hp),W-PAD.r+5,HY+4);
+    }}
+    const ri=VS+HX,b2=D.c[ri]>=D.o[ri];
+    st('ho',fmt(D.o[ri]));sc('ho',b2?'#26a69a':'#ef5350');
+    st('hh',fmt(D.h[ri]));st('hl',fmt(D.l[ri]));
+    st('hc',fmt(D.c[ri]));sc('hc',b2?'#26a69a':'#ef5350');
+    const tt=$('tt');
+    if(tt){{
+      tt.style.display='block';
+      let tx=MX+14,ty=MY-80;
+      if(tx+160>window.innerWidth)tx=MX-174;if(ty<0)ty=MY+10;
+      tt.style.left=tx+'px';tt.style.top=ty+'px';
+      st('ttD',fmtD(D.t[ri]));
+      st('ttO',fmt(D.o[ri]));st('ttH',fmt(D.h[ri]));
+      st('ttL',fmt(D.l[ri]));st('ttC',fmt(D.c[ri]));sc('ttC',b2?'#26a69a':'#ef5350');
+    }}
+  }}else{{const tt=$('tt');if(tt)tt.style.display='none';}}
+}}
+
+cv.addEventListener('mousemove',e=>{{
+  const r=cv.getBoundingClientRect();MX=e.clientX;MY=e.clientY;
+  HY=e.clientY-r.top;
+  if(drag){{
+    const N=VE-VS,CW=(cv.width-PAD.l-PAD.r)/N;
+    const sh=Math.round(-(e.clientX-dragX)/CW);
+    let s=Math.max(0,Math.min(D.t.length-N,dragVS+sh));
+    VS=s;VE=s+N;draw();return;
+  }}
+  const N=VE-VS,CW=(cv.width-PAD.l-PAD.r)/N;
+  HX=Math.max(0,Math.min(N-1,Math.floor((e.clientX-r.left-PAD.l)/CW)));draw();
+}});
+cv.addEventListener('mousedown',e=>{{drag=true;dragX=e.clientX;dragVS=VS;cv.style.cursor='grabbing';}});
+window.addEventListener('mouseup',()=>{{drag=false;cv.style.cursor='crosshair';}});
+cv.addEventListener('mouseleave',()=>{{
+  HX=-1;HY=-1;const tt=$('tt');if(tt)tt.style.display='none';
+  const n=D.c.length;if(n){{st('ho',fmt(D.o[n-1]));st('hh',fmt(D.h[n-1]));st('hl',fmt(D.l[n-1]));st('hc',fmt(D.c[n-1]));}}
+  draw();
+}});
+cv.addEventListener('wheel',e=>{{
+  e.preventDefault();
+  const N=VE-VS,f=e.deltaY>0?1.1:0.9;
+  const nN=Math.max(20,Math.min(D.t.length,Math.round(N*f)));
+  const c=HX>=0?VS+HX:Math.floor((VS+VE)/2);
+  let s=Math.max(0,c-Math.floor(nN/2));
+  let en=s+nN;if(en>D.t.length){{en=D.t.length;s=Math.max(0,en-nN);}}
+  VS=s;VE=en;draw();
+}},{{passive:false}});
+function init(){{setup();draw();setInterval(()=>{{if(HX<0)draw();}},200);}}
+window.addEventListener('load',init);
+window.addEventListener('resize',()=>{{setup();draw();}});
+</script></body></html>"""
 
 
 def _show_commodity_info(item, data):
@@ -673,31 +870,10 @@ def _show_charts():
     for col, sel in [(col1, sel1), (col2, sel2)]:
         with col:
             ticker = tickers_map[sel]
-            tv_sym = _get_tv_symbol(ticker)
-            tv_html = f"""
-            <div style="background:#000;border:1px solid #1a1a1a;border-top:2px solid #ff6600;">
-                <div class="tradingview-widget-container">
-                    <div class="tradingview-widget-container__widget"></div>
-                    <script type="text/javascript"
-                        src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                    {{
-                        "symbol": "{tv_sym}",
-                        "interval": "W",
-                        "timezone": "Europe/Paris",
-                        "theme": "dark",
-                        "style": "1",
-                        "locale": "fr",
-                        "backgroundColor": "#000000",
-                        "gridColor": "#0d0d0d",
-                        "width": "100%",
-                        "height": "380",
-                        "hide_top_toolbar": false,
-                        "save_image": false
-                    }}
-                    </script>
-                </div>
-            </div>"""
-            components.html(tv_html, height=390)
+            components.html(
+                render_commodity_chart(ticker, pair_label=sel, height=380),
+                height=390, scrolling=False
+            )
 
     # ── Graphique corrélation or/pétrole ──
     st.markdown('<div class="section-header">🔗 CORRÉLATIONS MATIÈRES PREMIÈRES</div>',
