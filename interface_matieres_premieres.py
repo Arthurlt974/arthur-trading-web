@@ -600,7 +600,6 @@ def render_commodity_chart(ticker: str, pair_label: str = "", height: int = 420)
                 f'font-family:IBM Plex Mono,monospace;font-size:12px;'
                 f'border:1px solid #1e222d;">Données indisponibles — {ticker}</div>')
 
-    import json as _json
     cd   = _json.dumps(candles)
     last = candles[-1]["c"]
     frst = candles[0]["o"]
@@ -744,7 +743,7 @@ html,body{{background:#131722;color:#d1d4dc;font-family:'IBM Plex Mono',monospac
 <div class="chart-zone">
   <canvas id="cv"></canvas>
   <div class="vol-sep" id="volSep"></div>
-  <canvas id="cvVol" id="cvVolEl"></canvas>
+  <canvas id="cvVol"></canvas>
 </div>
 
 <!-- TOOLTIP -->
@@ -788,7 +787,7 @@ let HX=-1, HY=-1, MX=0, MY=0;
 let drag=false, dragX=0, dragVS=0;
 
 const cv    = document.getElementById('cv');
-const cvVol = document.querySelector('#cvVol, canvas:last-of-type');
+const cvVol = document.getElementById('cvVol');
 const ctx   = cv.getContext('2d');
 const ctxV  = cvVol ? cvVol.getContext('2d') : null;
 const $     = id => document.getElementById(id);
@@ -810,7 +809,7 @@ const maCalc = (arr,p) => arr.map((_,i) => i<p-1 ? null : arr.slice(i-p+1,i+1).r
 // ════════════════════════════════════════════════════════
 function setup() {{
   const W = cv.parentElement.clientWidth || 700;
-  const totalH = cv.parentElement.clientHeight || {height}-72;
+  const totalH = cv.parentElement.clientHeight || (window.innerHeight - 80);
   const volH = showVol ? VPAH : 0;
   const mainH = Math.max(totalH - volH - (showVol?1:0), 100);
 
