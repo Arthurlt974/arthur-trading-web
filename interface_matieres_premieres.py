@@ -162,21 +162,21 @@ def render_price_card(item, data):
                 padding:12px 14px;margin-bottom:6px;position:relative;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
             <div>
-                <span style="font-size:9px;color:#444;font-family:'Share Tech Mono',monospace;
-                             letter-spacing:2px;text-transform:uppercase;">{item['emoji']} {item['name']}</span>
-                <div style="font-size:20px;font-weight:700;color:#e8e8e8;
-                            font-family:'Share Tech Mono',monospace;letter-spacing:-0.5px;margin-top:2px;">
+                <span style="font-size:9px;color:#444;font-family:'DM Sans', Arial, sans-serif;
+                             letter-spacing:0.8px;text-transform:uppercase;">{item['emoji']} {item['name']}</span>
+                <div style="font-size:18px;font-weight:700;color:#e8e8e8;
+                            font-family:'DM Sans', Arial, sans-serif;letter-spacing:-0.5px;margin-top:2px;">
                     {price_str}
                 </div>
-                <span style="font-size:9px;color:#333;font-family:'Share Tech Mono',monospace;">{item['unit']}</span>
+                <span style="font-size:9px;color:#333;font-family:'DM Sans', Arial, sans-serif;">{item['unit']}</span>
             </div>
             <div style="text-align:right;">
                 <div style="background:{bg};border:1px solid {border};
-                            color:{color};font-family:'Share Tech Mono',monospace;
-                            font-size:12px;font-weight:700;padding:4px 8px;letter-spacing:1px;">
+                            color:{color};font-family:'DM Sans', Arial, sans-serif;
+                            font-size:12px;font-weight:700;padding:4px 8px;letter-spacing:0.4px;">
                     {arrow} {sign}{change:.2f}%
                 </div>
-                <div style="font-size:9px;color:#333;margin-top:4px;font-family:'Share Tech Mono',monospace;">
+                <div style="font-size:9px;color:#333;margin-top:4px;font-family:'DM Sans', Arial, sans-serif;">
                     CLÔTURE: {data.get('prev',0):,.2f}
                 </div>
             </div>
@@ -192,11 +192,11 @@ def render_price_card(item, data):
 def show_matieres_premieres():
 
     st.markdown("""
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         .section-header {
             color: #ff6600;
-            font-family: 'Share Tech Mono', monospace;
+            font-family: 'DM Sans', Arial, sans-serif;
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 3px;
@@ -207,7 +207,7 @@ def show_matieres_premieres():
         }
         .cat-header {
             color: #ffcc00;
-            font-family: 'Share Tech Mono', monospace;
+            font-family: 'DM Sans', Arial, sans-serif;
             font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 2px;
@@ -222,7 +222,7 @@ def show_matieres_premieres():
             align-items: center;
             padding: 8px 12px;
             border-bottom: 1px solid #0d0d0d;
-            font-family: 'Share Tech Mono', monospace;
+            font-family: 'DM Sans', Arial, sans-serif;
             transition: background 0.1s;
         }
         .comm-row:hover { background: #0a0500; }
@@ -321,19 +321,19 @@ def _show_dashboard():
             st.markdown(f"""
             <div style="background:#080808;border:1px solid #1a1a1a;
                         border-top:3px solid {color};padding:12px;text-align:center;">
-                <div style="color:#444;font-size:9px;font-family:'Share Tech Mono',monospace;
-                            letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">
+                <div style="color:#444;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
+                            letter-spacing:0.8px;text-transform:uppercase;margin-bottom:4px;">
                     {item['emoji']} {item['name']}
                 </div>
-                <div style="color:#e8e8e8;font-size:22px;font-family:'Share Tech Mono',monospace;
-                            font-weight:700;letter-spacing:-1px;">
+                <div style="color:#e8e8e8;font-size:22px;font-family:'DM Mono', monospace;
+                            font-weight:500;letter-spacing:-0.5px;">
                     {d['price']:,.2f}
                 </div>
-                <div style="color:{color};font-size:12px;font-family:'Share Tech Mono',monospace;
+                <div style="color:{color};font-size:12px;font-family:'DM Sans', Arial, sans-serif;
                             margin-top:4px;">
                     {'▲' if up else '▼'} {sign}{d['change']:.2f}%
                 </div>
-                <div style="color:#222;font-size:8px;font-family:'Share Tech Mono',monospace;
+                <div style="color:#222;font-size:8px;font-family:'DM Sans', Arial, sans-serif;
                             margin-top:2px;">{item['unit']}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -353,11 +353,11 @@ def _show_dashboard():
             header_html = """
             <div style="display:flex;justify-content:space-between;padding:4px 12px;
                         border-bottom:1px solid #1a1a1a;">
-                <span style="color:#333;font-size:9px;font-family:'Share Tech Mono',monospace;
-                             letter-spacing:1px;">ACTIF</span>
-                <span style="color:#333;font-size:9px;font-family:'Share Tech Mono',monospace;">PRIX</span>
-                <span style="color:#333;font-size:9px;font-family:'Share Tech Mono',monospace;">VARIATION</span>
-                <span style="color:#333;font-size:9px;font-family:'Share Tech Mono',monospace;">UNITÉ</span>
+                <span style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
+                             letter-spacing:0.4px;">ACTIF</span>
+                <span style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;">PRIX</span>
+                <span style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;">VARIATION</span>
+                <span style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;">UNITÉ</span>
             </div>"""
             st.markdown(header_html, unsafe_allow_html=True)
 
@@ -371,13 +371,13 @@ def _show_dashboard():
 
                 st.markdown(f"""
                 <div class="comm-row">
-                    <span style="color:#e8e8e8;font-size:12px;font-family:'Share Tech Mono',monospace;
+                    <span style="color:#e8e8e8;font-size:12px;font-family:'DM Sans', Arial, sans-serif;
                                  width:130px;">{item['emoji']} {item['name']}</span>
-                    <span style="color:#ffffff;font-size:13px;font-family:'Share Tech Mono',monospace;
-                                 font-weight:700;width:100px;text-align:right;">{price_str}</span>
-                    <span style="color:{color};font-size:12px;font-family:'Share Tech Mono',monospace;
+                    <span style="color:#ffffff;font-size:13px;font-family:'DM Mono', monospace;
+                                 font-weight:500;width:100px;text-align:right;">{price_str}</span>
+                    <span style="color:{color};font-size:12px;font-family:'DM Sans', Arial, sans-serif;
                                  width:90px;text-align:right;">{arrow} {sign}{d['change']:.2f}%</span>
-                    <span style="color:#333;font-size:9px;font-family:'Share Tech Mono',monospace;
+                    <span style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
                                  width:70px;text-align:right;">{item['unit']}</span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -400,9 +400,9 @@ def _show_dashboard():
             item = m["item"]
             st.markdown(f"""
             <div class="comm-row">
-                <span style="color:#aaa;font-family:'Share Tech Mono',monospace;font-size:11px;">
+                <span style="color:#aaa;font-family:'DM Sans', Arial, sans-serif;font-size:11px;">
                     {item['emoji']} {item['name']}</span>
-                <span style="color:#00ff41;font-family:'Share Tech Mono',monospace;
+                <span style="color:#00ff41;font-family:'DM Sans', Arial, sans-serif;
                              font-size:13px;font-weight:700;">+{d['change']:.2f}%</span>
             </div>""", unsafe_allow_html=True)
 
@@ -413,9 +413,9 @@ def _show_dashboard():
             item = m["item"]
             st.markdown(f"""
             <div class="comm-row">
-                <span style="color:#aaa;font-family:'Share Tech Mono',monospace;font-size:11px;">
+                <span style="color:#aaa;font-family:'DM Sans', Arial, sans-serif;font-size:11px;">
                     {item['emoji']} {item['name']}</span>
-                <span style="color:#ff2222;font-family:'Share Tech Mono',monospace;
+                <span style="color:#ff2222;font-family:'DM Sans', Arial, sans-serif;
                              font-size:13px;font-weight:700;">{d['change']:.2f}%</span>
             </div>""", unsafe_allow_html=True)
 
@@ -440,12 +440,12 @@ def _show_dashboard():
             <div style="background:#080808;border:1px solid #1a1a1a;padding:10px 12px;
                         margin-bottom:6px;border-left:3px solid #ffcc00;">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span style="color:#ffcc00;font-family:'Share Tech Mono',monospace;
-                                 font-size:10px;letter-spacing:1px;">{name}</span>
-                    <span style="color:#e8e8e8;font-family:'Share Tech Mono',monospace;
+                    <span style="color:#ffcc00;font-family:'DM Sans', Arial, sans-serif;
+                                 font-size:10px;letter-spacing:0.4px;">{name}</span>
+                    <span style="color:#e8e8e8;font-family:'DM Sans', Arial, sans-serif;
                                  font-size:16px;font-weight:700;">{val:.1f}</span>
                 </div>
-                <div style="color:#333;font-size:9px;font-family:'Share Tech Mono',monospace;
+                <div style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
                             margin-top:3px;">{unit} — {note}</div>
             </div>""", unsafe_allow_html=True)
 
@@ -579,19 +579,19 @@ def _show_commodity_info(item, data):
     st.markdown(f"""
     <div style="background:#060606;border:1px solid #1a1a1a;border-left:3px solid #ff6600;
                 padding:12px 14px;margin-top:8px;">
-        <div style="color:#ff6600;font-family:'Share Tech Mono',monospace;font-size:10px;
-                    letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">
+        <div style="color:#ff6600;font-family:'DM Sans', Arial, sans-serif;font-size:10px;
+                    letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">
             📖 ANALYSE FONDAMENTALE — {item['name']}
         </div>
-        <p style="color:#888;font-size:11px;font-family:'Share Tech Mono',monospace;
+        <p style="color:#888;font-size:11px;font-family:'DM Sans', Arial, sans-serif;
                   line-height:1.7;margin-bottom:10px;">{info['desc']}</p>
-        <div style="color:#ffcc00;font-size:9px;font-family:'Share Tech Mono',monospace;
-                    letter-spacing:1px;margin-bottom:6px;">DRIVERS PRINCIPAUX</div>
+        <div style="color:#ffcc00;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
+                    letter-spacing:0.4px;margin-bottom:6px;">DRIVERS PRINCIPAUX</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-            {''.join(f"<span style='background:#1a0800;border:1px solid #2a1400;color:#ff6600;font-size:9px;font-family:Share Tech Mono,monospace;padding:3px 8px;letter-spacing:1px;'>{d}</span>" for d in info['drivers'])}
+            {''.join(f"<span style='background:#1a0800;border:1px solid #2a1400;color:#ff6600;font-size:9px;font-family:DM Sans, Arial, sans-serif;padding:3px 8px;letter-spacing:0.4px;'>{d}</span>" for d in info['drivers'])}
         </div>
-        <div style="color:#333;font-size:9px;font-family:'Share Tech Mono',monospace;
-                    letter-spacing:1px;">📅 SAISONNALITÉ : <span style="color:#555;">{info['saisonnalite']}</span>
+        <div style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
+                    letter-spacing:0.4px;">📅 SAISONNALITÉ : <span style="color:#555;">{info['saisonnalite']}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -680,18 +680,18 @@ def _show_charts():
                             st.markdown(f"""
                             <div style="background:#080808;border:1px solid #1a1a1a;
                                         border-top:2px solid {color};padding:12px;text-align:center;">
-                                <div style="color:#444;font-size:9px;font-family:'Share Tech Mono',monospace;
-                                            letter-spacing:1px;margin-bottom:6px;">{label}</div>
-                                <div style="color:{color};font-size:24px;font-family:'Share Tech Mono',monospace;
+                                <div style="color:#444;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
+                                            letter-spacing:0.4px;margin-bottom:6px;">{label}</div>
+                                <div style="color:{color};font-size:24px;font-family:'DM Sans', Arial, sans-serif;
                                             font-weight:700;">{corr:+.2f}</div>
-                                <div style="color:#333;font-size:8px;font-family:'Share Tech Mono',monospace;
+                                <div style="color:#333;font-size:8px;font-family:'DM Sans', Arial, sans-serif;
                                             margin-top:4px;">corrélation 1 an</div>
                             </div>""", unsafe_allow_html=True)
             except:
                 with col:
                     st.markdown(f"""<div style="background:#080808;border:1px solid #1a1a1a;
                                     padding:12px;text-align:center;">
-                        <div style="color:#333;font-size:9px;font-family:'Share Tech Mono',monospace;">{label}</div>
+                        <div style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;">{label}</div>
                         <div style="color:#333;font-size:20px;">—</div></div>""",
                         unsafe_allow_html=True)
 
@@ -760,9 +760,9 @@ El Niño impacte les productions d'Asie-Pacifique.
             st.markdown(f"""
             <div style="background:#060606;border:1px solid #1a1a1a;
                         border-left:3px solid {a['color']};padding:12px 14px;margin-bottom:8px;">
-                <div style="color:{a['color']};font-family:'Share Tech Mono',monospace;
-                            font-size:10px;letter-spacing:1px;margin-bottom:6px;">{a['titre']}</div>
-                <p style="color:#777;font-size:10px;font-family:'Share Tech Mono',monospace;
+                <div style="color:{a['color']};font-family:'DM Sans', Arial, sans-serif;
+                            font-size:10px;letter-spacing:0.4px;margin-bottom:6px;">{a['titre']}</div>
+                <p style="color:#777;font-size:10px;font-family:'DM Sans', Arial, sans-serif;
                           line-height:1.7;margin:0;">{a['contenu']}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -782,8 +782,8 @@ El Niño impacte les productions d'Asie-Pacifique.
             st.markdown(f"""
             <div style="display:flex;justify-content:space-between;align-items:center;
                         padding:6px 10px;border-bottom:1px solid #0d0d0d;">
-                <span style="color:#aaa;font-family:'Share Tech Mono',monospace;
+                <span style="color:#aaa;font-family:'DM Sans', Arial, sans-serif;
                              font-size:10px;">{rapport}</span>
-                <span style="color:{color};font-family:'Share Tech Mono',monospace;
-                             font-size:9px;letter-spacing:1px;">{timing}</span>
+                <span style="color:{color};font-family:'DM Sans', Arial, sans-serif;
+                             font-size:9px;letter-spacing:0.4px;">{timing}</span>
             </div>""", unsafe_allow_html=True)
