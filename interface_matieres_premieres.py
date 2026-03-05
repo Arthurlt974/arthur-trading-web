@@ -415,17 +415,7 @@ def _show_dashboard():
                     <span style="color:#333;font-size:10px;">{sel_item["unit"]}</span>
                 </div>
             </div>""", unsafe_allow_html=True)
-            tv_html = f"""<div style="background:#000;border:1px solid #1a1a1a;">
-                <div class="tradingview-widget-container">
-                    <div class="tradingview-widget-container__widget"></div>
-                    <script type="text/javascript"
-                        src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                    {{"symbol":"{tv_sym}","interval":"D","timezone":"Europe/Paris","theme":"dark",
-                      "style":"1","locale":"fr","backgroundColor":"#000000","gridColor":"#0d0d0d",
-                      "width":"100%","height":"460","hide_top_toolbar":false,"save_image":false}}
-                    </script>
-                </div></div>"""
-            components.html(tv_html, height=470)
+            components.html(_tv_chart_html(tv_sym, height=460, interval="D"), height=470)
             _show_commodity_info(sel_item, sel_d)
             st.markdown("<hr style=\'border:none;border-top:1px solid #111;margin:16px 0;\'>", unsafe_allow_html=True)
 
@@ -539,37 +529,57 @@ def _show_category(category):
 
         # Graphique TradingView
         tv_sym = _get_tv_symbol(active_item["ticker"])
-        tv_html = f"""
-        <div style="background:#000;border:1px solid #1a1a1a;border-top:2px solid #ff6600;">
-            <div class="tradingview-widget-container" style="height:420px;">
-                <div class="tradingview-widget-container__widget"></div>
-                <script type="text/javascript"
-                    src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                {{
-                    "symbol": "{tv_sym}",
-                    "interval": "D",
-                    "timezone": "Europe/Paris",
-                    "theme": "dark",
-                    "style": "1",
-                    "locale": "fr",
-                    "backgroundColor": "#000000",
-                    "gridColor": "#0d0d0d",
-                    "width": "100%",
-                    "height": "420",
-                    "hide_top_toolbar": false,
-                    "hide_legend": false,
-                    "save_image": false,
-                    "calendar": false,
-                    "support_host": "https://www.tradingview.com"
-                }}
-                </script>
-            </div>
-        </div>"""
-        components.html(tv_html, height=430)
+        components.html(_tv_chart_html(tv_sym, height=420, interval="D"), height=430)
 
         # Infos fondamentales
         d = prices[active_item["ticker"]]
         _show_commodity_info(active_item, d)
+
+
+def _tv_chart_html(tv_sym: str, height: int = 420, interval: str = "D") -> str:
+    """
+    Génère un chart TradingView qui se recharge correctement dans Streamlit.
+    Un ID unique (timestamp) force le re-render à chaque changement d'actif.
+    """
+    import time
+    uid = str(int(time.time() * 1000))
+    config = {
+        "symbol": tv_sym,
+        "interval": interval,
+        "timezone": "Europe/Paris",
+        "theme": "dark",
+        "style": "1",
+        "locale": "fr",
+        "backgroundColor": "#000000",
+        "gridColor": "#0d0d0d",
+        "width": "100%",
+        "height": str(height),
+        "hide_top_toolbar": False,
+        "hide_legend": False,
+        "save_image": False,
+        "calendar": False,
+        "support_host": "https://www.tradingview.com"
+    }
+    import json
+    config_json = json.dumps(config)
+    return f"""
+    <div id="tv_{uid}" style="background:#000;border:1px solid #1a1a1a;
+         border-top:2px solid #ff6600;height:{height}px;width:100%;"></div>
+    <script>
+    (function() {{
+        var container = document.getElementById('tv_{uid}');
+        var widget = document.createElement('div');
+        widget.className = 'tradingview-widget-container__widget';
+        container.appendChild(widget);
+        var script = document.createElement('script');
+        script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+        script.type = 'text/javascript';
+        script.async = true;
+        script.innerHTML = '{config_json.replace("'", "\\'")}';
+        container.appendChild(script);
+    }})();
+    </script>
+    """
 
 
 def _get_tv_symbol(ticker):
@@ -674,30 +684,7 @@ def _show_charts():
         with col:
             ticker = tickers_map[sel]
             tv_sym = _get_tv_symbol(ticker)
-            tv_html = f"""
-            <div style="background:#000;border:1px solid #1a1a1a;border-top:2px solid #ff6600;">
-                <div class="tradingview-widget-container">
-                    <div class="tradingview-widget-container__widget"></div>
-                    <script type="text/javascript"
-                        src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-                    {{
-                        "symbol": "{tv_sym}",
-                        "interval": "W",
-                        "timezone": "Europe/Paris",
-                        "theme": "dark",
-                        "style": "1",
-                        "locale": "fr",
-                        "backgroundColor": "#000000",
-                        "gridColor": "#0d0d0d",
-                        "width": "100%",
-                        "height": "380",
-                        "hide_top_toolbar": false,
-                        "save_image": false
-                    }}
-                    </script>
-                </div>
-            </div>"""
-            components.html(tv_html, height=390)
+            components.html(_tv_chart_html(tv_sym, height=380, interval="W"), height=390)
 
     # ── Graphique corrélation or/pétrole ──
     st.markdown('<div class="section-header">🔗 CORRÉLATIONS MATIÈRES PREMIÈRES</div>',
