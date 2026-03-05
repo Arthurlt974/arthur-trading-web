@@ -517,15 +517,16 @@ def show_interface_crypto():
 
         # ── Chart — ne se recharge QUE sur GO ──
         from chart_module import render_chart
+        _chart_html = render_chart(
+            symbol=st.session_state.chart_symbol,
+            interval="4h",
+            limit=200,
+            height=700,
+            exchange="Binance · Spot",
+            pair_label=f"{st.session_state.chart_base}/USDT",
+        ) + f"<!-- SYMBOL:{st.session_state.chart_symbol} -->"
         components.html(
-            render_chart(
-                symbol=st.session_state.chart_symbol,
-                interval="4h",
-                limit=200,
-                height=700,
-                exchange="Binance · Spot",
-                pair_label=f"{st.session_state.chart_base}/USDT",
-            ),
+            _chart_html,
             height=700,
             scrolling=False,
         )
