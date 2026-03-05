@@ -582,6 +582,18 @@ def render_commodity_chart(ticker: str, pair_label: str = "", height: int = 420)
     """
     candles = _fetch_candles(ticker, period="6mo", interval="1d")
 
+    # Pré-fetch tous les TFs côté Python → injectés en JSON dans le JS
+    import json as _json
+    def _tf_json(period, interval):
+        c = _fetch_candles(ticker, period=period, interval=interval)
+        return _json.dumps(c) if c else "[]"
+
+    d_1h  = _tf_json("60d",  "1h")
+    d_4h  = _tf_json("180d", "1h")   # yfinance pas de 4h, on simule avec 1h sur 180j
+    d_1d  = _json.dumps(candles)     # déjà fetché
+    d_1wk = _tf_json("5y",   "1wk")
+    d_1mo = _tf_json("max",  "1mo")
+
     if not candles:
         return (f'<div style="background:#131722;height:{height}px;display:flex;'
                 f'align-items:center;justify-content:center;color:#50535e;'
@@ -692,11 +704,11 @@ html,body{{background:#131722;color:#d1d4dc;font-family:'IBM Plex Mono',monospac
 
 <!-- TOOLBAR -->
 <div class="toolbar">
-  <button class="tf-btn" onclick="loadTF(this,'1h','60d')">1H</button>
-  <button class="tf-btn" onclick="loadTF(this,'4h','90d')">4H</button>
-  <button class="tf-btn active" id="tfD" onclick="loadTF(this,'1d','6mo')">1D</button>
-  <button class="tf-btn" onclick="loadTF(this,'1wk','5y')">1W</button>
-  <button class="tf-btn" onclick="loadTF(this,'1mo','max')">1M</button>
+  <button class="tf-btn" onclick="setTF(this,'1h')">1H</button>
+  <button class="tf-btn" onclick="setTF(this,'4h')">4H</button>
+  <button class="tf-btn active" id="tfD" onclick="setTF(this,'1d')">1D</button>
+  <button class="tf-btn" onclick="setTF(this,'1wk')">1W</button>
+  <button class="tf-btn" onclick="setTF(this,'1mo')">1M</button>
   <div class="tb-sep"></div>
   <button class="ind-btn on" id="btnMA"  onclick="toggleMA()">MA</button>
   <button class="ind-btn on" id="btnVol" onclick="toggleVol()">Vol</button>
@@ -748,22 +760,29 @@ html,body{{background:#131722;color:#d1d4dc;font-family:'IBM Plex Mono',monospac
 // ════════════════════════════════════════════════════════
 //  DONNÉES & CONFIG
 // ════════════════════════════════════════════════════════
-const TICKER = '{ticker}';
-let RAW = {cd};
+const TF_DATA = {{
+  '1h':  {d_1h},
+  '4h':  {d_4h},
+  '1d':  {d_1d},
+  '1wk': {d_1wk},
+  '1mo': {d_1mo},
+}};
 const PAD = {{l:0,r:70,t:8,b:22}};
-const VPAH = 60;   // hauteur volume panel
+const VPAH = 60;
 
 let showMA  = true;
 let showVol = true;
 let showBB  = false;
 let CHART_MODE = 'normal';
-let CURRENT_IV = '1d';
 
-let D = {{
-  t:RAW.map(r=>r.t), o:RAW.map(r=>r.o), h:RAW.map(r=>r.h),
-  l:RAW.map(r=>r.l), c:RAW.map(r=>r.c), v:RAW.map(r=>r.v),
-}};
+function makeD(raw) {{
+  return {{
+    t:raw.map(r=>r.t), o:raw.map(r=>r.o), h:raw.map(r=>r.h),
+    l:raw.map(r=>r.l), c:raw.map(r=>r.c), v:raw.map(r=>r.v),
+  }};
+}}
 
+let D = makeD(TF_DATA['1d'].length ? TF_DATA['1d'] : []);
 let VS=Math.max(0,D.t.length-120), VE=D.t.length;
 let HX=-1, HY=-1, MX=0, MY=0;
 let drag=false, dragX=0, dragVS=0;
@@ -1018,53 +1037,24 @@ const TF_YAHOO = {{
 
 // On passe par l'API yfinance via un fetch Streamlit (si l'app expose un endpoint)
 // Sinon on fait un rechargement en réutilisant les données injectées et en les filtrant
-async function loadTF(btn, interval, period) {{
+function setTF(btn, tf) {{
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  CURRENT_IV = interval;
-
-  // Afficher loader
-  const pe=$('prc');
-  if(pe) {{ pe.style.opacity='.5'; }}
-
-  try {{
-    // Fetch yfinance via un proxy JSON simple (données publiques)
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${{encodeURIComponent(TICKER)}}?interval=${{interval}}&range=${{period}}&includePrePost=false`;
-    const res = await fetch(url, {{headers:{{'User-Agent':'Mozilla/5.0'}}}});
-    if(!res.ok) throw new Error('YF '+res.status);
-    const json = await res.json();
-    const r    = json.chart.result[0];
-    const ts   = r.timestamp;
-    const q    = r.indicators.quote[0];
-
-    D.t.length=0; D.o.length=0; D.h.length=0; D.l.length=0; D.c.length=0; D.v.length=0;
-    for(let i=0;i<ts.length;i++) {{
-      if(q.close[i]==null) continue;
-      D.t.push(ts[i]);
-      D.o.push(q.open[i]||q.close[i]);
-      D.h.push(q.high[i]||q.close[i]);
-      D.l.push(q.low[i]||q.close[i]);
-      D.c.push(q.close[i]);
-      D.v.push(q.volume[i]||0);
-    }}
-
-    VS=Math.max(0,D.t.length-120); VE=D.t.length;
-    const last=D.c[D.c.length-1];
-    const frst=D.c[0];
-    const pct=((last-frst)/frst*100);
-    const bull=pct>=0;
-    if(pe) {{ pe.textContent=fmt(last); pe.style.color=bull?'#26a69a':'#ef5350'; pe.style.opacity='1'; }}
-    const ce=$('pchg');
-    if(ce) {{
-      ce.textContent=(bull?'▲ +':'▼ ')+Math.abs(pct).toFixed(2)+'%';
-      ce.className='chg '+(bull?'up':'dn');
-    }}
-    render();
-    console.log('[MP Chart] TF',interval,'→',D.t.length,'bougies');
-  }} catch(e) {{
-    console.warn('[MP Chart] loadTF erreur:', e.message);
-    if(pe) pe.style.opacity='1';
-  }}
+  const raw = TF_DATA[tf];
+  if(!raw || !raw.length) {{ console.warn('[MP] Pas de données pour TF:', tf); return; }}
+  D = makeD(raw);
+  VS = Math.max(0, D.t.length-120);
+  VE = D.t.length;
+  // Mettre à jour header
+  const lc=D.c[D.c.length-1], lo=D.o[0];
+  const pct=lo?((lc-lo)/lo*100):0, bull=pct>=0;
+  const clr=bull?'#26a69a':'#ef5350';
+  const pe=$('prc'); if(pe){{ pe.textContent=fmt(lc); pe.style.color=clr; }}
+  const ce=$('pchg'); if(ce){{ ce.textContent=(bull?'▲ +':'▼ ')+Math.abs(pct).toFixed(2)+'%'; ce.className='chg '+(bull?'up':'dn'); }}
+  const n=D.c.length;
+  if(n){{ st('ho',fmt(D.o[n-1])); st('hh',fmt(D.h[n-1])); st('hl',fmt(D.l[n-1])); st('hc',fmt(D.c[n-1])); }}
+  render();
+  console.log('[MP Chart] TF',tf,'→',D.t.length,'bougies');
 }}
 
 // ════════════════════════════════════════════════════════
