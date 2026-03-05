@@ -545,8 +545,9 @@ def _show_category(category):
 
 
 @st.cache_data(ttl=300)
+@st.cache_data(ttl=300)
 def _fetch_candles(ticker: str, period: str = "6mo", interval: str = "1d") -> list:
-    """Fetch OHLCV via yfinance — retourne [{t,o,h,l,c,v}, ...]"""
+    """Fetch OHLCV via yfinance."""
     try:
         df = yf.download(ticker, period=period, interval=interval,
                          progress=False, auto_adjust=True)
@@ -576,16 +577,19 @@ def _fetch_candles(ticker: str, period: str = "6mo", interval: str = "1d") -> li
 
 
 def render_commodity_chart(ticker: str, pair_label: str = "", height: int = 420) -> str:
-    """Graphique Canvas AM.Terminal pour matières premières (yfinance)."""
+    """Graphique Canvas AM.Terminal complet pour matières premières (yfinance).
+    Inclut : toolbar TF, MA/BB/Vol, dropdown Mode, crosshair, tooltip, volume panel.
+    """
     candles = _fetch_candles(ticker, period="6mo", interval="1d")
 
     if not candles:
-        return (f'''<div style="background:#131722;height:{height}px;display:flex;'''
-                f'''align-items:center;justify-content:center;color:#50535e;'''
-                f'''font-family:IBM Plex Mono,monospace;font-size:12px;'''
-                f'''border:1px solid #1e222d;">Données indisponibles — {ticker}</div>''')
+        return (f'<div style="background:#131722;height:{height}px;display:flex;'
+                f'align-items:center;justify-content:center;color:#50535e;'
+                f'font-family:IBM Plex Mono,monospace;font-size:12px;'
+                f'border:1px solid #1e222d;">Données indisponibles — {ticker}</div>')
 
-    cd   = json.dumps(candles)
+    import json as _json
+    cd   = _json.dumps(candles)
     last = candles[-1]["c"]
     frst = candles[0]["o"]
     pct  = (last - frst) / frst * 100 if frst else 0
@@ -594,7 +598,7 @@ def render_commodity_chart(ticker: str, pair_label: str = "", height: int = 420)
     cc   = "up"      if bull else "dn"
     arr  = "▲"       if bull else "▼"
     oh   = candles[-1]["o"]
-    hh   = candles[-1]["h"]
+    hh_  = candles[-1]["h"]
     lh   = candles[-1]["l"]
     ch   = candles[-1]["c"]
 
@@ -604,38 +608,134 @@ def render_commodity_chart(ticker: str, pair_label: str = "", height: int = 420)
 *{{margin:0;padding:0;box-sizing:border-box;}}
 html,body{{background:#131722;color:#d1d4dc;font-family:'IBM Plex Mono',monospace;
   font-size:11px;width:100%;height:{height}px;overflow:hidden;display:flex;flex-direction:column;}}
+
+/* ── HEADER ── */
 .hdr{{display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:#1e222d;
-  border-bottom:1px solid #2a2e39;height:40px;padding:0 12px;flex-shrink:0;}}
-.pair{{font-size:13px;font-weight:700;}}
-.price{{font-size:16px;font-weight:700;}}
-.chg{{font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600;}}
-.chg.up{{background:rgba(38,166,154,0.15);color:#26a69a;}}
-.chg.dn{{background:rgba(239,83,80,0.15);color:#ef5350;}}
+  border-bottom:1px solid #2a2e39;height:42px;padding:0 12px;flex-shrink:0;}}
+.pair{{font-size:13px;font-weight:700;white-space:nowrap;}}
+.price{{font-size:17px;font-weight:700;white-space:nowrap;transition:color .15s;}}
+.chg{{font-size:10px;padding:2px 7px;border-radius:3px;font-weight:600;white-space:nowrap;}}
+.chg.up{{background:rgba(38,166,154,.15);color:#26a69a;}}
+.chg.dn{{background:rgba(239,83,80,.15);color:#ef5350;}}
 .ohlc{{display:flex;gap:10px;margin-left:4px;}}
 .oi{{display:flex;flex-direction:column;gap:1px;}}
 .ol{{font-size:7px;color:#50535e;letter-spacing:1px;text-transform:uppercase;}}
 .ov{{font-size:10px;font-weight:600;}}
-.cz{{flex:1;position:relative;overflow:hidden;}}
-#cv{{display:block;cursor:crosshair;}}
+
+/* ── TOOLBAR ── */
+.toolbar{{display:flex;align-items:center;background:#1e222d;
+  border-bottom:1px solid #2a2e39;height:30px;padding:0 8px;gap:2px;flex-shrink:0;}}
+.tf-btn{{padding:2px 8px;border:none;background:transparent;color:#787b86;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;
+  cursor:pointer;border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:.5px;}}
+.tf-btn:hover{{background:#2a2e39;color:#d1d4dc;}}
+.tf-btn.active{{background:rgba(255,152,0,.12);color:#ff9800;}}
+.tb-sep{{width:1px;height:16px;background:#2a2e39;margin:0 3px;}}
+.ind-btn{{padding:2px 8px;border:1px solid #2a2e39;background:transparent;color:#787b86;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;cursor:pointer;border-radius:3px;transition:all .1s;}}
+.ind-btn:hover{{background:#2a2e39;color:#d1d4dc;}}
+.ind-btn.on{{color:#ff9800;border-color:rgba(255,152,0,.4);}}
+
+/* ── MODE DROPDOWN ── */
+.mode-wrap{{position:relative;margin-left:auto;}}
+.mode-btn{{display:flex;align-items:center;gap:6px;padding:0 10px;height:30px;
+  cursor:pointer;background:transparent;border:none;border-left:1px solid #2a2e39;
+  font-family:'IBM Plex Mono',monospace;transition:background .12s;}}
+.mode-btn:hover{{background:#2a2e39;}}
+.mode-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#b2b5be;}}
+.mode-caret{{font-size:7px;color:#50535e;transition:transform .15s;}}
+.mode-caret.open{{transform:rotate(180deg);}}
+.mode-dd{{display:none;position:absolute;top:100%;right:0;background:#1e222d;
+  border:1px solid #2a2e39;min-width:180px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.7);}}
+.mode-dd.open{{display:block;}}
+.mode-opt{{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;
+  border-bottom:1px solid #131722;transition:background .1s;}}
+.mode-opt:last-child{{border-bottom:none;}}
+.mode-opt:hover{{background:#2a2e39;}}
+.mode-opt.active{{background:rgba(255,152,0,.05);}}
+.mo-icon{{font-size:14px;min-width:18px;}}
+.mo-text{{flex:1;}}
+.mo-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}}
+.mo-desc{{font-size:8px;color:#50535e;margin-top:1px;}}
+.mo-check{{font-size:10px;color:#ff9800;opacity:0;}}
+.mode-opt.active .mo-check{{opacity:1;}}
+.mo-badge{{font-size:7px;padding:1px 4px;border-radius:2px;
+  background:rgba(255,152,0,.1);color:#ff9800;border:1px solid rgba(255,152,0,.2);}}
+
+/* ── CHART ── */
+.chart-zone{{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;}}
+#cv{{display:block;cursor:crosshair;flex:1;}}
+.vol-sep{{height:1px;background:#2a2e39;flex-shrink:0;}}
+#cvVol{{display:block;background:#131722;flex-shrink:0;}}
+
+/* ── TOOLTIP ── */
 #tt{{position:fixed;pointer-events:none;z-index:9999;background:#1e222d;
   border:1px solid #2a2e39;padding:7px 11px;border-radius:4px;font-size:10px;
-  box-shadow:0 4px 16px rgba(0,0,0,.6);display:none;min-width:140px;}}
+  box-shadow:0 4px 16px rgba(0,0,0,.6);display:none;min-width:145px;}}
 .td{{color:#787b86;font-size:8px;margin-bottom:5px;letter-spacing:1px;}}
 .tr{{display:flex;justify-content:space-between;gap:14px;margin:2px 0;}}
 .tl{{color:#50535e;font-size:9px;}}.tv{{font-weight:600;font-size:10px;}}
 </style></head><body>
+
+<!-- HEADER -->
 <div class="hdr">
   <div class="pair">{pair_label}</div>
   <div class="price" id="prc" style="color:{pc}">{last:,.2f}</div>
-  <div class="chg {cc}">{arr} {abs(pct):.2f}%</div>
+  <div class="chg {cc}" id="pchg">{arr} {abs(pct):.2f}%</div>
   <div class="ohlc">
     <div class="oi"><div class="ol">O</div><div class="ov" id="ho">{oh:,.2f}</div></div>
-    <div class="oi"><div class="ol">H</div><div class="ov" id="hh" style="color:#26a69a">{hh:,.2f}</div></div>
+    <div class="oi"><div class="ol">H</div><div class="ov" id="hh" style="color:#26a69a">{hh_:,.2f}</div></div>
     <div class="oi"><div class="ol">L</div><div class="ov" id="hl" style="color:#ef5350">{lh:,.2f}</div></div>
     <div class="oi"><div class="ol">C</div><div class="ov" id="hc">{ch:,.2f}</div></div>
   </div>
 </div>
-<div class="cz"><canvas id="cv"></canvas></div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <button class="tf-btn" onclick="loadTF(this,'1h','60d')">1H</button>
+  <button class="tf-btn" onclick="loadTF(this,'4h','90d')">4H</button>
+  <button class="tf-btn active" id="tfD" onclick="loadTF(this,'1d','6mo')">1D</button>
+  <button class="tf-btn" onclick="loadTF(this,'1wk','5y')">1W</button>
+  <button class="tf-btn" onclick="loadTF(this,'1mo','max')">1M</button>
+  <div class="tb-sep"></div>
+  <button class="ind-btn on" id="btnMA"  onclick="toggleMA()">MA</button>
+  <button class="ind-btn on" id="btnVol" onclick="toggleVol()">Vol</button>
+  <button class="ind-btn"    id="btnBB"  onclick="toggleBB()">BB</button>
+  <!-- MODE -->
+  <div class="mode-wrap">
+    <button class="mode-btn" id="modeBtn" onclick="toggleDD()">
+      <span class="mode-icon" id="modeIcon">📊</span>
+      <span class="mode-lbl" id="modeLbl">Normal</span>
+      <span class="mode-caret" id="modeCaret">&#9660;</span>
+    </button>
+    <div class="mode-dd" id="modeDD">
+      <div class="mode-opt active" onclick="pickMode('normal','Normal','📊')">
+        <span class="mo-icon">📊</span>
+        <div class="mo-text"><div class="mo-lbl" style="color:#b2b5be">Normal</div><div class="mo-desc">Bougies · MA · Volume</div></div>
+        <span class="mo-check">✓</span>
+      </div>
+      <div class="mode-opt" onclick="pickMode('pro','Pro','⚡')">
+        <span class="mo-icon">⚡</span>
+        <div class="mo-text"><div class="mo-lbl" style="color:#ff9800">Pro</div><div class="mo-desc">Indicateurs avancés</div></div>
+        <span class="mo-badge">Bientôt</span><span class="mo-check">✓</span>
+      </div>
+      <div class="mode-opt" onclick="pickMode('quant','Quant','🤖')">
+        <span class="mo-icon">🤖</span>
+        <div class="mo-text"><div class="mo-lbl" style="color:#f0b429">Quant</div><div class="mo-desc">Signaux algo · Patterns</div></div>
+        <span class="mo-badge">Bientôt</span><span class="mo-check">✓</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHART -->
+<div class="chart-zone">
+  <canvas id="cv"></canvas>
+  <div class="vol-sep" id="volSep"></div>
+  <canvas id="cvVol" id="cvVolEl"></canvas>
+</div>
+
+<!-- TOOLTIP -->
 <div id="tt">
   <div class="td" id="ttD"></div>
   <div class="tr"><span class="tl">Open</span><span class="tv" id="ttO"></span></div>
@@ -643,152 +743,368 @@ html,body{{background:#131722;color:#d1d4dc;font-family:'IBM Plex Mono',monospac
   <div class="tr"><span class="tl">Low</span><span class="tv" id="ttL" style="color:#ef5350"></span></div>
   <div class="tr"><span class="tl">Close</span><span class="tv" id="ttC"></span></div>
 </div>
+
 <script>
-const RAW={cd};
-const PAD={{l:0,r:70,t:8,b:22}};
-let D={{t:RAW.map(r=>r.t),o:RAW.map(r=>r.o),h:RAW.map(r=>r.h),l:RAW.map(r=>r.l),c:RAW.map(r=>r.c),v:RAW.map(r=>r.v)}};
-let VS=Math.max(0,D.t.length-120),VE=D.t.length;
-let HX=-1,HY=-1,MX=0,MY=0,drag=false,dragX=0,dragVS=0;
-const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
-const $=id=>document.getElementById(id);
-const st=(id,v)=>{{const e=$(id);if(e)e.textContent=v;}};
-const sc=(id,c)=>{{const e=$(id);if(e)e.style.color=c;}};
-const fmt=v=>{{
-  if(v==null||isNaN(v))return'—';
-  if(v>=10000)return v.toLocaleString('en-US',{{minimumFractionDigits:2,maximumFractionDigits:2}});
-  if(v>=100)return v.toFixed(2);
-  if(v>=1)return v.toFixed(4);
+// ════════════════════════════════════════════════════════
+//  DONNÉES & CONFIG
+// ════════════════════════════════════════════════════════
+const TICKER = '{ticker}';
+let RAW = {cd};
+const PAD = {{l:0,r:70,t:8,b:22}};
+const VPAH = 60;   // hauteur volume panel
+
+let showMA  = true;
+let showVol = true;
+let showBB  = false;
+let CHART_MODE = 'normal';
+let CURRENT_IV = '1d';
+
+let D = {{
+  t:RAW.map(r=>r.t), o:RAW.map(r=>r.o), h:RAW.map(r=>r.h),
+  l:RAW.map(r=>r.l), c:RAW.map(r=>r.c), v:RAW.map(r=>r.v),
+}};
+
+let VS=Math.max(0,D.t.length-120), VE=D.t.length;
+let HX=-1, HY=-1, MX=0, MY=0;
+let drag=false, dragX=0, dragVS=0;
+
+const cv    = document.getElementById('cv');
+const cvVol = document.querySelector('#cvVol, canvas:last-of-type');
+const ctx   = cv.getContext('2d');
+const ctxV  = cvVol ? cvVol.getContext('2d') : null;
+const $     = id => document.getElementById(id);
+const st    = (id,v) => {{ const e=$(id); if(e) e.textContent=v; }};
+const sc    = (id,c) => {{ const e=$(id); if(e) e.style.color=c; }};
+
+const fmt = v => {{
+  if(v==null||isNaN(v)) return '—';
+  if(v>=10000) return v.toLocaleString('en-US',{{minimumFractionDigits:2,maximumFractionDigits:2}});
+  if(v>=100)   return v.toFixed(2);
+  if(v>=1)     return v.toFixed(4);
   return v.toFixed(6);
 }};
-const fmtD=ts=>new Date(ts*1000).toLocaleDateString('fr-FR',{{day:'2-digit',month:'short',year:'2-digit'}});
-const maCalc=(arr,p)=>arr.map((_,i)=>i<p-1?null:arr.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);
+const fmtD = ts => new Date(ts*1000).toLocaleDateString('fr-FR',{{day:'2-digit',month:'short',year:'2-digit'}});
+const maCalc = (arr,p) => arr.map((_,i) => i<p-1 ? null : arr.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);
 
-function setup(){{
-  const W=cv.parentElement.clientWidth||700,H=cv.parentElement.clientHeight||{height}-40;
-  cv.width=W;cv.height=H;cv.style.width=W+'px';cv.style.height=H+'px';
+// ════════════════════════════════════════════════════════
+//  SETUP CANVAS
+// ════════════════════════════════════════════════════════
+function setup() {{
+  const W = cv.parentElement.clientWidth || 700;
+  const totalH = cv.parentElement.clientHeight || {height}-72;
+  const volH = showVol ? VPAH : 0;
+  const mainH = Math.max(totalH - volH - (showVol?1:0), 100);
+
+  cv.width=W; cv.height=mainH;
+  cv.style.width=W+'px'; cv.style.height=mainH+'px';
+
+  if(cvVol) {{
+    cvVol.width=W; cvVol.height=volH;
+    cvVol.style.width=W+'px'; cvVol.style.height=volH+'px';
+    cvVol.style.display = showVol ? 'block' : 'none';
+  }}
+  const sep = document.getElementById('volSep');
+  if(sep) sep.style.display = showVol ? 'block' : 'none';
 }}
 
-function draw(){{
-  const W=cv.width,H=cv.height;
-  ctx.fillStyle='#131722';ctx.fillRect(0,0,W,H);
-  const N=VE-VS;if(N<2)return;
-  const ts=D.t.slice(VS,VE),os=D.o.slice(VS,VE),hs=D.h.slice(VS,VE),ls=D.l.slice(VS,VE),cs=D.c.slice(VS,VE);
-  const mn=Math.min(...ls),mx2=Math.max(...hs),pd=(mx2-mn)*0.05||mx2*0.001;
-  const lo=mn-pd,hi=mx2+pd,rng=hi-lo||1;
-  const CW=(W-PAD.l-PAD.r)/N,BW=Math.max(1,CW*0.72);
-  const toX=i=>PAD.l+i*CW+CW/2;
-  const toY=p=>PAD.t+(hi-p)/rng*(H-PAD.t-PAD.b);
+// ════════════════════════════════════════════════════════
+//  CALCULS INDICATEURS
+// ════════════════════════════════════════════════════════
+function calcBB(arr, p=20, mult=2) {{
+  const ma = maCalc(arr, p);
+  return arr.map((_, i) => {{
+    if(ma[i]===null) return {{u:null,l:null,m:null}};
+    let v=0; for(let j=i-p+1;j<=i;j++) v+=Math.pow(arr[j]-ma[i],2);
+    const sd = Math.sqrt(v/p);
+    return {{u:ma[i]+mult*sd, l:ma[i]-mult*sd, m:ma[i]}};
+  }});
+}}
+
+// ════════════════════════════════════════════════════════
+//  DESSIN PRINCIPAL
+// ════════════════════════════════════════════════════════
+function drawMain() {{
+  const W=cv.width, H=cv.height;
+  ctx.fillStyle='#131722'; ctx.fillRect(0,0,W,H);
+  const N=VE-VS; if(N<2) return;
+
+  const ts=D.t.slice(VS,VE), os=D.o.slice(VS,VE), hs=D.h.slice(VS,VE);
+  const ls=D.l.slice(VS,VE), cs=D.c.slice(VS,VE);
+
+  const mn=Math.min(...ls), mx2=Math.max(...hs);
+  const pd=(mx2-mn)*0.05 || mx2*0.001;
+  const lo=mn-pd, hi=mx2+pd, rng=hi-lo||1;
+  const CW=(W-PAD.l-PAD.r)/N, BW=Math.max(1,CW*0.72);
+  const toX = i => PAD.l+i*CW+CW/2;
+  const toY = p => PAD.t+(hi-p)/rng*(H-PAD.t-PAD.b);
 
   // Grille horizontale
-  for(let s=0;s<=5;s++){{
+  for(let s=0;s<=5;s++) {{
     const y=PAD.t+s*(H-PAD.t-PAD.b)/5;
-    ctx.strokeStyle='#1e222d';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W-PAD.r,y);ctx.stroke();
-    ctx.fillStyle='#787b86';ctx.font='9px IBM Plex Mono,monospace';ctx.textAlign='left';
-    ctx.fillText(fmt(hi-s*rng/5),W-PAD.r+4,y+3);
+    ctx.strokeStyle='#1e222d'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
+    ctx.fillStyle='#787b86'; ctx.font='9px IBM Plex Mono,monospace';
+    ctx.textAlign='left'; ctx.fillText(fmt(hi-s*rng/5), W-PAD.r+4, y+3);
   }}
+
   // Axe temps
   const nT=Math.min(8,Math.max(3,Math.floor(N/15)));
-  ctx.fillStyle='#787b86';ctx.font='8px IBM Plex Mono,monospace';ctx.textAlign='center';
-  for(let t=0;t<=nT;t++){{
+  ctx.fillStyle='#787b86'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='center';
+  for(let t=0;t<=nT;t++) {{
     const i=Math.floor(t*(N-1)/Math.max(nT,1));
-    ctx.strokeStyle='#1e222d';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(toX(i),PAD.t);ctx.lineTo(toX(i),H-PAD.b);ctx.stroke();
-    ctx.fillText(new Date(ts[i]*1000).toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}}),toX(i),H-5);
+    ctx.strokeStyle='#1e222d'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(toX(i),PAD.t); ctx.lineTo(toX(i),H-PAD.b); ctx.stroke();
+    ctx.fillText(new Date(ts[i]*1000).toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}}), toX(i), H-5);
   }}
-  // MA 20/50/200
-  [{{'p':20,'c':'rgba(255,200,50,.8)'}},{{'p':50,'c':'rgba(33,150,243,.8)'}},{{'p':200,'c':'rgba(255,82,82,.8)'}}].forEach((m,mi)=>{{
-    const ma=maCalc(D.c,m.p).slice(VS,VE);
-    ctx.beginPath();let s=false;
-    for(let i=0;i<N;i++){{if(ma[i]==null)continue;s?ctx.lineTo(toX(i),toY(ma[i])):ctx.moveTo(toX(i),toY(ma[i]));s=true;}}
-    ctx.strokeStyle=m.c;ctx.lineWidth=1.2;ctx.stroke();
-    ctx.fillStyle=m.c;ctx.font='8px IBM Plex Mono,monospace';ctx.textAlign='left';
-    ctx.fillText('MA'+m.p,4+mi*46,16);
-  }});
+
+  // Bollinger Bands
+  if(showBB) {{
+    const bb = calcBB(D.c, 20, 2).slice(VS, VE);
+    ctx.beginPath(); let s=false;
+    for(let i=0;i<N;i++) {{ if(bb[i].u===null) continue; s?ctx.lineTo(toX(i),toY(bb[i].u)):ctx.moveTo(toX(i),toY(bb[i].u)); s=true; }}
+    for(let i=N-1;i>=0;i--) {{ if(bb[i].l===null) continue; ctx.lineTo(toX(i),toY(bb[i].l)); }}
+    ctx.closePath(); ctx.fillStyle='rgba(255,152,0,.04)'; ctx.fill();
+    ['u','l'].forEach(k => {{
+      ctx.beginPath(); s=false;
+      for(let i=0;i<N;i++) {{ if(bb[i][k]===null) continue; s?ctx.lineTo(toX(i),toY(bb[i][k])):ctx.moveTo(toX(i),toY(bb[i][k])); s=true; }}
+      ctx.strokeStyle='rgba(255,152,0,.4)'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+    }});
+    ctx.beginPath(); s=false;
+    for(let i=0;i<N;i++) {{ if(bb[i].m===null) continue; s?ctx.lineTo(toX(i),toY(bb[i].m)):ctx.moveTo(toX(i),toY(bb[i].m)); s=true; }}
+    ctx.strokeStyle='rgba(255,152,0,.5)'; ctx.lineWidth=1; ctx.stroke();
+  }}
+
+  // MA 20 / 50 / 200
+  if(showMA) {{
+    [{{p:20,c:'rgba(255,200,50,.85)'}},{{p:50,c:'rgba(33,150,243,.85)'}},{{p:200,c:'rgba(255,82,82,.85)'}}].forEach((m,mi) => {{
+      const ma=maCalc(D.c,m.p).slice(VS,VE);
+      ctx.beginPath(); let s=false;
+      for(let i=0;i<N;i++) {{ if(ma[i]==null) continue; s?ctx.lineTo(toX(i),toY(ma[i])):ctx.moveTo(toX(i),toY(ma[i])); s=true; }}
+      ctx.strokeStyle=m.c; ctx.lineWidth=1.2; ctx.stroke();
+      ctx.fillStyle=m.c; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='left';
+      ctx.fillText('MA'+m.p, 4+mi*46, 16);
+    }});
+  }}
+
   // Bougies
-  for(let i=0;i<N;i++){{
-    const x=toX(i),oy=toY(os[i]),hy2=toY(hs[i]),ly=toY(ls[i]),cy2=toY(cs[i]);
-    const bull=cs[i]>=os[i],col=bull?'#26a69a':'#ef5350';
-    const hw=Math.max(1,BW/2),top=Math.min(oy,cy2),bH=Math.max(1,Math.abs(cy2-oy));
-    ctx.strokeStyle=col;ctx.lineWidth=Math.max(1,BW*.1);
-    ctx.beginPath();ctx.moveTo(x,hy2);ctx.lineTo(x,ly);ctx.stroke();
-    ctx.fillStyle=col;ctx.fillRect(x-hw,top,hw*2,bH);
-    if(i===N-1){{
+  for(let i=0;i<N;i++) {{
+    const x=toX(i), oy=toY(os[i]), hy2=toY(hs[i]), ly=toY(ls[i]), cy2=toY(cs[i]);
+    const bull=cs[i]>=os[i], col=bull?'#26a69a':'#ef5350';
+    const hw=Math.max(1,BW/2), top=Math.min(oy,cy2), bH=Math.max(1,Math.abs(cy2-oy));
+    ctx.strokeStyle=col; ctx.lineWidth=Math.max(1,BW*.1);
+    ctx.beginPath(); ctx.moveTo(x,hy2); ctx.lineTo(x,ly); ctx.stroke();
+    ctx.fillStyle=col; ctx.fillRect(x-hw,top,hw*2,bH);
+    if(i===N-1) {{
       const g=1.5+Math.sin(Date.now()/300);
-      ctx.strokeStyle=bull?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)';ctx.lineWidth=1;
+      ctx.strokeStyle=bull?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'; ctx.lineWidth=1;
       ctx.strokeRect(x-hw-g,top-g,hw*2+g*2,bH+g*2);
     }}
   }}
+
   // Ligne dernier prix
-  const lc=cs[N-1],lb=cs[N-1]>=os[N-1];
+  const lc=cs[N-1], lb=lc>=os[N-1];
   const py=toY(lc);
   ctx.strokeStyle=lb?'rgba(38,166,154,.4)':'rgba(239,83,80,.4)';
-  ctx.lineWidth=1;ctx.setLineDash([4,4]);
-  ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W-PAD.r,py);ctx.stroke();ctx.setLineDash([]);
+  ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(W-PAD.r,py); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle=lb?'#26a69a':'#ef5350';
-  ctx.beginPath();ctx.roundRect(W-PAD.r+2,py-8,PAD.r-4,16,2);ctx.fill();
-  ctx.fillStyle='#fff';ctx.font='bold 8px IBM Plex Mono,monospace';ctx.textAlign='left';
-  ctx.fillText(fmt(lc),W-PAD.r+5,py+4);
+  ctx.beginPath(); ctx.roundRect(W-PAD.r+2,py-8,PAD.r-4,16,2); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='bold 8px IBM Plex Mono,monospace'; ctx.textAlign='left';
+  ctx.fillText(fmt(lc), W-PAD.r+5, py+4);
+
   // Crosshair
-  if(HX>=0&&HX<N){{
+  if(HX>=0 && HX<N) {{
     const x=toX(HX);
-    ctx.strokeStyle='rgba(132,142,156,.35)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(x,PAD.t);ctx.lineTo(x,H);ctx.stroke();
-    if(HY>0){{
-      ctx.beginPath();ctx.moveTo(0,HY);ctx.lineTo(W-PAD.r,HY);ctx.stroke();
+    ctx.strokeStyle='rgba(132,142,156,.35)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H); ctx.stroke();
+    if(HY>0) {{
+      ctx.beginPath(); ctx.moveTo(0,HY); ctx.lineTo(W-PAD.r,HY); ctx.stroke();
       const hp=hi-(HY-PAD.t)/((H-PAD.t-PAD.b))*rng;
-      ctx.fillStyle='#363a45';ctx.beginPath();ctx.roundRect(W-PAD.r+2,HY-8,PAD.r-4,16,2);ctx.fill();
-      ctx.fillStyle='#d1d4dc';ctx.font='8px IBM Plex Mono,monospace';ctx.textAlign='left';
-      ctx.fillText(fmt(hp),W-PAD.r+5,HY+4);
+      ctx.fillStyle='#363a45'; ctx.beginPath(); ctx.roundRect(W-PAD.r+2,HY-8,PAD.r-4,16,2); ctx.fill();
+      ctx.fillStyle='#d1d4dc'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='left';
+      ctx.fillText(fmt(hp), W-PAD.r+5, HY+4);
     }}
-    const ri=VS+HX,b2=D.c[ri]>=D.o[ri];
-    st('ho',fmt(D.o[ri]));sc('ho',b2?'#26a69a':'#ef5350');
-    st('hh',fmt(D.h[ri]));st('hl',fmt(D.l[ri]));
-    st('hc',fmt(D.c[ri]));sc('hc',b2?'#26a69a':'#ef5350');
+    const ri=VS+HX, b2=D.c[ri]>=D.o[ri];
+    st('ho',fmt(D.o[ri])); sc('ho',b2?'#26a69a':'#ef5350');
+    st('hh',fmt(D.h[ri])); st('hl',fmt(D.l[ri]));
+    st('hc',fmt(D.c[ri])); sc('hc',b2?'#26a69a':'#ef5350');
     const tt=$('tt');
-    if(tt){{
+    if(tt) {{
       tt.style.display='block';
-      let tx=MX+14,ty=MY-80;
-      if(tx+160>window.innerWidth)tx=MX-174;if(ty<0)ty=MY+10;
-      tt.style.left=tx+'px';tt.style.top=ty+'px';
+      let tx=MX+14, ty=MY-80;
+      if(tx+160>window.innerWidth) tx=MX-174; if(ty<0) ty=MY+10;
+      tt.style.left=tx+'px'; tt.style.top=ty+'px';
       st('ttD',fmtD(D.t[ri]));
-      st('ttO',fmt(D.o[ri]));st('ttH',fmt(D.h[ri]));
-      st('ttL',fmt(D.l[ri]));st('ttC',fmt(D.c[ri]));sc('ttC',b2?'#26a69a':'#ef5350');
+      st('ttO',fmt(D.o[ri])); st('ttH',fmt(D.h[ri]));
+      st('ttL',fmt(D.l[ri])); st('ttC',fmt(D.c[ri])); sc('ttC',b2?'#26a69a':'#ef5350');
     }}
-  }}else{{const tt=$('tt');if(tt)tt.style.display='none';}}
+  }} else {{ const tt=$('tt'); if(tt) tt.style.display='none'; }}
 }}
 
-cv.addEventListener('mousemove',e=>{{
-  const r=cv.getBoundingClientRect();MX=e.clientX;MY=e.clientY;
+// ════════════════════════════════════════════════════════
+//  VOLUME PANEL
+// ════════════════════════════════════════════════════════
+function drawVol() {{
+  if(!showVol || !cvVol || !ctxV) return;
+  const W=cvVol.width, H=cvVol.height;
+  ctxV.fillStyle='#131722'; ctxV.fillRect(0,0,W,H);
+  const N=VE-VS; if(!N||H<4) return;
+  const vs=D.v.slice(VS,VE), maxV=Math.max(...vs)||1;
+  const CW=(W-PAD.l-PAD.r)/N;
+  const maV=maCalc(D.v,20).slice(VS,VE);
+  for(let i=0;i<N;i++) {{
+    const bh=Math.max(1,(vs[i]/maxV)*(H-4));
+    const bull=D.c[VS+i]>=D.o[VS+i];
+    ctxV.fillStyle=bull?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)';
+    ctxV.fillRect(PAD.l+i*CW+1, H-bh, Math.max(1,CW-2), bh);
+  }}
+  ctxV.beginPath(); let s=false;
+  for(let i=0;i<N;i++) {{
+    if(maV[i]==null) continue;
+    const x=PAD.l+i*CW+CW/2, y=H-(maV[i]/maxV)*(H-4);
+    s?ctxV.lineTo(x,y):ctxV.moveTo(x,y); s=true;
+  }}
+  ctxV.strokeStyle='rgba(255,152,0,.7)'; ctxV.lineWidth=1; ctxV.stroke();
+  ctxV.fillStyle='#50535e'; ctxV.font='7px IBM Plex Mono,monospace';
+  ctxV.textAlign='left'; ctxV.fillText('VOL',4,9);
+}}
+
+function render() {{ drawMain(); drawVol(); }}
+
+// ════════════════════════════════════════════════════════
+//  INTERACTIONS SOURIS
+// ════════════════════════════════════════════════════════
+cv.addEventListener('mousemove', e => {{
+  const r=cv.getBoundingClientRect(); MX=e.clientX; MY=e.clientY;
   HY=e.clientY-r.top;
-  if(drag){{
-    const N=VE-VS,CW=(cv.width-PAD.l-PAD.r)/N;
+  if(drag) {{
+    const N=VE-VS, CW=(cv.width-PAD.l-PAD.r)/N;
     const sh=Math.round(-(e.clientX-dragX)/CW);
     let s=Math.max(0,Math.min(D.t.length-N,dragVS+sh));
-    VS=s;VE=s+N;draw();return;
+    VS=s; VE=s+N; render(); return;
   }}
-  const N=VE-VS,CW=(cv.width-PAD.l-PAD.r)/N;
-  HX=Math.max(0,Math.min(N-1,Math.floor((e.clientX-r.left-PAD.l)/CW)));draw();
+  const N=VE-VS, CW=(cv.width-PAD.l-PAD.r)/N;
+  HX=Math.max(0,Math.min(N-1,Math.floor((e.clientX-r.left-PAD.l)/CW)));
+  render();
 }});
-cv.addEventListener('mousedown',e=>{{drag=true;dragX=e.clientX;dragVS=VS;cv.style.cursor='grabbing';}});
-window.addEventListener('mouseup',()=>{{drag=false;cv.style.cursor='crosshair';}});
-cv.addEventListener('mouseleave',()=>{{
-  HX=-1;HY=-1;const tt=$('tt');if(tt)tt.style.display='none';
-  const n=D.c.length;if(n){{st('ho',fmt(D.o[n-1]));st('hh',fmt(D.h[n-1]));st('hl',fmt(D.l[n-1]));st('hc',fmt(D.c[n-1]));}}
-  draw();
+cv.addEventListener('mousedown', e => {{ drag=true; dragX=e.clientX; dragVS=VS; cv.style.cursor='grabbing'; }});
+window.addEventListener('mouseup', () => {{ drag=false; cv.style.cursor='crosshair'; }});
+cv.addEventListener('mouseleave', () => {{
+  HX=-1; HY=-1; const tt=$('tt'); if(tt) tt.style.display='none';
+  const n=D.c.length;
+  if(n) {{ st('ho',fmt(D.o[n-1])); st('hh',fmt(D.h[n-1])); st('hl',fmt(D.l[n-1])); st('hc',fmt(D.c[n-1])); }}
+  render();
 }});
-cv.addEventListener('wheel',e=>{{
+cv.addEventListener('wheel', e => {{
   e.preventDefault();
-  const N=VE-VS,f=e.deltaY>0?1.1:0.9;
+  const N=VE-VS, f=e.deltaY>0?1.1:0.9;
   const nN=Math.max(20,Math.min(D.t.length,Math.round(N*f)));
   const c=HX>=0?VS+HX:Math.floor((VS+VE)/2);
   let s=Math.max(0,c-Math.floor(nN/2));
-  let en=s+nN;if(en>D.t.length){{en=D.t.length;s=Math.max(0,en-nN);}}
-  VS=s;VE=en;draw();
-}},{{passive:false}});
-function init(){{setup();draw();setInterval(()=>{{if(HX<0)draw();}},200);}}
-window.addEventListener('load',init);
-window.addEventListener('resize',()=>{{setup();draw();}});
+  let en=s+nN; if(en>D.t.length){{en=D.t.length;s=Math.max(0,en-nN);}}
+  VS=s; VE=en; render();
+}}, {{passive:false}});
+
+// ════════════════════════════════════════════════════════
+//  TIMEFRAMES — rechargement via yfinance (API Streamlit workaround)
+// ════════════════════════════════════════════════════════
+const TF_YAHOO = {{
+  '1h':  {{'interval':'1h',  'period':'60d'}},
+  '4h':  {{'interval':'1h',  'period':'90d'}},   // yfinance n'a pas de 4h natif
+  '1d':  {{'interval':'1d',  'period':'6mo'}},
+  '1wk': {{'interval':'1wk', 'period':'5y'}},
+  '1mo': {{'interval':'1mo', 'period':'max'}},
+}};
+
+// On passe par l'API yfinance via un fetch Streamlit (si l'app expose un endpoint)
+// Sinon on fait un rechargement en réutilisant les données injectées et en les filtrant
+async function loadTF(btn, interval, period) {{
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  CURRENT_IV = interval;
+
+  // Afficher loader
+  const pe=$('prc');
+  if(pe) {{ pe.style.opacity='.5'; }}
+
+  try {{
+    // Fetch yfinance via un proxy JSON simple (données publiques)
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${{encodeURIComponent(TICKER)}}?interval=${{interval}}&range=${{period}}&includePrePost=false`;
+    const res = await fetch(url, {{headers:{{'User-Agent':'Mozilla/5.0'}}}});
+    if(!res.ok) throw new Error('YF '+res.status);
+    const json = await res.json();
+    const r    = json.chart.result[0];
+    const ts   = r.timestamp;
+    const q    = r.indicators.quote[0];
+
+    D.t.length=0; D.o.length=0; D.h.length=0; D.l.length=0; D.c.length=0; D.v.length=0;
+    for(let i=0;i<ts.length;i++) {{
+      if(q.close[i]==null) continue;
+      D.t.push(ts[i]);
+      D.o.push(q.open[i]||q.close[i]);
+      D.h.push(q.high[i]||q.close[i]);
+      D.l.push(q.low[i]||q.close[i]);
+      D.c.push(q.close[i]);
+      D.v.push(q.volume[i]||0);
+    }}
+
+    VS=Math.max(0,D.t.length-120); VE=D.t.length;
+    const last=D.c[D.c.length-1];
+    const frst=D.c[0];
+    const pct=((last-frst)/frst*100);
+    const bull=pct>=0;
+    if(pe) {{ pe.textContent=fmt(last); pe.style.color=bull?'#26a69a':'#ef5350'; pe.style.opacity='1'; }}
+    const ce=$('pchg');
+    if(ce) {{
+      ce.textContent=(bull?'▲ +':'▼ ')+Math.abs(pct).toFixed(2)+'%';
+      ce.className='chg '+(bull?'up':'dn');
+    }}
+    render();
+    console.log('[MP Chart] TF',interval,'→',D.t.length,'bougies');
+  }} catch(e) {{
+    console.warn('[MP Chart] loadTF erreur:', e.message);
+    if(pe) pe.style.opacity='1';
+  }}
+}}
+
+// ════════════════════════════════════════════════════════
+//  INDICATEURS & MODE
+// ════════════════════════════════════════════════════════
+function toggleMA()  {{ showMA=!showMA;  $('btnMA').classList.toggle('on',showMA);  render(); }}
+function toggleVol() {{ showVol=!showVol; $('btnVol').classList.toggle('on',showVol); setup(); render(); }}
+function toggleBB()  {{ showBB=!showBB;  $('btnBB').classList.toggle('on',showBB);  render(); }}
+
+function toggleDD() {{
+  $('modeDD').classList.toggle('open');
+  $('modeCaret').classList.toggle('open');
+}}
+function pickMode(key, lbl, icon) {{
+  CHART_MODE=key;
+  $('modeLbl').textContent=lbl; $('modeIcon').textContent=icon;
+  document.querySelectorAll('.mode-opt').forEach(el=>{{
+    el.classList.remove('active');
+    el.querySelector('.mo-check').style.opacity='0';
+  }});
+  const idx=['normal','pro','quant'].indexOf(key);
+  const opts=document.querySelectorAll('.mode-opt');
+  if(idx>=0) {{ opts[idx].classList.add('active'); opts[idx].querySelector('.mo-check').style.opacity='1'; }}
+  $('modeDD').classList.remove('open'); $('modeCaret').classList.remove('open');
+  console.log('[MP Chart] Mode →', key); render();
+}}
+document.addEventListener('click', e => {{
+  const w=document.querySelector('.mode-wrap');
+  if(w&&!w.contains(e.target)) {{ $('modeDD').classList.remove('open'); $('modeCaret').classList.remove('open'); }}
+}});
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+function init() {{
+  setup(); render();
+  setInterval(()=>{{if(HX<0)render();}},200);
+}}
+window.addEventListener('load', init);
+window.addEventListener('resize', ()=>{{setup();render();}});
 </script></body></html>"""
 
 
