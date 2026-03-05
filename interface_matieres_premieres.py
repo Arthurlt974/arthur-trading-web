@@ -289,6 +289,13 @@ def show_matieres_premieres():
 
 def _show_dashboard():
 
+    if "mp_selected" not in st.session_state:
+        st.session_state.mp_selected = None
+
+    # ── Init actif sélectionné ──
+    if "mp_selected" not in st.session_state:
+        st.session_state.mp_selected = None
+
     # ── Chargement de toutes les données ──
     all_items = []
     for cat, items in COMMODITIES.items():
@@ -368,19 +375,59 @@ def _show_dashboard():
                 sign = "+" if up else ""
                 arrow = "▲" if up else "▼"
                 price_str = f"{d['price']:,.2f}" if d["ok"] else "—"
+                is_sel = st.session_state.mp_selected == item["ticker"]
+                c1, c2, c3, c4 = st.columns([3, 2.5, 2, 1.5])
+                with c1:
+                    label = f"📊 {item['emoji']} {item['name']}" if is_sel else f"{item['emoji']} {item['name']}"
+                    if st.button(label, key=f"btn_d_{item['ticker']}", use_container_width=True,
+                                 type="primary" if is_sel else "secondary"):
+                        st.session_state.mp_selected = None if is_sel else item["ticker"]
+                        st.rerun()
+                with c2:
+                    st.markdown(f"<p style='text-align:right;font-family:DM Mono,monospace;font-size:13px;font-weight:600;color:#fff;margin:6px 0;'>{price_str}</p>", unsafe_allow_html=True)
+                with c3:
+                    st.markdown(f"<p style='text-align:right;font-size:12px;color:{color};margin:6px 0;'>{arrow} {sign}{d['change']:.2f}%</p>", unsafe_allow_html=True)
+                with c4:
+                    st.markdown(f"<p style='text-align:right;font-size:9px;color:#444;margin:8px 0;'>{item['unit']}</p>", unsafe_allow_html=True)
 
-                st.markdown(f"""
-                <div class="comm-row">
-                    <span style="color:#e8e8e8;font-size:12px;font-family:'DM Sans', Arial, sans-serif;
-                                 width:130px;">{item['emoji']} {item['name']}</span>
-                    <span style="color:#ffffff;font-size:13px;font-family:'DM Mono', monospace;
-                                 font-weight:500;width:100px;text-align:right;">{price_str}</span>
-                    <span style="color:{color};font-size:12px;font-family:'DM Sans', Arial, sans-serif;
-                                 width:90px;text-align:right;">{arrow} {sign}{d['change']:.2f}%</span>
-                    <span style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
-                                 width:70px;text-align:right;">{item['unit']}</span>
+    # ── GRAPHIQUE ACTIF SÉLECTIONNÉ ──
+    if st.session_state.get("mp_selected"):
+        sel_ticker = st.session_state.mp_selected
+        sel_item   = next((i for _, i in all_items if i["ticker"] == sel_ticker), None)
+        if sel_item:
+            tv_sym = _get_tv_symbol(sel_ticker)
+            sel_d  = prices.get(sel_ticker, {"price": 0, "change": 0, "ok": False})
+            up     = sel_d["change"] >= 0
+            c      = "#00ff41" if up else "#ff2222"
+            sign   = "+" if up else ""
+            st.markdown(f"""
+            <div style="background:#080808;border:1px solid #1a1a1a;border-top:3px solid #ff6600;
+                        padding:10px 16px;margin:10px 0 4px 0;display:flex;
+                        justify-content:space-between;align-items:center;">
+                <span style="color:#ff6600;font-family:DM Sans,Arial,sans-serif;font-size:14px;
+                             font-weight:700;">{sel_item["emoji"]} {sel_item["name"]}</span>
+                <div style="display:flex;gap:16px;align-items:center;">
+                    <span style="color:#e8e8e8;font-family:DM Mono,monospace;font-size:20px;
+                                 font-weight:600;">{sel_d["price"]:,.2f}</span>
+                    <span style="color:{c};font-size:13px;font-weight:600;">
+                        {"▲" if up else "▼"} {sign}{sel_d["change"]:.2f}%
+                    </span>
+                    <span style="color:#333;font-size:10px;">{sel_item["unit"]}</span>
                 </div>
-                """, unsafe_allow_html=True)
+            </div>""", unsafe_allow_html=True)
+            tv_html = f"""<div style="background:#000;border:1px solid #1a1a1a;">
+                <div class="tradingview-widget-container">
+                    <div class="tradingview-widget-container__widget"></div>
+                    <script type="text/javascript"
+                        src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+                    {{"symbol":"{tv_sym}","interval":"D","timezone":"Europe/Paris","theme":"dark",
+                      "style":"1","locale":"fr","backgroundColor":"#000000","gridColor":"#0d0d0d",
+                      "width":"100%","height":"460","hide_top_toolbar":false,"save_image":false}}
+                    </script>
+                </div></div>"""
+            components.html(tv_html, height=470)
+            _show_commodity_info(sel_item, sel_d)
+            st.markdown("<hr style=\'border:none;border-top:1px solid #111;margin:16px 0;\'>", unsafe_allow_html=True)
 
     with col_right:
         st.markdown('<div class="section-header">🏆 TOP MOVERS</div>', unsafe_allow_html=True)
