@@ -108,8 +108,8 @@ def render_chart(
 :root{{
   --bg:#000000;--surface:#0a0a0a;--surface2:#111111;
   --border:#1a1a1a;--border2:#1e1e1e;
-  --text:#e8e8e8;--text2:#3d80dd;--muted:#4d9fff;
-  --faint:#2a6aaa;--fainter:#1e1e1e;
+  --text:#e8e8e8;--text2:#4d9fff;--muted:#4d9fff;
+  --faint:#4d9fff;--fainter:#1e1e1e;
   --orange:#ff6600;--yellow:#ffcc00;
   --green:#00ff41;--green2:#00cc33;
   --red:#ff2222;--red2:#cc0000;
@@ -1100,12 +1100,12 @@ function drawMain() {{
     ctx.strokeStyle='#111111'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     // Prix axe droit
-    ctx.fillStyle='#2a6aaa'; ctx.font='10px Share Tech Mono,monospace';
+    ctx.fillStyle='#4d9fff'; ctx.font='10px Share Tech Mono,monospace';
     ctx.textAlign='left'; ctx.fillText(fmt(price), W-PAD.r+6, y+4);
   }}
 
   // ── GRILLE VERTICALE + AXE TEMPS ──
-  ctx.fillStyle='#2a6aaa'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#4d9fff'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='center';
   const nTicks=Math.min(10,Math.max(3,Math.floor(N/15)));
   const prevMonth={{val:-1}};
   for(let t=0;t<=nTicks;t++) {{
