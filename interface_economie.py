@@ -6,6 +6,7 @@ Fallback : données officielles les plus récentes (mars 2026)
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import requests
 import yfinance as yf
@@ -104,7 +105,7 @@ def _get(url, timeout=6):
 
 @st.cache_data(ttl=3600)
 def fetch_fred_series(series_id: str):
-    """FRED CSV — sans clé API. Retourne (date_str, valeur_float) ou None."""
+    """FRED CSV — sans clé API. Retourne (date_str, valeur_float) de la dernière obs."""
     r = _get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}")
     if r:
         lines = [l for l in r.text.strip().split('\n') if l and not l.startswith('DATE')]
@@ -115,6 +116,25 @@ def fetch_fred_series(series_id: str):
                     return parts[0].strip(), float(parts[1].strip())
                 except ValueError:
                     continue
+    return None
+
+
+@st.cache_data(ttl=3600)
+def fetch_fred_series_nth(series_id: str, n: int = -2):
+    """FRED CSV — retourne la N-ième observation (n=-2 = avant-dernière)."""
+    r = _get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}")
+    if r:
+        lines = [l for l in r.text.strip().split('\n') if l and not l.startswith('DATE')]
+        valid = []
+        for line in lines:
+            parts = line.split(',')
+            if len(parts) == 2 and parts[1].strip() not in ('', '.'):
+                try:
+                    valid.append((parts[0].strip(), float(parts[1].strip())))
+                except ValueError:
+                    continue
+        if len(valid) >= abs(n):
+            return valid[n]
     return None
 
 
@@ -233,9 +253,14 @@ def fetch_all_macro():
     if bce_inf:
         date, val = bce_inf[-1]
         fb = FALLBACK["inflation"]["🇪🇺 Zone Euro"]
-        data["inflation"]["🇪🇺 Zone Euro"] = {**fb, "actuel": round(val, 1),
-            "precedent": round(bce_inf[-2][1], 1) if len(bce_inf) >= 2 else fb["precedent"]}
-        sources["inflation_eu"] = f"BCE ICP ({date})"
+        # Guard : si val aberrant (0 ou négatif extrême), utiliser fallback
+        if val is not None and abs(val) > 0.05:
+            data["inflation"]["🇪🇺 Zone Euro"] = {**fb, "actuel": round(val, 1),
+                "precedent": round(bce_inf[-2][1], 1) if len(bce_inf) >= 2 else fb["precedent"]}
+            sources["inflation_eu"] = f"BCE ICP ({date})"
+        else:
+            data["inflation"]["🇪🇺 Zone Euro"] = fb
+            sources["inflation_eu"] = f"Fallback (BCE val={val})"
     else:
         data["inflation"]["🇪🇺 Zone Euro"] = FALLBACK["inflation"]["🇪🇺 Zone Euro"]
         sources["inflation_eu"] = "Fallback"
@@ -245,9 +270,13 @@ def fetch_all_macro():
     if bce_fr:
         date, val = bce_fr[-1]
         fb = FALLBACK["inflation"]["🇫🇷 France"]
-        data["inflation"]["🇫🇷 France"] = {**fb, "actuel": round(val, 1),
-            "precedent": round(bce_fr[-2][1], 1) if len(bce_fr) >= 2 else fb["precedent"]}
-        sources["inflation_fr"] = f"BCE ICP France ({date})"
+        if val is not None and abs(val) > 0.05:
+            data["inflation"]["🇫🇷 France"] = {**fb, "actuel": round(val, 1),
+                "precedent": round(bce_fr[-2][1], 1) if len(bce_fr) >= 2 else fb["precedent"]}
+            sources["inflation_fr"] = f"BCE ICP France ({date})"
+        else:
+            data["inflation"]["🇫🇷 France"] = fb
+            sources["inflation_fr"] = f"Fallback (BCE val={val})"
     else:
         data["inflation"]["🇫🇷 France"] = FALLBACK["inflation"]["🇫🇷 France"]
         sources["inflation_fr"] = "Fallback"
@@ -314,10 +343,16 @@ def fetch_all_macro():
     if bce_rate:
         date, val = bce_rate[-1]
         prev = bce_rate[-2][1] if len(bce_rate) >= 2 else FALLBACK["taux"]["🇪🇺 Zone Euro"]["precedent"]
-        for pays_bce in ["🇪🇺 Zone Euro", "🇫🇷 France"]:
-            fb = FALLBACK["taux"][pays_bce]
-            data["taux"][pays_bce] = {**fb, "actuel": round(val, 2), "precedent": round(prev, 2)}
-        sources["taux_bce"] = f"BCE MRR ({date})"
+        # Guard : BCE retourne parfois 0.0 si endpoint incorrect → fallback
+        if val is not None and val > 0.1:
+            for pays_bce in ["🇪🇺 Zone Euro", "🇫🇷 France"]:
+                fb = FALLBACK["taux"][pays_bce]
+                data["taux"][pays_bce] = {**fb, "actuel": round(val, 2), "precedent": round(prev, 2)}
+            sources["taux_bce"] = f"BCE MRR ({date})"
+        else:
+            data["taux"]["🇪🇺 Zone Euro"] = FALLBACK["taux"]["🇪🇺 Zone Euro"]
+            data["taux"]["🇫🇷 France"]    = FALLBACK["taux"]["🇫🇷 France"]
+            sources["taux_bce"] = f"Fallback (BCE val={val})"
     else:
         data["taux"]["🇪🇺 Zone Euro"] = FALLBACK["taux"]["🇪🇺 Zone Euro"]
         data["taux"]["🇫🇷 France"]    = FALLBACK["taux"]["🇫🇷 France"]
@@ -330,12 +365,17 @@ def fetch_all_macro():
 
     # ── CONFIANCE ─────────────────────────────────────────────
     # USA : FRED UMCSENT (UMich Consumer Sentiment)
-    res_conf = fetch_fred_series("UMCSENT")
-    if res_conf:
-        date, val = res_conf
+    # UMCSENT — charger 2 dernières observations pour calcul variation réelle
+    res_conf_curr = fetch_fred_series("UMCSENT")
+    res_conf_prev = fetch_fred_series_nth("UMCSENT", -2)  # avant-dernière obs
+    if res_conf_curr:
+        date, val = res_conf_curr
+        prev_val = res_conf_prev[1] if res_conf_prev else FALLBACK["confiance"]["🇺🇸 USA"]["precedent"]
         fb = FALLBACK["confiance"]["🇺🇸 USA"]
+        # Mettre à jour l'historique avec la vraie valeur actuelle
+        hist_updated = fb["historique"][:-1] + [round(val, 1)]
         data["confiance"]["🇺🇸 USA"] = {**fb, "actuel": round(val, 1),
-            "precedent": fb["historique"][-2]}
+            "precedent": round(prev_val, 1), "historique": hist_updated}
         sources["confiance_usa"] = f"FRED UMich Sentiment ({date})"
     else:
         data["confiance"]["🇺🇸 USA"] = FALLBACK["confiance"]["🇺🇸 USA"]
@@ -923,7 +963,7 @@ def show_economie():
 
         # Obligations
         st.markdown("#### 📊 TAUX OBLIGATAIRES")
-        bond_keys = [k for k in rates if "Y" in k or "Gilt" in k or "Spread" in k]
+        bond_keys = [k for k in rates if k in ("US 10Y", "US 2Y", "Spread 10Y-2Y US", "EUR 10Y (Bund)", "UK 10Y Gilt")]
         if bond_keys:
             bcols = st.columns(len(bond_keys))
             for i, key in enumerate(bond_keys):
