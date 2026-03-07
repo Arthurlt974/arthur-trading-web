@@ -2225,124 +2225,165 @@ elif outil == "ANALYSE TECHNIQUE PRO":
     if analyze_button:
         try:
             with st.spinner("Chargement et calcul des indicateurs..."):
-                df = yf.download(ticker_tech, period=period_tech, progress=False)
+                # FIX #8 : période 1mo incompatible avec SMA50 → forcer minimum 3mo
+                safe_period = period_tech
+                if period_tech == "1mo":
+                    safe_period = "3mo"
+                    st.warning("⚠️ Période ajustée à 3mo — SMA50 nécessite au moins 50 jours de données.")
+
+                df = yf.download(ticker_tech, period=safe_period, progress=False, auto_adjust=True)
                 if df.empty:
-                    st.error("Aucune donnée disponible pour ce ticker")
+                    st.error("Aucune donnée disponible pour ce ticker.")
                 else:
                     if isinstance(df.columns, pd.MultiIndex):
-                        df.columns = df.columns.droplevel(1)
+                        df.columns = df.columns.get_level_values(0)
 
+                    # FIX #4 : RSI avec méthode Wilder (EMA alpha=1/14) — standard TradingView
                     delta = df['Close'].diff()
-                    gain = delta.copy(); loss = delta.copy()
-                    gain[gain < 0] = 0; loss[loss > 0] = 0; loss = abs(loss)
-                    avg_gain = gain.rolling(window=14).mean()
-                    avg_loss = loss.rolling(window=14).mean()
-                    avg_loss = avg_loss.replace(0, 0.0001)
+                    gain  = delta.clip(lower=0)
+                    loss  = (-delta).clip(lower=0)
+                    avg_gain = gain.ewm(alpha=1/14, min_periods=14, adjust=False).mean()
+                    avg_loss = loss.ewm(alpha=1/14, min_periods=14, adjust=False).mean()
+                    avg_loss = avg_loss.replace(0, 1e-10)
                     rs = avg_gain / avg_loss
                     df['RSI'] = 100 - (100 / (1 + rs))
 
+                    # MACD standard
                     exp1 = df['Close'].ewm(span=12, adjust=False).mean()
                     exp2 = df['Close'].ewm(span=26, adjust=False).mean()
-                    df['MACD'] = exp1 - exp2
-                    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+                    df['MACD']      = exp1 - exp2
+                    df['Signal']    = df['MACD'].ewm(span=9, adjust=False).mean()
                     df['MACD_Hist'] = df['MACD'] - df['Signal']
 
-                    df['SMA_20'] = df['Close'].rolling(window=20).mean()
-                    df['BB_std'] = df['Close'].rolling(window=20).std()
+                    # Bollinger Bands & MAs
+                    df['SMA_20']   = df['Close'].rolling(window=20).mean()
+                    df['BB_std']   = df['Close'].rolling(window=20).std()
                     df['BB_Upper'] = df['SMA_20'] + (df['BB_std'] * 2)
                     df['BB_Lower'] = df['SMA_20'] - (df['BB_std'] * 2)
-                    df['SMA_50'] = df['Close'].rolling(window=50).mean()
-                    df['EMA_12'] = df['Close'].ewm(span=12, adjust=False).mean()
-                    df['Volume_MA'] = df['Volume'].rolling(window=20).mean()
-                    df = df.dropna()
+                    df['SMA_50']   = df['Close'].rolling(window=50).mean()
+                    df['Volume_MA']= df['Volume'].rolling(window=20).mean()
 
-                    if len(df) == 0:
-                        st.error("Pas assez de données pour calculer les indicateurs")
+                    # FIX #5 : dropna sélectif — ne pas perdre les données SMA20/RSI à cause de SMA50
+                    df_full = df.copy()  # garder pour le graphique
+                    df_indicators = df.dropna(subset=['RSI','MACD','Signal','BB_Upper','BB_Lower','SMA_20','Volume_MA'])
+
+                    # SMA50 peut être NaN sur les premières lignes, on la gère séparément
+                    has_sma50 = df_indicators['SMA_50'].notna().any()
+
+                    if len(df_indicators) == 0:
+                        st.error("Pas assez de données pour calculer les indicateurs. Essayez une période plus longue.")
                     else:
-                        last_row = df.iloc[-1]
-                        rsi_val = float(last_row['RSI'])
-                        macd_val = float(last_row['MACD'])
-                        signal_val = float(last_row['Signal'])
-                        close_val = float(last_row['Close'])
+                        last_row     = df_indicators.iloc[-1]
+                        rsi_val      = float(last_row['RSI'])
+                        macd_val     = float(last_row['MACD'])
+                        signal_val   = float(last_row['Signal'])
+                        close_val    = float(last_row['Close'])
                         bb_upper_val = float(last_row['BB_Upper'])
                         bb_lower_val = float(last_row['BB_Lower'])
-                        sma50_val = float(last_row['SMA_50'])
-                        volume_val = float(last_row['Volume'])
-                        volume_ma_val = float(last_row['Volume_MA'])
+                        sma50_val    = float(last_row['SMA_50']) if has_sma50 and pd.notna(last_row['SMA_50']) else None
+                        volume_val   = float(last_row['Volume'])
+                        volume_ma_val= float(last_row['Volume_MA'])
 
                         signals = []
-                        score = 0
+                        score   = 0
+                        SCORE_MAX = 10  # 5 indicateurs × 2 pts max chacun
 
-                        st.write(f"🔍 **Valeurs pour debug:** RSI={rsi_val:.2f}, MACD={macd_val:.4f}, Signal={signal_val:.4f}, Prix={close_val:.2f}, BB_Lower={bb_lower_val:.2f}, BB_Upper={bb_upper_val:.2f}")
-
-                        if rsi_val < 35:
-                            signals.append(("RSI", f"🟢 OVERSOLD ({rsi_val:.1f}) - Signal ACHAT", "bullish")); score += 2
-                        elif rsi_val > 65:
-                            signals.append(("RSI", f"🔴 OVERBOUGHT ({rsi_val:.1f}) - Signal VENTE", "bearish")); score -= 2
-                        elif rsi_val < 45:
-                            signals.append(("RSI", f"🟢 Légèrement bas ({rsi_val:.1f}) - Opportunité", "bullish")); score += 1
-                        elif rsi_val > 55:
-                            signals.append(("RSI", f"🟡 Légèrement haut ({rsi_val:.1f}) - Prudence", "neutral")); score -= 1
+                        # FIX #2 : RSI seuils standard 30/70 (Wilder), zones intermédiaires 40/60
+                        if rsi_val < 30:
+                            signals.append(("RSI", f"🟢 SURVENTE ({rsi_val:.1f}) — Signal ACHAT fort", "bullish")); score += 2
+                        elif rsi_val > 70:
+                            signals.append(("RSI", f"🔴 SURACHAT ({rsi_val:.1f}) — Signal VENTE fort", "bearish")); score -= 2
+                        elif rsi_val < 40:
+                            signals.append(("RSI", f"🟢 Zone basse ({rsi_val:.1f}) — Opportunité possible", "bullish")); score += 1
+                        elif rsi_val > 60:
+                            signals.append(("RSI", f"🟡 Zone haute ({rsi_val:.1f}) — Prudence", "neutral")); score -= 1
                         else:
                             signals.append(("RSI", f"🟡 NEUTRE ({rsi_val:.1f})", "neutral"))
 
-                        macd_diff = macd_val - signal_val
+                        # FIX #3 : MACD seuil relatif au prix (en % au lieu de 0.5 absolu)
+                        macd_diff    = macd_val - signal_val
+                        macd_pct     = (abs(macd_diff) / close_val) * 100  # en % du prix
                         if macd_diff > 0:
-                            if macd_diff > 0.5:
-                                signals.append(("MACD", f"🟢 FORTEMENT BULLISH (+{macd_diff:.2f})", "bullish")); score += 2
+                            if macd_pct > 0.3:
+                                signals.append(("MACD", f"🟢 FORTEMENT HAUSSIER (+{macd_pct:.2f}% du prix)", "bullish")); score += 2
                             else:
-                                signals.append(("MACD", f"🟢 BULLISH (+{macd_diff:.2f})", "bullish")); score += 1
+                                signals.append(("MACD", f"🟢 HAUSSIER (+{macd_pct:.2f}% du prix)", "bullish")); score += 1
                         else:
-                            if macd_diff < -0.5:
-                                signals.append(("MACD", f"🔴 FORTEMENT BEARISH ({macd_diff:.2f})", "bearish")); score -= 2
+                            if macd_pct > 0.3:
+                                signals.append(("MACD", f"🔴 FORTEMENT BAISSIER (-{macd_pct:.2f}% du prix)", "bearish")); score -= 2
                             else:
-                                signals.append(("MACD", f"🔴 BEARISH ({macd_diff:.2f})", "bearish")); score -= 1
+                                signals.append(("MACD", f"🔴 BAISSIER (-{macd_pct:.2f}% du prix)", "bearish")); score -= 1
 
-                        bb_position = (close_val - bb_lower_val) / (bb_upper_val - bb_lower_val) * 100
+                        # Bollinger Bands
+                        bb_range = bb_upper_val - bb_lower_val
+                        if bb_range > 0:
+                            bb_position = (close_val - bb_lower_val) / bb_range * 100
+                        else:
+                            bb_position = 50
                         if bb_position < 10:
-                            signals.append(("Bollinger", f"🟢 Prix très proche bande basse ({bb_position:.0f}%) - ACHAT", "bullish")); score += 2
+                            signals.append(("Bollinger", f"🟢 Bande basse ({bb_position:.0f}%) — ACHAT potentiel", "bullish")); score += 2
                         elif bb_position < 30:
-                            signals.append(("Bollinger", f"🟢 Prix dans zone basse ({bb_position:.0f}%)", "bullish")); score += 1
+                            signals.append(("Bollinger", f"🟢 Zone basse ({bb_position:.0f}%)", "bullish")); score += 1
                         elif bb_position > 90:
-                            signals.append(("Bollinger", f"🔴 Prix très proche bande haute ({bb_position:.0f}%) - VENTE", "bearish")); score -= 2
+                            signals.append(("Bollinger", f"🔴 Bande haute ({bb_position:.0f}%) — VENTE potentielle", "bearish")); score -= 2
                         elif bb_position > 70:
-                            signals.append(("Bollinger", f"🔴 Prix dans zone haute ({bb_position:.0f}%)", "bearish")); score -= 1
+                            signals.append(("Bollinger", f"🔴 Zone haute ({bb_position:.0f}%)", "bearish")); score -= 1
                         else:
-                            signals.append(("Bollinger", f"🟡 Prix au milieu ({bb_position:.0f}%)", "neutral"))
+                            signals.append(("Bollinger", f"🟡 Milieu des bandes ({bb_position:.0f}%)", "neutral"))
 
-                        ma_diff_pct = ((close_val - sma50_val) / sma50_val) * 100
-                        if ma_diff_pct > 5:
-                            signals.append(("MA50", f"🟢 Prix bien au-dessus MA50 (+{ma_diff_pct:.1f}%)", "bullish")); score += 2
-                        elif ma_diff_pct > 0:
-                            signals.append(("MA50", f"🟢 Prix au-dessus MA50 (+{ma_diff_pct:.1f}%)", "bullish")); score += 1
-                        elif ma_diff_pct < -5:
-                            signals.append(("MA50", f"🔴 Prix bien en-dessous MA50 ({ma_diff_pct:.1f}%)", "bearish")); score -= 2
+                        # SMA50 — seulement si disponible
+                        if sma50_val:
+                            ma_diff_pct = ((close_val - sma50_val) / sma50_val) * 100
+                            if ma_diff_pct > 5:
+                                signals.append(("MA50", f"🟢 Au-dessus MA50 (+{ma_diff_pct:.1f}%) — Tendance haussière", "bullish")); score += 2
+                            elif ma_diff_pct > 0:
+                                signals.append(("MA50", f"🟢 Légèrement au-dessus MA50 (+{ma_diff_pct:.1f}%)", "bullish")); score += 1
+                            elif ma_diff_pct < -5:
+                                signals.append(("MA50", f"🔴 En-dessous MA50 ({ma_diff_pct:.1f}%) — Tendance baissière", "bearish")); score -= 2
+                            else:
+                                signals.append(("MA50", f"🔴 Légèrement en-dessous MA50 ({ma_diff_pct:.1f}%)", "bearish")); score -= 1
                         else:
-                            signals.append(("MA50", f"🔴 Prix en-dessous MA50 ({ma_diff_pct:.1f}%)", "bearish")); score -= 1
+                            signals.append(("MA50", "⚪ SMA50 non disponible (période trop courte)", "neutral"))
 
-                        volume_ratio = volume_val / volume_ma_val
+                        # FIX #7 : Volume — tient compte du sens de la bougie
+                        prev_close = float(df_indicators['Close'].iloc[-2]) if len(df_indicators) > 1 else close_val
+                        price_up   = close_val >= prev_close
+                        volume_ratio = volume_val / volume_ma_val if volume_ma_val > 0 else 1
                         if volume_ratio > 2:
-                            signals.append(("Volume", f"⚠️ Volume TRÈS élevé (x{volume_ratio:.1f})", "important")); score += 2
+                            if price_up:
+                                signals.append(("Volume", f"🟢 Volume très élevé (×{volume_ratio:.1f}) + hausse — Confirmation ACHAT", "bullish")); score += 2
+                            else:
+                                signals.append(("Volume", f"🔴 Volume très élevé (×{volume_ratio:.1f}) + baisse — Confirmation VENTE", "bearish")); score -= 2
                         elif volume_ratio > 1.5:
-                            signals.append(("Volume", f"⚠️ Volume élevé (x{volume_ratio:.1f})", "important")); score += 1
+                            if price_up:
+                                signals.append(("Volume", f"🟢 Volume élevé (×{volume_ratio:.1f}) avec hausse", "bullish")); score += 1
+                            else:
+                                signals.append(("Volume", f"🔴 Volume élevé (×{volume_ratio:.1f}) avec baisse", "bearish")); score -= 1
                         elif volume_ratio < 0.5:
-                            signals.append(("Volume", f"📊 Volume faible (x{volume_ratio:.1f})", "neutral"))
+                            signals.append(("Volume", f"⚪ Volume très faible (×{volume_ratio:.1f}) — Mouvement peu fiable", "neutral"))
                         else:
-                            signals.append(("Volume", f"📊 Volume normal (x{volume_ratio:.1f})", "neutral"))
+                            signals.append(("Volume", f"🟡 Volume normal (×{volume_ratio:.1f})", "neutral"))
 
-                        if score >= 5:    sentiment = "FORTEMENT HAUSSIER 🚀"; sentiment_color = "#00ff00"
-                        elif score >= 2: sentiment = "HAUSSIER 📈"; sentiment_color = "#7fff00"
-                        elif score >= 1: sentiment = "LÉGÈREMENT HAUSSIER 📈"; sentiment_color = "#90ee90"
-                        elif score <= -5: sentiment = "FORTEMENT BAISSIER 📉"; sentiment_color = "#ff0000"
-                        elif score <= -2: sentiment = "BAISSIER 📉"; sentiment_color = "#ff4444"
-                        elif score <= -1: sentiment = "LÉGÈREMENT BAISSIER 📉"; sentiment_color = "#ff6347"
-                        else:             sentiment = "NEUTRE ➡️"; sentiment_color = "#ff9800"
+                        # FIX #6 : score normalisé sur 10 et plafonné
+                        score_display = max(-SCORE_MAX, min(SCORE_MAX, score))
+                        score_pct     = (score_display + SCORE_MAX) / (2 * SCORE_MAX)  # 0 à 1
+
+                        if score >= 6:     sentiment = "FORTEMENT HAUSSIER 🚀"; sentiment_color = "#00ff41"
+                        elif score >= 3:   sentiment = "HAUSSIER 📈";            sentiment_color = "#7fff00"
+                        elif score >= 1:   sentiment = "LÉGÈREMENT HAUSSIER 📈"; sentiment_color = "#90ee90"
+                        elif score <= -6:  sentiment = "FORTEMENT BAISSIER 📉";  sentiment_color = "#ff2222"
+                        elif score <= -3:  sentiment = "BAISSIER 📉";             sentiment_color = "#ff4444"
+                        elif score <= -1:  sentiment = "LÉGÈREMENT BAISSIER 📉"; sentiment_color = "#ff6347"
+                        else:              sentiment = "NEUTRE ➡️";               sentiment_color = "#ff9800"
 
                         st.markdown(f"""
-                            <div style='text-align: center; padding: 20px; background: {sentiment_color}22; border: 3px solid {sentiment_color}; border-radius: 15px; margin: 20px 0;'>
-                                <h1 style='color: {sentiment_color}; margin: 0;'>{sentiment}</h1>
-                                <p style='color: white; font-size: 20px; margin: 10px 0;'>Score Technique: {score}/10</p>
-                                <p style='color: #ccc; font-size: 14px; margin: 5px 0;'>Analyse basée sur 5 indicateurs techniques</p>
+                            <div style='text-align:center;padding:20px;background:{sentiment_color}22;
+                                        border:3px solid {sentiment_color};border-radius:15px;margin:20px 0;'>
+                                <h1 style='color:{sentiment_color};margin:0;'>{sentiment}</h1>
+                                <p style='color:white;font-size:20px;margin:10px 0;'>
+                                    Score Technique : {score_display:+d} / {SCORE_MAX}</p>
+                                <p style='color:#ccc;font-size:14px;margin:5px 0;'>
+                                    Analyse basée sur 5 indicateurs (RSI Wilder, MACD, Bollinger, MA50, Volume)</p>
                             </div>
                         """, unsafe_allow_html=True)
 
@@ -2350,34 +2391,48 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                         st.markdown("### 📊 GRAPHIQUE AVEC INDICATEURS")
 
                         from plotly.subplots import make_subplots
+                        df_plot = df_full.dropna(subset=['SMA_20','BB_Upper','BB_Lower'])
                         fig = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.05,
                                             row_heights=[0.6, 0.2, 0.2],
-                                            subplot_titles=('PRIX & BOLLINGER BANDS', 'RSI', 'MACD'))
+                                            subplot_titles=('PRIX & BOLLINGER BANDS', 'RSI (Wilder)', 'MACD'))
 
-                        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'],
-                                                      low=df['Low'], close=df['Close'], name='Prix'), row=1, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=df['BB_Upper'], name='BB Upper',
-                                                  line=dict(color='rgba(255,152,0,0.3)', dash='dash')), row=1, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=df['SMA_20'], name='SMA 20',
-                                                  line=dict(color='orange', width=2)), row=1, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=df['BB_Lower'], name='BB Lower',
-                                                  line=dict(color='rgba(255,152,0,0.3)', dash='dash'),
-                                                  fill='tonexty', fillcolor='rgba(255,152,0,0.1)'), row=1, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=df['SMA_50'], name='SMA 50',
-                                                  line=dict(color='cyan', width=2)), row=1, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], name='RSI',
-                                                  line=dict(color='purple', width=2)), row=2, col=1)
-                        fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-                        fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=df['MACD'], name='MACD',
-                                                  line=dict(color='blue', width=2)), row=3, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=df['Signal'], name='Signal',
-                                                  line=dict(color='red', width=2)), row=3, col=1)
-                        fig.add_trace(go.Bar(x=df.index, y=df['MACD_Hist'], name='Histogram',
-                                             marker_color='gray'), row=3, col=1)
+                        fig.add_trace(go.Candlestick(x=df_plot.index,
+                                                      open=df_plot['Open'], high=df_plot['High'],
+                                                      low=df_plot['Low'],   close=df_plot['Close'],
+                                                      name='Prix',
+                                                      increasing_line_color='#00ff41',
+                                                      decreasing_line_color='#ff2222'), row=1, col=1)
+                        fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['BB_Upper'], name='BB Upper',
+                                                  line=dict(color='rgba(255,152,0,0.4)', dash='dash', width=1)), row=1, col=1)
+                        fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['SMA_20'], name='SMA 20',
+                                                  line=dict(color='#ff6600', width=1.5)), row=1, col=1)
+                        fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['BB_Lower'], name='BB Lower',
+                                                  line=dict(color='rgba(255,152,0,0.4)', dash='dash', width=1),
+                                                  fill='tonexty', fillcolor='rgba(255,152,0,0.05)'), row=1, col=1)
+                        if has_sma50:
+                            fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['SMA_50'], name='SMA 50',
+                                                      line=dict(color='#00ccff', width=1.5)), row=1, col=1)
 
-                        fig.update_layout(template="plotly_dark", paper_bgcolor='black', plot_bgcolor='black',
-                                          height=900, showlegend=True, xaxis_rangeslider_visible=False)
+                        rsi_plot = df_full.dropna(subset=['RSI'])
+                        fig.add_trace(go.Scatter(x=rsi_plot.index, y=rsi_plot['RSI'], name='RSI',
+                                                  line=dict(color='#bf5fff', width=2)), row=2, col=1)
+                        fig.add_hline(y=70, line_dash="dash", line_color="red",   opacity=0.6, row=2, col=1)
+                        fig.add_hline(y=30, line_dash="dash", line_color="green", opacity=0.6, row=2, col=1)
+                        fig.add_hline(y=50, line_dash="dot",  line_color="gray",  opacity=0.3, row=2, col=1)
+
+                        macd_plot = df_full.dropna(subset=['MACD','Signal','MACD_Hist'])
+                        macd_colors = ['#00ff41' if v >= 0 else '#ff2222' for v in macd_plot['MACD_Hist']]
+                        fig.add_trace(go.Bar(x=macd_plot.index, y=macd_plot['MACD_Hist'],
+                                             name='Histogramme', marker_color=macd_colors, opacity=0.7), row=3, col=1)
+                        fig.add_trace(go.Scatter(x=macd_plot.index, y=macd_plot['MACD'], name='MACD',
+                                                  line=dict(color='#00ccff', width=2)), row=3, col=1)
+                        fig.add_trace(go.Scatter(x=macd_plot.index, y=macd_plot['Signal'], name='Signal',
+                                                  line=dict(color='#ff6600', width=2)), row=3, col=1)
+
+                        fig.update_layout(template="plotly_dark", paper_bgcolor='#000000',
+                                          plot_bgcolor='#050505', height=900,
+                                          showlegend=True, xaxis_rangeslider_visible=False,
+                                          font=dict(color='#cccccc', family='Courier New'))
                         st.plotly_chart(fig, use_container_width=True)
 
                         st.markdown("---")
@@ -2385,12 +2440,14 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                         cols_signals = st.columns(3)
                         for idx, (indicator, message, signal_type) in enumerate(signals):
                             with cols_signals[idx % 3]:
-                                color_map = {"bullish": "#00ff00", "bearish": "#ff0000",
-                                             "neutral": "#ff9800", "important": "#00ffff"}
+                                color_map = {"bullish": "#00ff41", "bearish": "#ff2222",
+                                             "neutral": "#ff9800", "important": "#00ccff"}
+                                c = color_map.get(signal_type, '#666')
                                 st.markdown(f"""
-                                    <div style='padding: 15px; background: {color_map.get(signal_type, '#666')}22; border: 2px solid {color_map.get(signal_type, '#666')}; border-radius: 10px; margin: 10px 0; min-height: 100px;'>
-                                        <h4 style='color: {color_map.get(signal_type, '#fff')}; margin: 0 0 10px 0;'>{indicator}</h4>
-                                        <p style='color: #ccc; font-size: 14px; margin: 0;'>{message}</p>
+                                    <div style='padding:15px;background:{c}18;border:2px solid {c};
+                                                border-radius:10px;margin:10px 0;min-height:90px;'>
+                                        <h4 style='color:{c};margin:0 0 8px 0;'>{indicator}</h4>
+                                        <p style='color:#ccc;font-size:13px;margin:0;'>{message}</p>
                                     </div>
                                 """, unsafe_allow_html=True)
 
@@ -2398,22 +2455,24 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                         st.markdown("### 📊 VALEURS ACTUELLES")
                         col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                         with col_stat1:
-                            st.metric("RSI", f"{rsi_val:.2f}")
-                            st.metric("Prix", f"${close_val:.2f}")
+                            st.metric("RSI (Wilder)", f"{rsi_val:.1f}",
+                                      delta="Survente" if rsi_val < 30 else ("Surachat" if rsi_val > 70 else "Neutre"))
+                            st.metric("Prix Clôture", f"${close_val:.2f}")
                         with col_stat2:
                             st.metric("MACD", f"{macd_val:.4f}")
-                            st.metric("Signal", f"{signal_val:.4f}")
+                            st.metric("Signal MACD", f"{signal_val:.4f}",
+                                      delta=f"{macd_diff:+.4f}")
                         with col_stat3:
                             st.metric("BB Upper", f"${bb_upper_val:.2f}")
                             st.metric("BB Lower", f"${bb_lower_val:.2f}")
                         with col_stat4:
                             st.metric("SMA 20", f"${float(last_row['SMA_20']):.2f}")
-                            st.metric("SMA 50", f"${sma50_val:.2f}")
+                            st.metric("SMA 50", f"${sma50_val:.2f}" if sma50_val else "N/A")
 
         except Exception as e:
-            st.error(f"Erreur lors de l'analyse: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
+            # FIX #9 : pas de traceback en prod, message propre
+            st.error(f"❌ Erreur lors de l'analyse : {str(e)}")
+            st.info("Vérifiez que le ticker est valide et que la période sélectionnée contient suffisamment de données.")
 
 # ==========================================
 # OUTIL : FIBONACCI CALCULATOR
