@@ -3898,10 +3898,15 @@ elif outil == "MARKET MONITOR":
 
     for i, (tk, nom) in enumerate(indices.items()):
         try:
-            hist_idx = get_ticker_history(tk)
-            if not hist_idx.empty:
-                val_actuelle, val_prec = hist_idx['Close'].iloc[-1], hist_idx['Close'].iloc[-2]
+            hist_idx = get_ticker_history(tk, "5d")
+            if not hist_idx.empty and len(hist_idx) >= 2:
+                val_actuelle = float(hist_idx['Close'].iloc[-1])
+                val_prec     = float(hist_idx['Close'].iloc[-2])
                 variation = ((val_actuelle - val_prec) / val_prec) * 100
+            elif not hist_idx.empty:
+                val_actuelle = float(hist_idx['Close'].iloc[-1])
+                val_prec     = val_actuelle
+                variation    = 0.0
                 cols[i].metric(nom, f"{val_actuelle:,.2f}", f"{variation:+.2f}%")
                 if cols[i].button(f"LOAD {nom}", key=f"btn_{tk}"):
                     st.session_state.index_selectionne = tk
@@ -4220,7 +4225,11 @@ elif outil == "DAILY BRIEF":
     def afficher_flux_daily(url, filtre_boursorama_24h=False):
         try:
             import time
-            flux = feedparser.parse(url)
+            # User-Agent requis — certains serveurs bloquent les requêtes sans header
+            flux = feedparser.parse(url, request_headers={
+                "User-Agent": "Mozilla/5.0 (compatible; AM-Terminal/1.0; +https://am-analysis.streamlit.app)",
+                "Accept-Language": "fr-FR,fr;q=0.9"
+            })
             if not flux.entries: st.info("NO DATA FOUND."); return
             maintenant = time.time()
             secondes_par_jour = 24 * 3600
@@ -4442,7 +4451,7 @@ elif outil == "HEATMAP MARCHÉ":
     if st.button("🎨 GÉNÉRER LA HEATMAP", key="gen_heatmap"):
         try:
             with st.spinner(f"Génération de la heatmap {market_choice}..."):
-                period_map = {"1 Jour":"1d","5 Jours":"5d","1 Mois":"1mo","3 Mois":"3mo","1 An":"1y"}
+                period_map = {"1 Jour":"5d","5 Jours":"5d","1 Mois":"1mo","3 Mois":"3mo","1 An":"1y"}
                 period = period_map[time_period]
                 heatmap_data = []
 
@@ -4462,9 +4471,17 @@ elif outil == "HEATMAP MARCHÉ":
                         df = yf.download(ticker_item, period=period, progress=False)
                         if not df.empty:
                             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-                            start_price = float(df['Close'].iloc[0])
-                            end_price = float(df['Close'].iloc[-1])
-                            change_pct = ((end_price - start_price) / start_price) * 100
+                            # Variation : dernière clôture vs avant-dernière (J0 vs J-1)
+                            if len(df) >= 2:
+                                end_price   = float(df['Close'].iloc[-1])
+                                start_price = float(df['Close'].iloc[-2])
+                            else:
+                                end_price   = float(df['Close'].iloc[-1])
+                                start_price = end_price
+                            # Pour les périodes longues : comparer début vs fin
+                            if time_period != "1 Jour" and len(df) > 2:
+                                start_price = float(df['Close'].iloc[0])
+                            change_pct = ((end_price - start_price) / start_price) * 100 if start_price > 0 else 0
                             display_name = ticker_item.replace('.PA','').replace('-USD','') if market_choice in ["CAC 40","Crypto Top 15"] else ticker_item
                             heatmap_data.append({'Ticker': display_name, 'Sector': sector, 'Change': change_pct, 'Price': end_price})
                     except: continue
@@ -4495,6 +4512,49 @@ elif outil == "HEATMAP MARCHÉ":
                         st.markdown("#### 📉 TOP LOSERS")
                         for idx, row in df_heatmap.nsmallest(5, 'Change').iterrows():
                             st.markdown(f"<div style='padding: 12px; background: #ff000022; border-left: 4px solid #ff0000; border-radius: 5px; margin: 8px 0;'><div style='display: flex; justify-content: space-between;'><b style='color: #ff0000; font-size: 16px;'>{row['Ticker']}</b><b style='color: white; font-size: 16px;'>{row['Change']:+.2f}%</b></div><small style='color: #ccc;'>${row['Price']:.2f}</small></div>", unsafe_allow_html=True)
+
+                    st.markdown("---")
+                    st.markdown("### 🗺️ TREEMAP VISUEL")
+                    # Couleur progressive : rouge fort → gris → vert fort
+                    def _heat_color(v):
+                        if v >= 3:   return "#00e676"
+                        elif v >= 1: return "#66bb6a"
+                        elif v >= 0: return "#a5d6a7"
+                        elif v >= -1: return "#ef9a9a"
+                        elif v >= -3: return "#e53935"
+                        else:        return "#b71c1c"
+
+                    df_heatmap["color"] = df_heatmap["Change"].apply(_heat_color)
+                    df_heatmap["label"] = df_heatmap.apply(
+                        lambda r: f"{r['Ticker']}<br>{r['Change']:+.2f}%", axis=1)
+                    fig_tree = go.Figure(go.Treemap(
+                        labels=df_heatmap["label"],
+                        parents=df_heatmap["Sector"],
+                        values=[abs(c) + 0.5 for c in df_heatmap["Change"]],
+                        marker=dict(
+                            colors=df_heatmap["color"],
+                            line=dict(color="#111", width=1.5)
+                        ),
+                        textinfo="label",
+                        textfont=dict(size=13, color="white", family="IBM Plex Mono"),
+                        hovertemplate="<b>%{label}</b><extra></extra>",
+                    ))
+                    fig_tree.update_layout(
+                        paper_bgcolor="#0e1117", margin=dict(l=0,r=0,t=10,b=0), height=500,
+                        font=dict(color="white")
+                    )
+                    st.plotly_chart(fig_tree, use_container_width=True)
+                    # Légende couleur
+                    st.markdown("""
+                        <div style='display:flex;gap:12px;font-size:12px;font-family:monospace;margin-top:-10px;'>
+                            <span style='color:#b71c1c'>■ < -3%</span>
+                            <span style='color:#e53935'>■ -3% à -1%</span>
+                            <span style='color:#ef9a9a'>■ -1% à 0%</span>
+                            <span style='color:#a5d6a7'>■ 0% à +1%</span>
+                            <span style='color:#66bb6a'>■ +1% à +3%</span>
+                            <span style='color:#00e676'>■ > +3%</span>
+                        </div>
+                    """, unsafe_allow_html=True)
 
                     st.markdown("---")
                     st.markdown("### 📊 DISTRIBUTION DES PERFORMANCES")
@@ -4567,10 +4627,22 @@ elif outil == "ALERTS MANAGER":
                 alert_value = st.number_input("VARIATION (%)", min_value=0.1, value=5.0, step=0.5, key="alert_value_pct")
             alert_name = st.text_input("NOM DE L'ALERTE (optionnel)", key="alert_name", placeholder="Ex: AAPL breakout 150")
         if st.button("🚀 CRÉER L'ALERTE", key="create_alert_btn", use_container_width=True):
-            new_alert = {'id': len(st.session_state.alerts) + 1, 'ticker': alert_ticker, 'type': alert_type,
-                         'value': alert_value, 'name': alert_name if alert_name else f"{alert_ticker} {alert_type}",
-                         'created_at': datetime.now(), 'active': True}
+            import uuid
+            new_alert = {
+                'id': str(uuid.uuid4())[:8],
+                'ticker': alert_ticker,
+                'type': alert_type,
+                'value': alert_value,
+                'name': alert_name if alert_name else f"{alert_ticker} {alert_type}",
+                'created_at': datetime.now().strftime("%d/%m/%Y %H:%M"),
+                'active': True
+            }
             st.session_state.alerts.append(new_alert)
+            # Sauvegarder dans Firebase si user connecté
+            try:
+                _save_current_session_config()
+            except Exception:
+                pass
             st.success(f"✅ Alerte créée : {new_alert['name']}")
             st.rerun()
 
@@ -4582,7 +4654,7 @@ elif outil == "ALERTS MANAGER":
                     for alert in st.session_state.alerts:
                         if not alert['active']: continue
                         try:
-                            df = yf.download(alert['ticker'], period="2d", progress=False)
+                            df = yf.download(alert['ticker'], period="5d", progress=False, auto_adjust=True)
                             if df.empty: continue
                             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
                             current_price = float(df['Close'].iloc[-1])
