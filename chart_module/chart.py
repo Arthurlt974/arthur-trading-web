@@ -160,7 +160,6 @@ html,body{{
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
 
 /* ── CHART ZONE ── */
-.chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
 #cvMain{{display:block;cursor:crosshair;}}
 .vol-sep{{height:1px;background:var(--border);flex-shrink:0;}}
 #cvVol{{display:block;background:var(--bg);flex-shrink:0;}}
@@ -467,7 +466,7 @@ html,body{{
 <div class="main" id="mainArea">
 
 <!-- ZONE CHART -->
-<div class="chart-zone" style="position:relative">
+<div class="chart-zone">
   <!-- DRAWING TOOLBAR -->
   <div class="draw-toolbar" id="drawToolbar">
     <button class="draw-btn active" id="dBtn_cursor" onclick="setDrawTool('cursor')" title="Curseur">&#9654;</button>
@@ -485,7 +484,7 @@ html,body{{
     <div class="draw-sep"></div>
     <button class="draw-btn" id="dBtn_clear"  onclick="clearDrawings()"       title="Tout effacer" style="color:#ff4444;font-size:11px">&#10006;</button>
   </div>
-  <canvas id="cvMain" style="margin-left:36px"></canvas>
+  <canvas id="cvMain"></canvas>
   <div class="vol-sep"></div>
   <canvas id="cvVol"></canvas>
   <div class="vol-sep" id="rsiSep" style="display:none"></div>
@@ -692,7 +691,7 @@ const D = {{ t:[], o:[], h:[], l:[], c:[], v:[] }};
 // ════════════════════════════════════════════════════════
 //  CONFIG RENDU
 // ════════════════════════════════════════════════════════
-const PAD  = {{l:0, r:72, t:8, b:24}};
+const PAD  = {{l:36, r:72, t:8, b:24}};
 const VPAH = 80;   // hauteur volume
 let showMA  = {ma_init_js};
 let showVol = {vol_init_js};
@@ -771,7 +770,8 @@ const fmtDate = ts => {{
 
 function setupCanvas() {{
   const panelW = (CHART_MODE === 'quant' && quantPanelOpen) ? 320 : 0;
-  const W  = (window.innerWidth  || 900) - panelW;
+  const TOOLBAR_W = 36;
+  const W  = (window.innerWidth  || 900) - panelW - TOOLBAR_W;
   const fullH = window.innerHeight || 600;
   const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
   const volH  = showVol  ? VPAH   : 0;
@@ -1221,7 +1221,7 @@ function promptText(x1, p1, barIdx) {{
 // ── Helpers coordonnées souris ──
 function getChartCoords(e) {{
   const rect = cvMain.getBoundingClientRect();
-  const mx = e.clientX - rect.left - 36; // -36 pour la toolbar
+  const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
   const W  = cvMain.width;
   const H  = cvMain.height;
@@ -1594,7 +1594,7 @@ function drawMain() {{
     const y=PAD.t+s*(H-PAD.t-PAD.b)/gridSteps;
     const price=hi-s*rng/gridSteps;
     ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(PAD.l+36,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     ctx.strokeStyle='rgba(255,255,255,0.15)';
     ctx.beginPath(); ctx.moveTo(W-PAD.r,y); ctx.lineTo(W-PAD.r+4,y); ctx.stroke();
     const mid=(hi+lo)/2;
