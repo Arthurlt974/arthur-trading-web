@@ -104,7 +104,7 @@ def render_chart(
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Rajdhani:wght@500;700&display=swap');
 :root{{
   --bg:#000000;--surface:#0a0a0a;--surface2:#111111;
   --border:#1a1a1a;--border2:#1e1e1e;
@@ -119,7 +119,7 @@ def render_chart(
 *{{margin:0;padding:0;box-sizing:border-box;}}
 html,body{{
   background:var(--bg);color:var(--text);
-  font-family:'Share Tech Mono',monospace;font-size:12px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;
   width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column;
 }}
 
@@ -148,13 +148,13 @@ html,body{{
 .toolbar{{display:flex;align-items:center;background:var(--surface);
   border-bottom:1px solid var(--border2);height:34px;padding:0 8px;gap:2px;flex-shrink:0;}}
 .tf-btn{{padding:3px 9px;border:none;background:transparent;color:var(--muted);
-  font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
   border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.5px;}}
 .tf-btn:hover{{background:var(--surface2);color:var(--text);}}
 .tf-btn.active{{background:rgba(255,152,0,0.12);color:var(--orange);}}
 .tb-sep{{width:1px;height:18px;background:var(--border2);margin:0 4px;}}
 .indicator-btn{{padding:3px 9px;border:1px solid var(--border2);background:transparent;
-  color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;
+  color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;
   border-radius:3px;transition:all .1s;}}
 .indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
@@ -200,7 +200,7 @@ html,body{{
   display:none;align-items:center;gap:6px;
   padding:3px 12px;border:1px solid rgba(250,190,44,0.35);
   background:rgba(250,190,44,0.07);color:#FABE2C;
-  font-family:'Share Tech Mono',monospace;font-size:10px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
   font-weight:700;letter-spacing:1.5px;cursor:pointer;
   border-radius:3px;transition:all .15s;white-space:nowrap;
 }}
@@ -276,7 +276,7 @@ html,body{{
 .field-lbl{{font-size:8px;color:var(--muted);letter-spacing:0.5px;min-width:72px;}}
 .field-inp{{
   flex:1;background:var(--bg);border:1px solid #2A2A2A;
-  color:#FF9944;font-family:'Share Tech Mono',monospace;
+  color:#FF9944;font-family:'JetBrains Mono',monospace;
   font-size:10px;padding:3px 7px;border-radius:2px;outline:none;
 }}
 .field-inp:focus{{border-color:rgba(255,102,0,0.5);}}
@@ -308,7 +308,7 @@ html,body{{
   display:flex;align-items:center;gap:8px;padding:0 12px;height:34px;
   cursor:pointer;background:transparent;border:none;
   border-left:1px solid var(--border2);
-  font-family:'Share Tech Mono',monospace;
+  font-family:'JetBrains Mono',monospace;
   transition:background .12s;
 }}
 .mode-btn:hover{{background:var(--surface2);}}
@@ -373,7 +373,7 @@ html,body{{
 .draw-btn[title]:hover::after{{
   content:attr(title);position:absolute;left:34px;top:50%;transform:translateY(-50%);
   background:var(--surface);border:1px solid var(--border2);
-  color:var(--text);font-family:'Share Tech Mono',monospace;font-size:9px;
+  color:var(--text);font-family:'JetBrains Mono',monospace;font-size:9px;
   padding:3px 8px;border-radius:3px;white-space:nowrap;z-index:9999;
   pointer-events:none;letter-spacing:0.5px;
 }}
@@ -880,7 +880,7 @@ function drawRSI() {{
     ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = col; ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.fillStyle = col; ctx.font="600 9px 'JetBrains Mono',monospace"; ctx.textAlign='left';
     ctx.fillText(v, W-PAD.r+4, y+3);
   }});
 
@@ -903,12 +903,12 @@ function drawRSI() {{
     ctx.beginPath();
     ctx.roundRect(W-PAD.r+2, toY(lastRSI)-8, PAD.r-4, 16, 2);
     ctx.fill();
-    ctx.fillStyle='#fff'; ctx.font='bold 8px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.fillStyle='#000'; ctx.font="700 9px 'JetBrains Mono',monospace"; ctx.textAlign='left';
     ctx.fillText(lastRSI.toFixed(1), W-PAD.r+5, toY(lastRSI)+3);
   }}
 
   // Label
-  ctx.fillStyle='#555'; ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='rgba(180,180,200,0.65)'; ctx.font="700 8.5px 'JetBrains Mono',monospace"; ctx.textAlign='left';
   ctx.fillText('RSI(14)', 4, 10);
 }}
 
@@ -1007,16 +1007,16 @@ function drawMACD() {{
   const lm = macd.filter(v=>v!==null).pop();
   const ls = sig.filter(v=>v!==null).pop();
   if(lm!=null) {{
-    ctx.fillStyle='rgba(100,180,255,0.8)'; ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='right';
+    ctx.fillStyle='rgba(100,180,255,0.9)'; ctx.font="600 9px 'JetBrains Mono',monospace"; ctx.textAlign='right';
     ctx.fillText('M:'+lm.toFixed(4), W-PAD.r-2, 10);
   }}
   if(ls!=null) {{
-    ctx.fillStyle='rgba(255,165,0,0.8)'; ctx.textAlign='right';
+    ctx.fillStyle='rgba(255,165,0,0.9)'; ctx.font="600 9px 'JetBrains Mono',monospace"; ctx.textAlign='right';
     ctx.fillText('S:'+ls.toFixed(4), W-PAD.r-2, 20);
   }}
 
   // Label
-  ctx.fillStyle='#555'; ctx.textAlign='left';
+  ctx.fillStyle='rgba(180,180,200,0.65)'; ctx.font="700 8.5px 'JetBrains Mono',monospace"; ctx.textAlign='left';
   ctx.fillText('MACD(12,26,9)', 4, 10);
 }}
 
@@ -1084,7 +1084,7 @@ function drawSingleDrawing(ctx, d, W, H, toX, toY, hi, lo, N, isPreview=false) {
   ctx.fillStyle   = d.color || 'rgba(255,180,0,0.9)';
   ctx.lineWidth   = d.width || 1.5;
   ctx.setLineDash([]);
-  ctx.font = '9px Share Tech Mono,monospace';
+  ctx.font = '9px 'JetBrains Mono',monospace';
 
   if(d.type === 'line') {{
     // Ligne de tendance étendue entre x1 et x2
@@ -1150,12 +1150,12 @@ function drawSingleDrawing(ctx, d, W, H, toX, toY, hi, lo, N, isPreview=false) {
     ctx.setLineDash([]);
 
     // Labels prix
-    ctx.fillStyle=lc; ctx.textAlign='right'; ctx.font='9px Share Tech Mono,monospace';
+    ctx.fillStyle=lc; ctx.textAlign='right'; ctx.font="9px 'JetBrains Mono',monospace";
     ctx.fillText(fmt(pt), W-PAD.r-4, yt-3);
     ctx.fillText(fmt(pb), W-PAD.r-4, yb+10);
 
     // Label variation au centre
-    ctx.textAlign='center'; ctx.font='bold 10px Share Tech Mono,monospace';
+    ctx.textAlign='center'; ctx.font="bold 10px 'JetBrains Mono',monospace";
     ctx.fillStyle = bull ? 'rgba(0,255,65,0.9)' : 'rgba(255,34,34,0.9)';
     ctx.fillText((bull?'▲ +':'▼ ')+pct+'%', (W-PAD.r)/2, (yt+yb)/2+4);
 
@@ -1172,7 +1172,7 @@ function drawSingleDrawing(ctx, d, W, H, toX, toY, hi, lo, N, isPreview=false) {
       ctx.setLineDash([]);
       // Labels
       ctx.fillStyle = FIBO_COLORS[fi];
-      ctx.textAlign='left'; ctx.font='8px Share Tech Mono,monospace';
+      ctx.textAlign='left'; ctx.font="600 8.5px 'JetBrains Mono',monospace";
       ctx.fillText((lvl*100).toFixed(1)+'%  '+fmt(p), x1+4, yf-2);
     }});
     // Ligne diagonale
@@ -1186,7 +1186,7 @@ function drawSingleDrawing(ctx, d, W, H, toX, toY, hi, lo, N, isPreview=false) {
 
   }} else if(d.type === 'text') {{
     if(x1===null||y1===null) {{ ctx.globalAlpha=1; return; }}
-    ctx.font='bold 12px Share Tech Mono,monospace';
+    ctx.font="bold 12px 'JetBrains Mono',monospace";
     ctx.fillStyle=d.color||'rgba(255,220,80,0.95)';
     ctx.textAlign='left';
     // Fond semi-transparent
@@ -1494,7 +1494,7 @@ function drawGaussianChannel(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
   }}
 
   // Légende
-  ctx.font = '9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.font = '9px 'JetBrains Mono',monospace'; ctx.textAlign='left';
   ctx.fillStyle='rgba(0,255,136,0.7)';
   ctx.fillText('GC', 8, 30);
 }}
@@ -1548,7 +1548,7 @@ function drawOrderBlocks(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
 
     // Label
     const label = (isBull ? 'Bull OB' : 'Bear OB') + (ob.mitigated ? ' ✗' : '');
-    ctx.font = 'bold 8px Share Tech Mono,monospace';
+    ctx.font = 'bold 8px 'JetBrains Mono',monospace';
     ctx.fillStyle = isBull ? 'rgba(0,255,180,0.75)' : 'rgba(255,100,100,0.75)';
     ctx.textAlign = 'left';
     ctx.fillText(label, xStart + 4, Math.min(yTop,yBtm) + 10);
@@ -1558,7 +1558,7 @@ function drawOrderBlocks(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
   obs.bear.forEach(ob => drawOB(ob, false));
 
   // Légende
-  ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.font="9px 'JetBrains Mono',monospace"; ctx.textAlign='left';
   ctx.fillStyle='rgba(8,200,150,0.7)';
   ctx.fillText('OB', 8+25, 30);
 }}
@@ -1593,24 +1593,27 @@ function drawMain() {{
   for(let s=0;s<=gridSteps;s++) {{
     const y=PAD.t+s*(H-PAD.t-PAD.b)/gridSteps;
     const price=hi-s*rng/gridSteps;
-    ctx.strokeStyle='#111111'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
-    // Prix axe droit
-    ctx.fillStyle='#444444'; ctx.font='10px Share Tech Mono,monospace';
-    ctx.textAlign='left'; ctx.fillText(fmt(price), W-PAD.r+6, y+4);
+    ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(PAD.l+36,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.15)';
+    ctx.beginPath(); ctx.moveTo(W-PAD.r,y); ctx.lineTo(W-PAD.r+4,y); ctx.stroke();
+    const mid=(hi+lo)/2;
+    ctx.fillStyle=(price>=mid)?'rgba(0,210,100,0.85)':'rgba(255,80,80,0.85)';
+    ctx.font="600 10.5px 'JetBrains Mono',monospace";
+    ctx.textAlign='left';
+    ctx.fillText(fmt(price), W-PAD.r+8, y+4);
   }}
 
-  // ── GRILLE VERTICALE + AXE TEMPS ──
-  ctx.fillStyle='#444444'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='center';
+    // ── GRILLE VERTICALE + AXE TEMPS ──
+  ctx.fillStyle='rgba(160,160,180,0.55)'; ctx.font="500 9px 'JetBrains Mono',monospace"; ctx.textAlign='center';
   const nTicks=Math.min(10,Math.max(3,Math.floor(N/15)));
   const prevMonth={{val:-1}};
   for(let t=0;t<=nTicks;t++) {{
     const i=Math.floor(t*(N-1)/Math.max(nTicks,1));
     const x=toX(i);
     const d=new Date(ts[i]*1000);
-    ctx.strokeStyle='#111111'; ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(255,255,255,0.03)'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(x,PAD.t); ctx.lineTo(x,H-PAD.b); ctx.stroke();
-    // Label : heure si intraday, date si daily+
     let lbl;
     if(IV_SEC<86400) {{
       lbl=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -1621,6 +1624,9 @@ function drawMain() {{
     }} else {{
       lbl=d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'short'}});
     }}
+    // Tick bas
+    ctx.strokeStyle='rgba(255,255,255,0.15)';
+    ctx.beginPath(); ctx.moveTo(x,H-PAD.b); ctx.lineTo(x,H-PAD.b+3); ctx.stroke();
     ctx.fillText(lbl, x, H-6);
   }}
 
@@ -1682,7 +1688,7 @@ function drawMain() {{
       ctx.strokeStyle=mc.color; ctx.lineWidth=mc.w; ctx.stroke();
     }});
     // Légende MA
-    ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.font="600 9px 'JetBrains Mono',monospace"; ctx.textAlign='left';
     [{{'p':20,'c':'rgba(255,102,0,0.90)'}},{{'p':50,'c':'rgba(255,204,0,0.85)'}},{{'p':200,'c':'rgba(100,180,255,0.80)'}}].forEach((m,i)=>{{
       ctx.fillStyle=m.c;
       ctx.fillText(`MA${{m.p}}`, 8+i*52, 18);
@@ -1735,7 +1741,7 @@ function drawMain() {{
   ctx.beginPath();
   ctx.roundRect(W-PAD.r+2, py-9, PAD.r-4, 18, 2);
   ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='bold 9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#fff'; ctx.font="bold 9px 'JetBrains Mono',monospace"; ctx.textAlign='left';
   ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
 
   // ── DRAWINGS ──
@@ -1754,7 +1760,7 @@ function drawMain() {{
       const hp=hi-(HOVER_Y-PAD.t)/((H-PAD.t-PAD.b))*rng;
       ctx.fillStyle='#1a0800';
       ctx.beginPath(); ctx.roundRect(W-PAD.r+2,HOVER_Y-9,PAD.r-4,18,2); ctx.fill();
-      ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
+      ctx.fillStyle='#d0d0e8'; ctx.font="600 9.5px 'JetBrains Mono',monospace"; ctx.textAlign='left';
       ctx.fillText(fmt(hp), W-PAD.r+5, HOVER_Y+4);
     }}
     // Label date en bas
@@ -1763,7 +1769,7 @@ function drawMain() {{
     ctx.fillStyle='#1a0800'; ctx.textAlign='center';
     const tw=ctx.measureText(dateLbl).width+12;
     ctx.beginPath(); ctx.roundRect(x-tw/2, H-PAD.b+2, tw, 16, 2); ctx.fill();
-    ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace';
+    ctx.fillStyle='#c8c8d8'; ctx.font="600 9px 'JetBrains Mono',monospace";
     ctx.fillText(dateLbl, x, H-PAD.b+13);
 
     // Mise à jour OHLC header
@@ -1810,8 +1816,8 @@ function drawVol() {{
   ctx.strokeStyle='rgba(255,102,0,0.70)'; ctx.lineWidth=1; ctx.stroke();
 
   // Label
-  ctx.fillStyle='#333333'; ctx.font='8px Share Tech Mono,monospace';
-  ctx.textAlign='left'; ctx.fillText('VOLUME', 4, 10);
+  ctx.fillStyle='rgba(150,150,170,0.55)'; ctx.font="700 8.5px 'JetBrains Mono',monospace";
+  ctx.textAlign='left'; ctx.fillText('VOL', 4, 10);
 }}
 
 function render() {{ drawMain(); drawVol(); drawRSI(); drawMACD(); }}
