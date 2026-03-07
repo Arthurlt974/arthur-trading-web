@@ -159,6 +159,24 @@ html,body{{
 .indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
 
+
+/* ── DRAWING TOOLBAR ── */
+.draw-toolbar{{
+  width:36px;flex-shrink:0;background:var(--surface);
+  border-right:1px solid var(--border2);
+  display:flex;flex-direction:column;align-items:center;
+  padding:6px 0;gap:2px;z-index:10;
+}}
+.draw-btn{{
+  width:26px;height:26px;background:transparent;border:none;
+  color:var(--muted);font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:3px;transition:all .1s;
+}}
+.draw-btn:hover{{background:var(--surface2);color:var(--text);}}
+.draw-btn.active{{background:rgba(255,152,0,0.15);color:var(--orange);}}
+.draw-sep{{width:20px;height:1px;background:var(--border2);margin:2px 0;}}
+
 /* ── CHART ZONE ── */
 .chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
 #cvMain{{display:block;cursor:crosshair;}}
@@ -438,6 +456,24 @@ html,body{{
 
 <!-- MAIN = CHART + QUANT PANEL -->
 <div class="main" id="mainArea">
+
+<!-- DRAWING TOOLBAR -->
+<div class="draw-toolbar" id="drawToolbar">
+  <button class="draw-btn active" id="dBtn_cursor" onclick="setDrawTool('cursor')" title="Curseur">&#9654;</button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dBtn_line"  onclick="setDrawTool('line')"  title="Ligne de tendance">&#9135;</button>
+  <button class="draw-btn" id="dBtn_hline" onclick="setDrawTool('hline')" title="Ligne horizontale">&#8212;</button>
+  <button class="draw-btn" id="dBtn_vline" onclick="setDrawTool('vline')" title="Ligne verticale">&#124;</button>
+  <button class="draw-btn" id="dBtn_ray"   onclick="setDrawTool('ray')"   title="Rayon">&#8599;</button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dBtn_fibo"  onclick="setDrawTool('fibo')"  title="Fibonacci">&#966;</button>
+  <button class="draw-btn" id="dBtn_rect"  onclick="setDrawTool('rect')"  title="Rectangle">&#9645;</button>
+  <button class="draw-btn" id="dBtn_range" onclick="setDrawTool('range')" title="Intervalle de prix">&#8597;</button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dBtn_text"  onclick="setDrawTool('text')"  title="Texte">T</button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dBtn_clear" onclick="clearDrawings()"       title="Effacer" style="color:#ff4444;font-size:11px">&#10006;</button>
+</div>
 
 <!-- ZONE CHART -->
 <div class="chart-zone">
@@ -727,7 +763,7 @@ const fmtDate = ts => {{
 
 function setupCanvas() {{
   const panelW = (CHART_MODE === 'quant' && quantPanelOpen) ? 320 : 0;
-  const W  = (window.innerWidth  || 900) - panelW;
+  const W  = (window.innerWidth  || 900) - panelW - 36;
   const fullH = window.innerHeight || 600;
   const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
   const volH  = showVol  ? VPAH   : 0;
@@ -1206,6 +1242,9 @@ function drawMain() {{
   ctx.fillStyle='#fff'; ctx.font='bold 9px Share Tech Mono,monospace'; ctx.textAlign='left';
   ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
 
+  // ── DRAWINGS ──
+  drawAllDrawings(ctx, W, H);
+
   // ── CROSSHAIR ──
   if(HOVER_IDX>=0 && HOVER_IDX<N) {{
     const x=toX(HOVER_IDX);
@@ -1475,6 +1514,155 @@ function updateStats() {{
   setTxt('hl',fmt(D.l[N-1])); setTxt('hc',fmt(D.c[N-1]));
 }}
 
+
+// ════════════════════════════════════════════════════════
+//  OUTILS DE DESSIN
+// ════════════════════════════════════════════════════════
+let DRAW_TOOL = 'cursor';
+let drawings  = [];
+let drawPending = null;  // dessin en cours (1er point posé)
+
+function setDrawTool(tool) {{
+  DRAW_TOOL = tool;
+  document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+  const btn = $('dBtn_'+tool);
+  if(btn) btn.classList.add('active');
+  cvMain.style.cursor = tool === 'cursor' ? 'crosshair' : tool === 'text' ? 'text' : 'crosshair';
+  drawPending = null;
+}}
+
+function clearDrawings() {{
+  drawings = []; drawPending = null; render();
+}}
+
+// Convertir pixel → prix/index
+function pxToPrice(y) {{
+  const H = cvMain.height;
+  const N = VIEW_END - VIEW_START;
+  const slice = arr => arr.slice(VIEW_START, VIEW_END);
+  const hi = Math.max(...slice(D.h));
+  const lo = Math.min(...slice(D.l));
+  const rng = (hi - lo) || 1;
+  return hi - ((y - PAD.t) / (H - PAD.t - PAD.b)) * rng;
+}}
+function pxToIdx(x) {{
+  const W = cvMain.width;
+  const N = VIEW_END - VIEW_START;
+  const CW = (W - PAD.l - PAD.r) / N;
+  return VIEW_START + Math.max(0, Math.min(N-1, Math.floor((x - PAD.l) / CW)));
+}}
+// Convertir prix/index → pixel
+function priceToY(price) {{
+  const H = cvMain.height;
+  const N = VIEW_END - VIEW_START;
+  const slice = arr => arr.slice(VIEW_START, VIEW_END);
+  const hi = Math.max(...slice(D.h));
+  const lo = Math.min(...slice(D.l));
+  const rng = (hi - lo) || 1;
+  return PAD.t + ((hi - price) / rng) * (H - PAD.t - PAD.b);
+}}
+function idxToX(idx) {{
+  const W = cvMain.width;
+  const N = VIEW_END - VIEW_START;
+  const CW = (W - PAD.l - PAD.r) / N;
+  return PAD.l + (idx - VIEW_START) * CW + CW / 2;
+}}
+
+// Dessiner tous les drawings sur le canvas principal
+function drawAllDrawings(ctx, W, H) {{
+  drawings.forEach(d => drawSingle(ctx, d, W, H));
+  if(drawPending) drawSingle(ctx, drawPending, W, H);
+}}
+
+function drawSingle(ctx, d, W, H) {{
+  ctx.save();
+  ctx.strokeStyle = d.color || '#FABE2C';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+
+  const x1 = idxToX(d.i1), y1 = priceToY(d.p1);
+  const x2 = d.i2 != null ? idxToX(d.i2) : x1;
+  const y2 = d.p2 != null ? priceToY(d.p2) : y1;
+
+  if(d.type === 'line') {{
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    // Petits cercles aux extrémités
+    ctx.fillStyle = d.color||'#FABE2C';
+    ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x2,y2,3,0,Math.PI*2); ctx.fill();
+
+  }} else if(d.type === 'hline') {{
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(0,y1); ctx.lineTo(W-PAD.r,y1); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=d.color||'#FABE2C'; ctx.font='8px Share Tech Mono,monospace';
+    ctx.textAlign='right'; ctx.fillText(fmt(d.p1), W-PAD.r-4, y1-3);
+
+  }} else if(d.type === 'vline') {{
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(x1,PAD.t); ctx.lineTo(x1,H-PAD.b); ctx.stroke();
+    ctx.setLineDash([]);
+
+  }} else if(d.type === 'ray') {{
+    // Étendre jusqu'au bord droit
+    const dx = x2 - x1, dy = y2 - y1;
+    const t = dx !== 0 ? (W - PAD.r - x1) / dx : 999;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1+dx*t, y1+dy*t); ctx.stroke();
+    ctx.fillStyle=d.color||'#FABE2C';
+    ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill();
+
+  }} else if(d.type === 'rect') {{
+    if(d.i2==null) {{ ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill(); }}
+    else {{
+      ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+      ctx.fillStyle = 'rgba(250,190,44,0.06)';
+      ctx.fillRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+    }}
+
+  }} else if(d.type === 'fibo') {{
+    if(d.i2==null) {{ ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill(); }}
+    else {{
+      const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+      const cols   = ['#888','#26a69a','#66bb6a','#FABE2C','#ff9800','#ef5350','#888'];
+      levels.forEach((lv, li) => {{
+        const p = d.p1 + (d.p2 - d.p1) * lv;
+        const y = priceToY(p);
+        ctx.strokeStyle = cols[li]; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(Math.min(x1,x2), y); ctx.lineTo(Math.max(x1,x2), y); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle=cols[li]; ctx.font='8px Share Tech Mono,monospace';
+        ctx.textAlign='left';
+        ctx.fillText((lv*100).toFixed(1)+'%  '+fmt(p), Math.min(x1,x2)+4, y-2);
+      }});
+    }}
+
+  }} else if(d.type === 'range') {{
+    if(d.i2==null) {{ ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill(); }}
+    else {{
+      const yTop=Math.min(y1,y2), yBot=Math.max(y1,y2);
+      const pTop=d.p1>d.p2?d.p1:d.p2, pBot=d.p1<d.p2?d.p1:d.p2;
+      const bull=pTop>pBot;
+      ctx.strokeStyle=bull?'rgba(38,166,154,0.9)':'rgba(239,83,80,0.9)';
+      ctx.fillStyle=bull?'rgba(38,166,154,0.08)':'rgba(239,83,80,0.08)';
+      ctx.fillRect(Math.min(x1,x2), yTop, Math.abs(x2-x1), yBot-yTop);
+      ctx.strokeRect(Math.min(x1,x2), yTop, Math.abs(x2-x1), yBot-yTop);
+      const pct=((pTop-pBot)/pBot*100).toFixed(2);
+      ctx.fillStyle=bull?'rgba(38,166,154,0.9)':'rgba(239,83,80,0.9)';
+      ctx.font='bold 10px Share Tech Mono,monospace'; ctx.textAlign='center';
+      ctx.fillText((bull?'▲ +':'▼ ')+pct+'%', (Math.min(x1,x2)+Math.max(x1,x2))/2, (yTop+yBot)/2+4);
+      ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='right';
+      ctx.fillText(fmt(pTop), Math.max(x1,x2)-4, yTop-3);
+      ctx.fillText(fmt(pBot), Math.max(x1,x2)-4, yBot+10);
+    }}
+
+  }} else if(d.type === 'text') {{
+    ctx.fillStyle=d.color||'#FABE2C';
+    ctx.font='bold 12px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText(d.label||'', x1+2, y1);
+  }}
+  ctx.restore();
+}}
+
 // ════════════════════════════════════════════════════════
 //  INTERACTIONS SOURIS
 // ════════════════════════════════════════════════════════
@@ -1516,15 +1704,52 @@ cvMain.addEventListener('mousemove', e => {{
     setTxt('ttC', fmt(D.c[ri])); setCol('ttC', bull2?'var(--bull)':'var(--bear)');
     setTxt('ttV', fmtV(D.v[ri]));
   }}
+  // Mise à jour dessin en cours
+  if(drawPending) {{
+    const rect2=cvMain.getBoundingClientRect();
+    drawPending.i2=pxToIdx(e.clientX-rect2.left);
+    drawPending.p2=pxToPrice(e.clientY-rect2.top);
+  }}
   drawMain();
 }});
 
 cvMain.addEventListener('mousedown', e => {{
+  if(DRAW_TOOL !== 'cursor') {{
+    const rect=cvMain.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const price=pxToPrice(my), idx=pxToIdx(mx);
+
+    if(DRAW_TOOL==='hline') {{
+      drawings.push({{type:'hline',i1:idx,p1:price,i2:null,p2:null}});
+      drawPending=null; render(); return;
+    }}
+    if(DRAW_TOOL==='vline') {{
+      drawings.push({{type:'vline',i1:idx,p1:price,i2:null,p2:null}});
+      drawPending=null; render(); return;
+    }}
+    if(DRAW_TOOL==='text') {{
+      const lbl=prompt('Texte :'); if(!lbl) return;
+      drawings.push({{type:'text',i1:idx,p1:price,i2:null,p2:null,label:lbl}});
+      drawPending=null; render(); return;
+    }}
+    // Outils 2 points : line, ray, fibo, rect, range
+    if(!drawPending) {{
+      drawPending={{type:DRAW_TOOL,i1:idx,p1:price,i2:idx,p2:price}};
+    }} else {{
+      drawPending.i2=idx; drawPending.p2=price;
+      drawings.push({{...drawPending}});
+      drawPending=null;
+      setDrawTool('cursor');
+      render();
+    }}
+    return;
+  }}
   isDragging=true; dragStartX=e.clientX; dragStartView=VIEW_START;
   cvMain.style.cursor='grabbing';
 }});
 window.addEventListener('mouseup', () => {{
-  isDragging=false; cvMain.style.cursor='crosshair';
+  isDragging=false;
+  if(DRAW_TOOL==='cursor') cvMain.style.cursor='crosshair';
 }});
 cvMain.addEventListener('mouseleave', () => {{
   HOVER_IDX=-1; HOVER_Y=-1;
@@ -1548,6 +1773,15 @@ cvMain.addEventListener('wheel', e => {{
   VIEW_START=s; VIEW_END=en;
   render();
 }},{{passive:false}});
+
+
+// Raccourcis clavier
+document.addEventListener('keydown', e => {{
+  if(e.key==='Escape') {{ drawPending=null; setDrawTool('cursor'); render(); }}
+  if((e.ctrlKey||e.metaKey) && e.key==='z') {{
+    drawings.pop(); drawPending=null; render();
+  }}
+}});
 
 // ════════════════════════════════════════════════════════
 //  TIMEFRAME & INDICATEURS
