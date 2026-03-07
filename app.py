@@ -1696,6 +1696,7 @@ if categorie == "MON ESPACE ANALYSE":
 
 if categorie == "MARCHÉ CRYPTO":
     outil = st.sidebar.radio("MODULES CRYPTO :", [
+        "GRAPHIQUE CRYPTO",
         "BITCOIN DOMINANCE",
         "CRYPTO WALLET",
         "HEATMAP LIQUIDATIONS",
@@ -1809,9 +1810,59 @@ components.html(marquee_html, height=60)
 # ════════════════════════════════════════════════════════════
 
 # ==========================================
+# OUTIL : GRAPHIQUE CRYPTO (AM.TERMINAL)
+# ==========================================
+if outil == "GRAPHIQUE CRYPTO":
+    from chart_module import render_chart
+    import time as _t
+
+    st.markdown("""
+    <div style='display:flex;align-items:center;gap:12px;margin-bottom:12px;'>
+        <span style='color:#ff6600;font-family:monospace;font-size:20px;font-weight:700;'>AM.TERMINAL</span>
+        <span style='color:#4d9fff;font-size:13px;font-family:monospace;'>GRAPHIQUE CRYPTO LIVE</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    CRYPTOS_DISPO = {
+        "BTC — Bitcoin":       ("BTCUSDT",  "BTC/USDT"),
+        "ETH — Ethereum":      ("ETHUSDT",  "ETH/USDT"),
+        "SOL — Solana":        ("SOLUSDT",  "SOL/USDT"),
+        "BNB — BNB":           ("BNBUSDT",  "BNB/USDT"),
+        "XRP — Ripple":        ("XRPUSDT",  "XRP/USDT"),
+        "ADA — Cardano":       ("ADAUSDT",  "ADA/USDT"),
+        "AVAX — Avalanche":    ("AVAXUSDT", "AVAX/USDT"),
+        "DOGE — Dogecoin":     ("DOGEUSDT", "DOGE/USDT"),
+        "LINK — Chainlink":    ("LINKUSDT", "LINK/USDT"),
+        "DOT — Polkadot":      ("DOTUSDT",  "DOT/USDT"),
+    }
+
+    col_s1, col_s2 = st.columns([3, 1])
+    with col_s1:
+        choix = st.selectbox("PAIRE", list(CRYPTOS_DISPO.keys()),
+                             key="chart_crypto_pair", label_visibility="collapsed")
+    with col_s2:
+        tf_choix = st.selectbox("TIMEFRAME", ["1h", "4h", "1d", "1w"],
+                                index=1, key="chart_crypto_tf", label_visibility="collapsed")
+
+    symbol, pair_label = CRYPTOS_DISPO[choix]
+
+    _html = render_chart(
+        symbol=symbol,
+        interval=tf_choix,
+        limit=200,
+        height=660,
+        pair_label=pair_label,
+        exchange="Binance · Spot",
+        show_ma=True,
+        show_bb=False,
+    ) + f"<!-- {symbol}:{tf_choix}:{int(_t.time()*1000)} -->"
+
+    components.html(_html, height=670, scrolling=False)
+
+# ==========================================
 # OUTIL : BITCOIN DOMINANCE (BTC.D)
 # ==========================================
-if outil == "BITCOIN DOMINANCE":
+elif outil == "BITCOIN DOMINANCE":
     st.title("📊 BITCOIN DOMINANCE (BTC.D)")
     st.write("Analyse de la part de marché du Bitcoin par rapport au reste du marché crypto.")
 
