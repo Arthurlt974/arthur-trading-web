@@ -1394,8 +1394,14 @@ def afficher_horloge_temps_reel():
     """
     components.html(horloge_html, height=120)
 
-def afficher_graphique_pro(symbol, height=600):
-    """Graphique Plotly candlestick via yfinance — fonctionne sur Streamlit Cloud sans dépendance externe."""
+# Suffixes boursiers européens — TradingView ne les supporte pas bien
+_EU_SUFFIXES = (".PA", ".AS", ".DE", ".MI", ".MA", ".BR", ".LS", ".ST", ".HE", ".OL", ".CO")
+
+def _is_european(symbol: str) -> bool:
+    return any(symbol.upper().endswith(s) for s in _EU_SUFFIXES)
+
+def _plotly_candle_pro(symbol, height=600):
+    """Graphique Plotly avec indicateurs — pour actions européennes."""
     try:
         from plotly.subplots import make_subplots
         df = yf.download(symbol, period="6mo", progress=False, auto_adjust=True)
@@ -1404,13 +1410,11 @@ def afficher_graphique_pro(symbol, height=600):
             return
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        # Indicateurs
         df["SMA20"] = df["Close"].rolling(20).mean()
         df["SMA50"] = df["Close"].rolling(50).mean()
-        df["BB_mid"] = df["SMA20"]
         df["BB_std"] = df["Close"].rolling(20).std()
-        df["BB_up"]  = df["BB_mid"] + 2 * df["BB_std"]
-        df["BB_dn"]  = df["BB_mid"] - 2 * df["BB_std"]
+        df["BB_up"]  = df["SMA20"] + 2 * df["BB_std"]
+        df["BB_dn"]  = df["SMA20"] - 2 * df["BB_std"]
         df["VolMA"]  = df["Volume"].rolling(20).mean()
 
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
@@ -1433,18 +1437,15 @@ def afficher_graphique_pro(symbol, height=600):
         if df["SMA50"].notna().any():
             fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"],
                 line=dict(color="#2196f3", width=1.5), name="SMA 50"), row=1, col=1)
-        # Volume
         colors_vol = ["#26a69a" if c >= o else "#ef5350"
                       for c, o in zip(df["Close"], df["Open"])]
         fig.add_trace(go.Bar(x=df.index, y=df["Volume"],
             marker_color=colors_vol, name="Volume", opacity=0.6), row=2, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df["VolMA"],
-            line=dict(color="rgba(255,152,0,0.7)", width=1.5),
-            name="Vol MA20"), row=2, col=1)
+            line=dict(color="rgba(255,152,0,0.7)", width=1.5), name="Vol MA20"), row=2, col=1)
         fig.update_layout(
-            template="plotly_dark", paper_bgcolor="#0e1117",
-            plot_bgcolor="#0e1117", height=height,
-            xaxis_rangeslider_visible=False,
+            template="plotly_dark", paper_bgcolor="#0e1117", plot_bgcolor="#0e1117",
+            height=height, xaxis_rangeslider_visible=False,
             font=dict(color="#d1d4dc", family="IBM Plex Mono"),
             legend=dict(bgcolor="rgba(0,0,0,0.5)", bordercolor="#2a2e39"),
             margin=dict(l=10, r=10, t=30, b=10),
@@ -1452,37 +1453,100 @@ def afficher_graphique_pro(symbol, height=600):
         fig.update_xaxes(gridcolor="#1e222d", showgrid=True)
         fig.update_yaxes(gridcolor="#1e222d", showgrid=True)
         st.plotly_chart(fig, use_container_width=True)
+        st.caption("📊 Graphique Plotly (action européenne — TradingView non supporté pour ce marché)")
     except Exception as e:
         st.error(f"Erreur graphique : {e}")
 
+def afficher_graphique_pro(symbol, height=600):
+    """TradingView pour actions US/crypto, Plotly pour actions européennes."""
+    if _is_european(symbol):
+        _plotly_candle_pro(symbol, height)
+        return
+    # Construire le symbole TradingView
+    traduction_symbols = {
+        "^FCHI": "INDEX:CAC40",
+        "^GSPC": "VANTAGE:SP500",
+        "^IXIC": "NASDAQ:IXIC",
+        "BTC-USD": "BINANCE:BTCUSDT",
+        "ETH-USD": "BINANCE:ETHUSDT",
+    }
+    tv_symbol = traduction_symbols.get(symbol, symbol.replace("-USD", "USDT"))
+    tradingview_html = f"""
+        <div id="tv_pro_{symbol.replace('.','_').replace('^','')}" style="height:{height}px;"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script type="text/javascript">
+        new TradingView.widget({{
+          "autosize": true,
+          "symbol": "{tv_symbol}",
+          "interval": "D",
+          "timezone": "Europe/Paris",
+          "theme": "dark",
+          "style": "1",
+          "locale": "fr",
+          "toolbar_bg": "#000000",
+          "enable_publishing": false,
+          "hide_side_toolbar": false,
+          "allow_symbol_change": true,
+          "details": true,
+          "container_id": "tv_pro_{symbol.replace('.','_').replace('^','')}"
+        }});
+        </script>
+    """
+    components.html(tradingview_html, height=height + 10)
+
 def afficher_mini_graphique(symbol, chart_id):
-    """Mini graphique candlestick Plotly — remplace TradingView widget."""
-    try:
-        df = yf.download(symbol, period="3mo", progress=False, auto_adjust=True)
-        if df.empty:
-            st.warning(f"Pas de données pour {symbol}")
-            return
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        fig = go.Figure(go.Candlestick(
-            x=df.index, open=df["Open"], high=df["High"],
-            low=df["Low"], close=df["Close"], name=symbol,
-            increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
-            increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"
-        ))
-        fig.update_layout(
-            template="plotly_dark", paper_bgcolor="#0e1117",
-            plot_bgcolor="#0e1117", height=400,
-            xaxis_rangeslider_visible=False,
-            font=dict(color="#d1d4dc", family="IBM Plex Mono"),
-            margin=dict(l=5, r=5, t=25, b=5),
-            title=dict(text=symbol, font=dict(size=13, color="#ff9800")),
-        )
-        fig.update_xaxes(gridcolor="#1e222d")
-        fig.update_yaxes(gridcolor="#1e222d")
-        st.plotly_chart(fig, use_container_width=True, key=f"mini_{chart_id}")
-    except Exception as e:
-        st.error(f"Erreur graphique {symbol}: {e}")
+    """TradingView pour actions US/crypto, Plotly pour actions européennes."""
+    if _is_european(symbol):
+        # Plotly mini pour EU
+        try:
+            df = yf.download(symbol, period="3mo", progress=False, auto_adjust=True)
+            if df.empty:
+                st.warning(f"Pas de données pour {symbol}")
+                return
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            fig = go.Figure(go.Candlestick(
+                x=df.index, open=df["Open"], high=df["High"],
+                low=df["Low"], close=df["Close"], name=symbol,
+                increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+                increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"
+            ))
+            fig.update_layout(
+                template="plotly_dark", paper_bgcolor="#0e1117",
+                plot_bgcolor="#0e1117", height=400,
+                xaxis_rangeslider_visible=False,
+                font=dict(color="#d1d4dc", family="IBM Plex Mono"),
+                margin=dict(l=5, r=5, t=25, b=5),
+                title=dict(text=symbol, font=dict(size=13, color="#ff9800")),
+            )
+            fig.update_xaxes(gridcolor="#1e222d")
+            fig.update_yaxes(gridcolor="#1e222d")
+            st.plotly_chart(fig, use_container_width=True, key=f"mini_{chart_id}")
+        except Exception as e:
+            st.error(f"Erreur graphique {symbol}: {e}")
+        return
+    # TradingView pour tout le reste
+    traduction_symbols = {"^FCHI": "INDEX:CAC40", "^GSPC": "VANTAGE:SP500",
+                          "^IXIC": "NASDAQ:IXIC", "BTC-USD": "BINANCE:BTCUSDT"}
+    tv_symbol = traduction_symbols.get(symbol, symbol.replace("-USD", "USDT"))
+    cid = f"tv_mini_{chart_id}_{symbol.replace('.','_').replace('^','')}"
+    tradingview_html = f"""
+        <div id="{cid}" style="height:400px;"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script type="text/javascript">
+        new TradingView.widget({{
+          "autosize": true,
+          "symbol": "{tv_symbol}",
+          "interval": "D",
+          "timezone": "Europe/Paris",
+          "theme": "dark",
+          "style": "1",
+          "locale": "fr",
+          "container_id": "{cid}"
+        }});
+        </script>
+    """
+    components.html(tradingview_html, height=410)
 
 
 # ============================================================
@@ -1757,44 +1821,27 @@ if outil == "BITCOIN DOMINANCE":
 
     st.markdown("---")
 
-    # Bitcoin Dominance via yfinance (BTC.D approximé : BTC market cap / total crypto index)
-    try:
-        df_btc = yf.download("BTC-USD", period="1y", progress=False, auto_adjust=True)
-        if isinstance(df_btc.columns, pd.MultiIndex):
-            df_btc.columns = df_btc.columns.get_level_values(0)
-        if not df_btc.empty:
-            # Approximation BTC.D via corrélation historique + normalisation
-            df_btc["SMA20"] = df_btc["Close"].rolling(20).mean()
-            df_btc["SMA50"] = df_btc["Close"].rolling(50).mean()
-            fig_dom = go.Figure()
-            fig_dom.add_trace(go.Scatter(
-                x=df_btc.index, y=df_btc["Close"],
-                name="BTC/USD", line=dict(color="#f7931a", width=2), fill="tozeroy",
-                fillcolor="rgba(247,147,26,0.08)"
-            ))
-            fig_dom.add_trace(go.Scatter(
-                x=df_btc.index, y=df_btc["SMA20"],
-                name="SMA 20", line=dict(color="#00ccff", width=1.5, dash="dash")
-            ))
-            fig_dom.add_trace(go.Scatter(
-                x=df_btc.index, y=df_btc["SMA50"],
-                name="SMA 50", line=dict(color="#ff9800", width=1.5, dash="dash")
-            ))
-            fig_dom.update_layout(
-                template="plotly_dark", paper_bgcolor="#0e1117",
-                plot_bgcolor="#0e1117", height=600, title="BTC/USD — 1 An",
-                font=dict(color="#d1d4dc", family="IBM Plex Mono"),
-                legend=dict(bgcolor="rgba(0,0,0,0.5)"),
-                margin=dict(l=10, r=10, t=40, b=10),
-                xaxis=dict(gridcolor="#1e222d"),
-                yaxis=dict(gridcolor="#1e222d", title="Prix USD"),
-            )
-            st.plotly_chart(fig_dom, use_container_width=True)
-            st.caption("📊 Graphique BTC/USD via yfinance. Pour BTC.D exact, consultez TradingView CRYPTOCAP:BTC.D")
-        else:
-            st.warning("Données BTC non disponibles.")
-    except Exception as e:
-        st.error(f"Erreur graphique BTC : {e}")
+    tv_html_dom = """
+        <div id="tv_chart_dom" style="height:600px;"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script>
+        new TradingView.widget({
+          "autosize": true,
+          "symbol": "CRYPTOCAP:BTC.D",
+          "interval": "D",
+          "timezone": "Europe/Paris",
+          "theme": "dark",
+          "style": "1",
+          "locale": "fr",
+          "toolbar_bg": "#f1f3f6",
+          "enable_publishing": false,
+          "hide_top_toolbar": false,
+          "save_image": false,
+          "container_id": "tv_chart_dom"
+        });
+        </script>
+    """
+    components.html(tv_html_dom, height=610)
 
 # ==========================================
 # OUTIL : CRYPTO WALLET TRACKER
