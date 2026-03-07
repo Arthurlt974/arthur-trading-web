@@ -45,7 +45,7 @@ def _get(url, params=None, retries=2, timeout=10):
 
 PLOTLY_BASE = dict(
     template="plotly_dark", paper_bgcolor="#000000", plot_bgcolor="#0a0a0a",
-    font=dict(color="#cccccc", family="Courier New"),
+    font=dict(color="#4d9fff", family="Courier New"),
     legend=dict(bgcolor="rgba(0,0,0,0.7)", bordercolor="#333", borderwidth=1),
     margin=dict(l=50, r=20, t=50, b=40),
 )
@@ -53,7 +53,7 @@ PLOTLY_BASE = dict(
 # Version sans xaxis/yaxis — obligatoire pour go.Pie et go.Treemap
 PLOTLY_PIE = dict(
     template="plotly_dark", paper_bgcolor="#000000",
-    font=dict(color="#cccccc", family="Courier New"),
+    font=dict(color="#4d9fff", family="Courier New"),
     legend=dict(bgcolor="rgba(0,0,0,0.7)", bordercolor="#333", borderwidth=1),
     margin=dict(l=20, r=20, t=50, b=20),
 )
@@ -65,7 +65,7 @@ def _card(titre, valeur, sous_titre="", couleur="#ff9800"):
     st.markdown(f"""
         <div style="background:#0d0d0d;border:1px solid {couleur};border-left:4px solid {couleur};
              border-radius:6px;padding:14px;margin-bottom:10px;">
-            <div style="color:#888;font-size:11px;font-family:monospace;">{titre}</div>
+            <div style="color:#4d9fff;font-size:11px;font-family:monospace;">{titre}</div>
             <div style="color:white;font-size:22px;font-weight:bold;margin:4px 0;">{valeur}</div>
             <div style="color:{couleur};font-size:12px;font-family:monospace;">{sous_titre}</div>
         </div>
@@ -586,7 +586,7 @@ def show_liquidations():
                     customdata=df_chart["Annualisé"],
                     hovertemplate="<b>%{x}</b><br>8h: %{y:.4f}%<br>Annualisé: %{customdata:.1f}%<extra></extra>"
                 ))
-                fig.add_hline(y=0, line_color="#888", line_width=1)
+                fig.add_hline(y=0, line_color="#4d9fff", line_width=1)
                 fig.update_layout(**PLOTLY_BASE, height=450,
                                   title=dict(text=f"Funding Rate par Paire — {fr_source}",
                                              font=dict(color="#ff9800", size=15)),
@@ -605,7 +605,7 @@ def show_liquidations():
                                 <b style='color:#ff4b4b;'>{row['Paire']}</b>
                                 <span style='float:right;'>
                                     <span style='color:#ff4b4b;'>{row['Funding Rate']:+.4f}%</span>
-                                    <span style='color:#666;font-size:10px;'> ({annualise:+.1f}%/an)</span>
+                                    <span style='color:#4d9fff;font-size:10px;'> ({annualise:+.1f}%/an)</span>
                                 </span>
                             </div>
                         """, unsafe_allow_html=True)
@@ -619,7 +619,7 @@ def show_liquidations():
                                 <b style='color:#00ff88;'>{row['Paire']}</b>
                                 <span style='float:right;'>
                                     <span style='color:#00ff88;'>{row['Funding Rate']:+.4f}%</span>
-                                    <span style='color:#666;font-size:10px;'> ({annualise:+.1f}%/an)</span>
+                                    <span style='color:#4d9fff;font-size:10px;'> ({annualise:+.1f}%/an)</span>
                                 </span>
                             </div>
                         """, unsafe_allow_html=True)
@@ -631,17 +631,17 @@ def show_liquidations():
                 with c1:
                     st.markdown("""<div style='background:#0d0d0d;border:1px solid #ff4b4b;border-radius:8px;padding:12px;'>
                     <b style='color:#ff4b4b;'>> +0.05% (8h)</b><br>
-                    <span style='color:#ccc;font-size:12px;'>Marché très haussier<br>Attention retournement</span>
+                    <span style='color:#4d9fff;font-size:12px;'>Marché très haussier<br>Attention retournement</span>
                     </div>""", unsafe_allow_html=True)
                 with c2:
                     st.markdown("""<div style='background:#0d0d0d;border:1px solid #ff9800;border-radius:8px;padding:12px;'>
                     <b style='color:#ff9800;'>0% à +0.05% (8h)</b><br>
-                    <span style='color:#ccc;font-size:12px;'>Zone neutre à haussière<br>Situation normale</span>
+                    <span style='color:#4d9fff;font-size:12px;'>Zone neutre à haussière<br>Situation normale</span>
                     </div>""", unsafe_allow_html=True)
                 with c3:
                     st.markdown("""<div style='background:#0d0d0d;border:1px solid #00ff88;border-radius:8px;padding:12px;'>
                     <b style='color:#00ff88;'>< 0% (8h)</b><br>
-                    <span style='color:#ccc;font-size:12px;'>Marché baissier/neutre<br>Opportunité long ?</span>
+                    <span style='color:#4d9fff;font-size:12px;'>Marché baissier/neutre<br>Opportunité long ?</span>
                     </div>""", unsafe_allow_html=True)
 
     # ── OPEN INTEREST ──
@@ -758,9 +758,9 @@ def show_staking():
                             <b style='color:#00ff88;font-size:22px;'>{info["apy"]}%<span style='font-size:12px;color:#888;'>/an</span></b>
                         </div>
                         <div style='margin-top:8px;display:flex;gap:20px;font-size:12px;font-family:monospace;'>
-                            <span style='color:#888;'>Min: <b style='color:#ccc;'>{info["min"]}</b></span>
-                            <span style='color:#888;'>Lock: <b style='color:#ccc;'>{info["lockup"]}</b></span>
-                            <span style='color:#888;'>Risque: <b style='color:{risque_color};'>{info["risque"]}</b></span>
+                            <span style='color:#4d9fff;'>Min: <b style='color:#4d9fff;'>{info["min"]}</b></span>
+                            <span style='color:#4d9fff;'>Lock: <b style='color:#4d9fff;'>{info["lockup"]}</b></span>
+                            <span style='color:#4d9fff;'>Risque: <b style='color:{risque_color};'>{info["risque"]}</b></span>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
@@ -847,7 +847,7 @@ def show_staking():
         invested = [capital_float + apport_float * m for m in range(mois_total+1)]
         fig_sim.add_trace(go.Scatter(
             x=list(range(mois_total+1)), y=invested,
-            name="Capital investi", line=dict(color="#888", width=1.5, dash="dot")
+            name="Capital investi", line=dict(color="#4d9fff", width=1.5, dash="dot")
         ))
         fig_sim.update_layout(**PLOTLY_BASE, height=400, hovermode="x unified",
                               title=dict(text=f"Projection sur {duree_ans} an(s) à {apy_input}% APY",
@@ -2515,7 +2515,7 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                                 <h1 style='color:{sentiment_color};margin:0;'>{sentiment}</h1>
                                 <p style='color:white;font-size:20px;margin:10px 0;'>
                                     Score Technique : {score_display:+d} / {SCORE_MAX}</p>
-                                <p style='color:#ccc;font-size:14px;margin:5px 0;'>
+                                <p style='color:#4d9fff;font-size:14px;margin:5px 0;'>
                                     Analyse basée sur 5 indicateurs (RSI Wilder, MACD, Bollinger, MA50, Volume)</p>
                             </div>
                         """, unsafe_allow_html=True)
@@ -2565,7 +2565,7 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                         fig.update_layout(template="plotly_dark", paper_bgcolor='#000000',
                                           plot_bgcolor='#050505', height=900,
                                           showlegend=True, xaxis_rangeslider_visible=False,
-                                          font=dict(color='#cccccc', family='Courier New'))
+                                          font=dict(color='#4d9fff', family='Courier New'))
                         st.plotly_chart(fig, use_container_width=True)
 
                         st.markdown("---")
@@ -2580,7 +2580,7 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                                     <div style='padding:15px;background:{c}18;border:2px solid {c};
                                                 border-radius:10px;margin:10px 0;min-height:90px;'>
                                         <h4 style='color:{c};margin:0 0 8px 0;'>{indicator}</h4>
-                                        <p style='color:#ccc;font-size:13px;margin:0;'>{message}</p>
+                                        <p style='color:#4d9fff;font-size:13px;margin:0;'>{message}</p>
                                     </div>
                                 """, unsafe_allow_html=True)
 
@@ -3613,11 +3613,11 @@ elif outil == "THE GRAND COUNCIL️":
 
                     col_res1, col_res2, col_res3 = st.columns([2, 1, 1])
                     with col_res1:
-                        st.markdown(f"<div style='text-align:center; padding:25px; border:3px solid {color_f}; border-radius:15px; background: linear-gradient(135deg, #0a0a0a 0%, #000000 100%);'><h1 style='color:{color_f}; margin:0; font-size: 48px;'>{final_score_20} / 20</h1><h3 style='color:white; margin: 10px 0;'>{verdict}</h3><small style='color:#999;'>{verdict_desc}</small></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align:center; padding:25px; border:3px solid {color_f}; border-radius:15px; background: linear-gradient(135deg, #0a0a0a 0%, #000000 100%);'><h1 style='color:{color_f}; margin:0; font-size: 48px;'>{final_score_20} / 20</h1><h3 style='color:white; margin: 10px 0;'>{verdict}</h3><small style='color:#4d9fff;'>{verdict_desc}</small></div>", unsafe_allow_html=True)
                     with col_res2:
-                        st.markdown(f"<div style='text-align:center; padding:20px; border:2px solid #00ff00; border-radius:10px; background:#0a0a0a;'><h2 style='color:#00ff00; margin:0; font-size: 32px;'>{consensus_bullish}</h2><small style='color:#ccc;'>EXPERTS POSITIFS</small></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align:center; padding:20px; border:2px solid #00ff00; border-radius:10px; background:#0a0a0a;'><h2 style='color:#00ff00; margin:0; font-size: 32px;'>{consensus_bullish}</h2><small style='color:#4d9fff;'>EXPERTS POSITIFS</small></div>", unsafe_allow_html=True)
                     with col_res3:
-                        st.markdown(f"<div style='text-align:center; padding:20px; border:2px solid #ff0000; border-radius:10px; background:#0a0a0a;'><h2 style='color:#ff0000; margin:0; font-size: 32px;'>{consensus_bearish}</h2><small style='color:#ccc;'>EXPERTS NÉGATIFS</small></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='text-align:center; padding:20px; border:2px solid #ff0000; border-radius:10px; background:#0a0a0a;'><h2 style='color:#ff0000; margin:0; font-size: 32px;'>{consensus_bearish}</h2><small style='color:#4d9fff;'>EXPERTS NÉGATIFS</small></div>", unsafe_allow_html=True)
 
                     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -3671,7 +3671,7 @@ elif outil == "THE GRAND COUNCIL️":
                                     <span style="color:{color}; font-size:20px;">{stars}</span>
                                 </div>
                                 <b style="color:{color}; font-size: 16px;">{row['Expert']}</b><br>
-                                <small style="color:#888; font-size: 11px;">{row['Style']}</small><br>
+                                <small style="color:#4d9fff; font-size: 11px;">{row['Style']}</small><br>
                                 <div style="margin-top: 12px; padding: 10px; background: #050505; border-radius: 6px; border-left: 3px solid {color};">
                                     <p style="color:#bbb; font-size:12px; margin:0;"><i>"{row['Avis']}"</i></p>
                                 </div>
