@@ -160,6 +160,7 @@ html,body{{
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
 
 /* ── CHART ZONE ── */
+.chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
 #cvMain{{display:block;cursor:crosshair;}}
 .vol-sep{{height:1px;background:var(--border);flex-shrink:0;}}
 #cvVol{{display:block;background:var(--bg);flex-shrink:0;}}
@@ -353,10 +354,11 @@ html,body{{
 
 /* ── DRAWING TOOLBAR ── */
 .draw-toolbar{{
-  width:36px;flex-shrink:0;background:var(--surface);
+  position:absolute;left:0;top:0;bottom:0;
+  width:36px;background:var(--surface);
   border-right:1px solid var(--border2);
   display:flex;flex-direction:column;align-items:center;
-  padding:6px 0;gap:2px;z-index:10;overflow:hidden;
+  padding:6px 0;gap:2px;z-index:100;
 }}
 .draw-btn{{
   width:28px;height:28px;border:1px solid transparent;
@@ -464,27 +466,26 @@ html,body{{
 <!-- MAIN = CHART + QUANT PANEL -->
 <div class="main" id="mainArea">
 
-<!-- DRAWING TOOLBAR LATERAL -->
-<div class="draw-toolbar" id="drawToolbar">
-  <button class="draw-btn active" id="dBtn_cursor" onclick="setDrawTool('cursor')" title="Curseur">&#9654;</button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dBtn_line"   onclick="setDrawTool('line')"   title="Ligne de tendance">&#9135;</button>
-  <button class="draw-btn" id="dBtn_hline"  onclick="setDrawTool('hline')"  title="Ligne horizontale">&#8212;</button>
-  <button class="draw-btn" id="dBtn_vline"  onclick="setDrawTool('vline')"  title="Ligne verticale">&#124;</button>
-  <button class="draw-btn" id="dBtn_ray"    onclick="setDrawTool('ray')"    title="Rayon">&#8599;</button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dBtn_fibo"   onclick="setDrawTool('fibo')"   title="Fibonacci">&#966;</button>
-  <button class="draw-btn" id="dBtn_rect"   onclick="setDrawTool('rect')"   title="Rectangle">&#9645;</button>
-  <button class="draw-btn" id="dBtn_range"  onclick="setDrawTool('range')"  title="Intervalle de prix">&#8597;</button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dBtn_text"   onclick="setDrawTool('text')"   title="Texte">T</button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dBtn_clear"  onclick="clearDrawings()"       title="Effacer" style="color:#ff4444;font-size:11px">&#10006;</button>
-</div>
-
 <!-- ZONE CHART -->
-<div class="chart-zone">
-  <canvas id="cvMain"></canvas>
+<div class="chart-zone" style="position:relative">
+  <!-- DRAWING TOOLBAR -->
+  <div class="draw-toolbar" id="drawToolbar">
+    <button class="draw-btn active" id="dBtn_cursor" onclick="setDrawTool('cursor')" title="Curseur">&#9654;</button>
+    <div class="draw-sep"></div>
+    <button class="draw-btn" id="dBtn_line"   onclick="setDrawTool('line')"   title="Ligne de tendance">&#9135;</button>
+    <button class="draw-btn" id="dBtn_hline"  onclick="setDrawTool('hline')"  title="Ligne horizontale">&#8212;</button>
+    <button class="draw-btn" id="dBtn_vline"  onclick="setDrawTool('vline')"  title="Ligne verticale">&#124;</button>
+    <button class="draw-btn" id="dBtn_ray"    onclick="setDrawTool('ray')"    title="Rayon">&#8599;</button>
+    <div class="draw-sep"></div>
+    <button class="draw-btn" id="dBtn_fibo"   onclick="setDrawTool('fibo')"   title="Retracement Fibonacci">&#966;</button>
+    <button class="draw-btn" id="dBtn_rect"   onclick="setDrawTool('rect')"   title="Rectangle">&#9645;</button>
+    <button class="draw-btn" id="dBtn_range"  onclick="setDrawTool('range')"  title="Intervalle de prix">&#8597;</button>
+    <div class="draw-sep"></div>
+    <button class="draw-btn" id="dBtn_text"   onclick="setDrawTool('text')"   title="Texte">T</button>
+    <div class="draw-sep"></div>
+    <button class="draw-btn" id="dBtn_clear"  onclick="clearDrawings()"       title="Tout effacer" style="color:#ff4444;font-size:11px">&#10006;</button>
+  </div>
+  <canvas id="cvMain" style="margin-left:36px"></canvas>
   <div class="vol-sep"></div>
   <canvas id="cvVol"></canvas>
   <div class="vol-sep" id="rsiSep" style="display:none"></div>
@@ -770,7 +771,7 @@ const fmtDate = ts => {{
 
 function setupCanvas() {{
   const panelW = (CHART_MODE === 'quant' && quantPanelOpen) ? 320 : 0;
-  const W  = (window.innerWidth  || 900) - panelW - 36;
+  const W  = (window.innerWidth  || 900) - panelW;
   const fullH = window.innerHeight || 600;
   const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
   const volH  = showVol  ? VPAH   : 0;
@@ -1220,7 +1221,7 @@ function promptText(x1, p1, barIdx) {{
 // ── Helpers coordonnées souris ──
 function getChartCoords(e) {{
   const rect = cvMain.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
+  const mx = e.clientX - rect.left - 36; // -36 pour la toolbar
   const my = e.clientY - rect.top;
   const W  = cvMain.width;
   const H  = cvMain.height;
@@ -1593,7 +1594,7 @@ function drawMain() {{
     const y=PAD.t+s*(H-PAD.t-PAD.b)/gridSteps;
     const price=hi-s*rng/gridSteps;
     ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD.l+36,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     ctx.strokeStyle='rgba(255,255,255,0.15)';
     ctx.beginPath(); ctx.moveTo(W-PAD.r,y); ctx.lineTo(W-PAD.r+4,y); ctx.stroke();
     const mid=(hi+lo)/2;
