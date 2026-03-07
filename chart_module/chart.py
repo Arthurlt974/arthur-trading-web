@@ -96,6 +96,8 @@ def render_chart(
     cls_ma  = "indicator-btn on" if show_ma     else "indicator-btn"
     cls_vol = "indicator-btn on" if show_volume else "indicator-btn"
     cls_bb  = "indicator-btn on" if show_bb     else "indicator-btn"
+    cls_gc  = "indicator-btn"
+    cls_ob  = "indicator-btn"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -385,6 +387,8 @@ html,body{{
   <button class="{cls_ma}" id="btnMA" onclick="toggleMA()">MA</button>
   <button class="{cls_vol}" id="btnVol" onclick="toggleVol()">Vol</button>
   <button class="{cls_bb}" id="btnBB" onclick="toggleBB()">BB</button>
+  <button class="{cls_gc}" id="btnGC" onclick="toggleGC()" title="Gaussian Channel">GC</button>
+  <button class="{cls_ob}" id="btnOB" onclick="toggleOB()" title="Order Blocks">OB</button>
 
   <!-- QUANT TOOLS TOGGLE (visible only in quant mode) -->
   <button class="qp-toggle-btn" id="qpToggleBtn" onclick="toggleQuantPanel()">⚙ QUANT TOOLS ▶</button>
@@ -643,6 +647,8 @@ const VPAH = 80;   // hauteur volume
 let showMA  = {ma_init_js};
 let showVol = {vol_init_js};
 let showBB  = {bb_init_js};
+let showGC  = false;   // Gaussian Channel
+let showOB  = false;   // Order Blocks
 
 let VIEW_START = 0, VIEW_END = 0;
 let HOVER_IDX  = -1, HOVER_Y = -1;
@@ -750,6 +756,261 @@ function calcBB(data, period=20, mult=2) {{
   return {{ma,upper,lower}};
 }}
 
+
+// ════════════════════════════════════════════════════════
+//  GAUSSIAN CHANNEL [DW] — traduit de Pine Script v4
+// ════════════════════════════════════════════════════════
+function calcGaussianChannel(closes, highs, lows, N=4, per=144, mult=1.414) {
+  const n = closes.length;
+  if(n < per) return null;
+
+  // Beta & alpha
+  const beta  = (1 - Math.cos(4*Math.asin(1)/per)) / (Math.pow(1.414, 2/N) - 1);
+  const alpha = -beta + Math.sqrt(beta*beta + 2*beta);
+  const x     = 1 - alpha;
+  const lag   = Math.floor((per - 1) / (2 * N));
+
+  // Calcul filtre gaussien (N poles) sur hlc3
+  const src  = closes.map((c,i) => (highs[i] + lows[i] + c) / 3);
+  const trs  = closes.map((c,i) => {
+    const prev = i > 0 ? closes[i-1] : c;
+    return Math.max(highs[i] - lows[i], Math.abs(highs[i] - prev), Math.abs(lows[i] - prev));
+  });
+
+  function applyFilter(data, a) {
+    const f = new Array(data.length).fill(0);
+    const xv = 1 - a;
+    for(let i = 0; i < data.length; i++) {
+      let val = Math.pow(a, N) * (data[i] || 0);
+      if(i >= 1) val += N * xv * f[i-1];
+      if(N >= 2 && i >= 2) val -= (N*(N-1)/2) * xv*xv * f[i-2];
+      if(N >= 3 && i >= 3) val += (N*(N-1)*(N-2)/6) * Math.pow(xv,3) * f[i-3];
+      if(N >= 4 && i >= 4) val -= (N*(N-1)*(N-2)*(N-3)/24) * Math.pow(xv,4) * f[i-4];
+      f[i] = val;
+    }
+    return f;
+  }
+
+  const filt   = applyFilter(src, alpha);
+  const filttr = applyFilter(trs, alpha);
+
+  const upper = filt.map((v,i) => v + filttr[i] * mult);
+  const lower = filt.map((v,i) => v - filttr[i] * mult);
+
+  return { filt, upper, lower };
+}
+
+// ════════════════════════════════════════════════════════
+//  ORDER BLOCKS [LuxAlgo / Flux] — traduit de Pine Script
+// ════════════════════════════════════════════════════════
+function calcOrderBlocks(opens, highs, lows, closes, volumes, swingLen=10, maxOBs=3) {
+  const n = closes.length;
+  if(n < swingLen * 2 + 5) return { bull: [], bear: [] };
+
+  // ATR (10)
+  function calcATR(period=10) {
+    const atrs = [];
+    for(let i=0; i<n; i++) {
+      if(i < period) { atrs.push(null); continue; }
+      let sum = 0;
+      for(let j=i-period+1; j<=i; j++) {
+        const prev = closes[j-1] || closes[j];
+        sum += Math.max(highs[j]-lows[j], Math.abs(highs[j]-prev), Math.abs(lows[j]-prev));
+      }
+      atrs.push(sum/period);
+    }
+    return atrs;
+  }
+  const atr = calcATR(10);
+
+  // Swing detection
+  const swingType = new Array(n).fill(0);
+  for(let i=swingLen; i<n; i++) {
+    const upper = Math.max(...highs.slice(i-swingLen, i));
+    const lower = Math.min(...lows.slice(i-swingLen, i));
+    if(highs[i-swingLen] > upper) swingType[i] = 0;
+    else if(lows[i-swingLen] < lower) swingType[i] = 1;
+    else swingType[i] = swingType[i-1] || 0;
+  }
+
+  const bullOBs = [];
+  const bearOBs = [];
+
+  // Pivot volume highs
+  for(let i=swingLen; i<n-swingLen; i++) {
+    const vol = volumes[i];
+    let isVolPivot = true;
+    for(let j=i-swingLen; j<=i+swingLen; j++) {
+      if(j!==i && volumes[j] > vol) { isVolPivot=false; break; }
+    }
+    if(!isVolPivot) continue;
+
+    const st = swingType[i];
+
+    // Bullish OB : pivot volume en downtrend (os==1)
+    if(st === 1 && bullOBs.length < maxOBs) {
+      const top = (highs[i] + lows[i]) / 2;
+      const btm = lows[i];
+      const atv = atr[i] || (highs[i]-lows[i]);
+      if(Math.abs(top-btm) <= atv * 3.5) {
+        bullOBs.unshift({ top, btm, idx: i, mitigated: false });
+        if(bullOBs.length > maxOBs) bullOBs.pop();
+      }
+    }
+    // Bearish OB : pivot volume en uptrend (os==0)
+    if(st === 0 && bearOBs.length < maxOBs) {
+      const top = highs[i];
+      const btm = (highs[i] + lows[i]) / 2;
+      const atv = atr[i] || (highs[i]-lows[i]);
+      if(Math.abs(top-btm) <= atv * 3.5) {
+        bearOBs.unshift({ top, btm, idx: i, mitigated: false });
+        if(bearOBs.length > maxOBs) bearOBs.pop();
+      }
+    }
+  }
+
+  // Mitigation : check si le prix a traversé l'OB
+  bullOBs.forEach(ob => {
+    for(let i=ob.idx+1; i<n; i++) {
+      if(lows[i] < ob.btm) { ob.mitigated=true; break; }
+    }
+  });
+  bearOBs.forEach(ob => {
+    for(let i=ob.idx+1; i<n; i++) {
+      if(highs[i] > ob.top) { ob.mitigated=true; break; }
+    }
+  });
+
+  return { bull: bullOBs, bear: bearOBs };
+}
+
+// ════════════════════════════════════════════════════════
+//  DRAW — GAUSSIAN CHANNEL
+// ════════════════════════════════════════════════════════
+function drawGaussianChannel(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {
+  const gc = calcGaussianChannel(D.c, D.h, D.l, 4, 144, 1.414);
+  if(!gc) return;
+
+  const N = VIEW_END - VIEW_START;
+  const filt  = gc.filt.slice(VIEW_START, VIEW_END);
+  const upper = gc.upper.slice(VIEW_START, VIEW_END);
+  const lower = gc.lower.slice(VIEW_START, VIEW_END);
+
+  // Fill canal
+  ctx.beginPath();
+  let started = false;
+  for(let i=0; i<N; i++) {
+    if(upper[i]==null) continue;
+    started ? ctx.lineTo(toX(i), toY(upper[i])) : ctx.moveTo(toX(i), toY(upper[i]));
+    started = true;
+  }
+  for(let i=N-1; i>=0; i--) {
+    if(lower[i]==null) continue;
+    ctx.lineTo(toX(i), toY(lower[i]));
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,200,100,0.06)';
+  ctx.fill();
+
+  // Upper band
+  ctx.beginPath(); started=false;
+  for(let i=0;i<N;i++) {
+    if(upper[i]==null) continue;
+    started?ctx.lineTo(toX(i),toY(upper[i])):ctx.moveTo(toX(i),toY(upper[i]));
+    started=true;
+  }
+  ctx.strokeStyle='rgba(0,255,136,0.45)'; ctx.lineWidth=1.2; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Lower band
+  ctx.beginPath(); started=false;
+  for(let i=0;i<N;i++) {
+    if(lower[i]==null) continue;
+    started?ctx.lineTo(toX(i),toY(lower[i])):ctx.moveTo(toX(i),toY(lower[i]));
+    started=true;
+  }
+  ctx.strokeStyle='rgba(255,75,75,0.45)'; ctx.lineWidth=1.2; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Filtre central (coloré selon direction)
+  for(let i=1;i<N;i++) {
+    if(filt[i]==null||filt[i-1]==null) continue;
+    const rising = filt[i] > filt[i-1];
+    ctx.beginPath();
+    ctx.moveTo(toX(i-1), toY(filt[i-1]));
+    ctx.lineTo(toX(i),   toY(filt[i]));
+    ctx.strokeStyle = rising ? 'rgba(0,255,136,0.85)' : 'rgba(255,75,75,0.85)';
+    ctx.lineWidth = 2.2; ctx.stroke();
+  }
+
+  // Légende
+  ctx.font = '9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='rgba(0,255,136,0.7)';
+  ctx.fillText('GC', 8, 30);
+}
+
+// ════════════════════════════════════════════════════════
+//  DRAW — ORDER BLOCKS
+// ════════════════════════════════════════════════════════
+function drawOrderBlocks(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {
+  const obs = calcOrderBlocks(D.o, D.h, D.l, D.c, D.v, 10, 3);
+  const N   = VIEW_END - VIEW_START;
+  const CW  = (W - 72) / N;   // PAD.r = 72
+
+  function drawOB(ob, isBull) {
+    // Convertir idx global en idx vue
+    const viewIdx = ob.idx - VIEW_START;
+    if(viewIdx < -10 || viewIdx > N + 10) return; // hors vue
+
+    const xStart = Math.max(0, toX(viewIdx) - CW/2);
+    const xEnd   = W - 72; // étendre jusqu'au bord droit (prix actuel)
+
+    const yTop = toY(ob.top);
+    const yBtm = toY(ob.btm);
+    const boxH  = Math.abs(yBtm - yTop);
+
+    if(boxH < 1) return;
+
+    const alpha    = ob.mitigated ? 0.12 : 0.22;
+    const border   = ob.mitigated ? 0.25 : 0.55;
+    const fillCol  = isBull
+      ? `rgba(8,153,129,${alpha})`
+      : `rgba(242,54,70,${alpha})`;
+    const lineCol  = isBull
+      ? `rgba(8,200,150,${border})`
+      : `rgba(242,54,70,${border})`;
+
+    // Rectangle zone
+    ctx.fillStyle   = fillCol;
+    ctx.strokeStyle = lineCol;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.rect(xStart, Math.min(yTop,yBtm), xEnd-xStart, boxH);
+    ctx.fill();
+    ctx.stroke();
+
+    // Ligne médiane (average)
+    const yMid = (yTop + yBtm) / 2;
+    ctx.beginPath();
+    ctx.moveTo(xStart, yMid); ctx.lineTo(xEnd, yMid);
+    ctx.strokeStyle = isBull ? 'rgba(8,200,150,0.45)' : 'rgba(242,54,70,0.45)';
+    ctx.lineWidth = 1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+
+    // Label
+    const label = (isBull ? 'Bull OB' : 'Bear OB') + (ob.mitigated ? ' ✗' : '');
+    ctx.font = 'bold 8px Share Tech Mono,monospace';
+    ctx.fillStyle = isBull ? 'rgba(0,255,180,0.75)' : 'rgba(255,100,100,0.75)';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, xStart + 4, Math.min(yTop,yBtm) + 10);
+  }
+
+  obs.bull.forEach(ob => drawOB(ob, true));
+  obs.bear.forEach(ob => drawOB(ob, false));
+
+  // Légende
+  ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='rgba(8,200,150,0.7)';
+  ctx.fillText('OB', 8+25, 30);
+}
+
 function drawMain() {{
   const W=cvMain.width, H=cvMain.height;
   const ctx=ctxM;
@@ -843,6 +1104,12 @@ function drawMain() {{
     }}
     ctx.strokeStyle='rgba(255,102,0,0.45)'; ctx.lineWidth=1; ctx.stroke();
   }}
+
+  // ── GAUSSIAN CHANNEL ──
+  if(showGC) drawGaussianChannel(ctx, W, H, toX, toY, VIEW_START, VIEW_END);
+
+  // ── ORDER BLOCKS ──
+  if(showOB) drawOrderBlocks(ctx, W, H, toX, toY, VIEW_START, VIEW_END);
 
   // ── MOVING AVERAGES ──
   if(showMA) {{
@@ -1303,6 +1570,12 @@ function toggleVol() {{
 }}
 function toggleBB() {{
   showBB=!showBB; $('btnBB').classList.toggle('on',showBB); render();
+}}
+function toggleGC() {{
+  showGC=!showGC; $('btnGC').classList.toggle('on',showGC); render();
+}}
+function toggleOB() {{
+  showOB=!showOB; $('btnOB').classList.toggle('on',showOB); render();
 }}
 
 // ════════════════════════════════════════════════════════
