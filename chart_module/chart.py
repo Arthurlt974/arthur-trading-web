@@ -381,8 +381,8 @@ html,body{{
   <button class="{cls_15m}" onclick="setTF(this,'15m')">15m</button>
   <button class="{cls_1h}" onclick="setTF(this,'1h')">1h</button>
   <button class="{cls_4h}" onclick="setTF(this,'4h')">4h</button>
-  <button class="{cls_1d}" onclick="setTF(this,'1D')">1D</button>
-  <button class="{cls_1w}" onclick="setTF(this,'1W')">1W</button>
+  <button class="{cls_1d}" onclick="setTF(this,'1d')">1D</button>
+  <button class="{cls_1w}" onclick="setTF(this,'1w')">1W</button>
   <div class="tb-sep"></div>
   <button class="{cls_ma}" id="btnMA" onclick="toggleMA()">MA</button>
   <button class="{cls_vol}" id="btnVol" onclick="toggleVol()">Vol</button>
@@ -1383,6 +1383,7 @@ const TF_MAP = {{
 let CURRENT_TF = '{active_tf}';
 
 async function setTF(btn, tf) {{
+  tf = tf.toLowerCase();
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   CURRENT_TF = tf;
