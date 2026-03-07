@@ -353,11 +353,10 @@ html,body{{
 
 /* ── DRAWING TOOLBAR ── */
 .draw-toolbar{{
-  position:absolute;left:0;top:0;bottom:0;
-  width:36px;background:var(--surface);
+  width:36px;flex-shrink:0;background:var(--surface);
   border-right:1px solid var(--border2);
   display:flex;flex-direction:column;align-items:center;
-  padding:6px 0;gap:2px;z-index:100;
+  padding:6px 0;gap:2px;z-index:10;overflow:hidden;
 }}
 .draw-btn{{
   width:28px;height:28px;border:1px solid transparent;
@@ -465,25 +464,26 @@ html,body{{
 <!-- MAIN = CHART + QUANT PANEL -->
 <div class="main" id="mainArea">
 
+<!-- DRAWING TOOLBAR LATERAL -->
+<div class="draw-toolbar" id="drawToolbar">
+  <button class="draw-btn active" id="dBtn_cursor" onclick="setDrawTool('cursor')" title="Curseur">&#9654;</button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dBtn_line"   onclick="setDrawTool('line')"   title="Ligne de tendance">&#9135;</button>
+  <button class="draw-btn" id="dBtn_hline"  onclick="setDrawTool('hline')"  title="Ligne horizontale">&#8212;</button>
+  <button class="draw-btn" id="dBtn_vline"  onclick="setDrawTool('vline')"  title="Ligne verticale">&#124;</button>
+  <button class="draw-btn" id="dBtn_ray"    onclick="setDrawTool('ray')"    title="Rayon">&#8599;</button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dBtn_fibo"   onclick="setDrawTool('fibo')"   title="Fibonacci">&#966;</button>
+  <button class="draw-btn" id="dBtn_rect"   onclick="setDrawTool('rect')"   title="Rectangle">&#9645;</button>
+  <button class="draw-btn" id="dBtn_range"  onclick="setDrawTool('range')"  title="Intervalle de prix">&#8597;</button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dBtn_text"   onclick="setDrawTool('text')"   title="Texte">T</button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dBtn_clear"  onclick="clearDrawings()"       title="Effacer" style="color:#ff4444;font-size:11px">&#10006;</button>
+</div>
+
 <!-- ZONE CHART -->
 <div class="chart-zone">
-  <!-- DRAWING TOOLBAR -->
-  <div class="draw-toolbar" id="drawToolbar">
-    <button class="draw-btn active" id="dBtn_cursor" onclick="setDrawTool('cursor')" title="Curseur">&#9654;</button>
-    <div class="draw-sep"></div>
-    <button class="draw-btn" id="dBtn_line"   onclick="setDrawTool('line')"   title="Ligne de tendance">&#9135;</button>
-    <button class="draw-btn" id="dBtn_hline"  onclick="setDrawTool('hline')"  title="Ligne horizontale">&#8212;</button>
-    <button class="draw-btn" id="dBtn_vline"  onclick="setDrawTool('vline')"  title="Ligne verticale">&#124;</button>
-    <button class="draw-btn" id="dBtn_ray"    onclick="setDrawTool('ray')"    title="Rayon">&#8599;</button>
-    <div class="draw-sep"></div>
-    <button class="draw-btn" id="dBtn_fibo"   onclick="setDrawTool('fibo')"   title="Retracement Fibonacci">&#966;</button>
-    <button class="draw-btn" id="dBtn_rect"   onclick="setDrawTool('rect')"   title="Rectangle">&#9645;</button>
-    <button class="draw-btn" id="dBtn_range"  onclick="setDrawTool('range')"  title="Intervalle de prix">&#8597;</button>
-    <div class="draw-sep"></div>
-    <button class="draw-btn" id="dBtn_text"   onclick="setDrawTool('text')"   title="Texte">T</button>
-    <div class="draw-sep"></div>
-    <button class="draw-btn" id="dBtn_clear"  onclick="clearDrawings()"       title="Tout effacer" style="color:#ff4444;font-size:11px">&#10006;</button>
-  </div>
   <canvas id="cvMain"></canvas>
   <div class="vol-sep"></div>
   <canvas id="cvVol"></canvas>
@@ -691,7 +691,7 @@ const D = {{ t:[], o:[], h:[], l:[], c:[], v:[] }};
 // ════════════════════════════════════════════════════════
 //  CONFIG RENDU
 // ════════════════════════════════════════════════════════
-const PAD  = {{l:36, r:72, t:8, b:24}};
+const PAD  = {{l:0, r:72, t:8, b:24}};
 const VPAH = 80;   // hauteur volume
 let showMA  = {ma_init_js};
 let showVol = {vol_init_js};
@@ -770,8 +770,7 @@ const fmtDate = ts => {{
 
 function setupCanvas() {{
   const panelW = (CHART_MODE === 'quant' && quantPanelOpen) ? 320 : 0;
-  const TOOLBAR_W = 36;
-  const W  = (window.innerWidth  || 900) - panelW - TOOLBAR_W;
+  const W  = (window.innerWidth  || 900) - panelW - 36;
   const fullH = window.innerHeight || 600;
   const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
   const volH  = showVol  ? VPAH   : 0;
