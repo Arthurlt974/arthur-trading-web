@@ -418,29 +418,39 @@ def show_analyse_perso():
             st.markdown("<br>", unsafe_allow_html=True)
             search_btn = st.button("🔍 RECHERCHER", key="btn_search_actif", use_container_width=True)
 
-        # Résultats de recherche
+        # Lancer la recherche — stocker en session_state pour persister entre reruns
         if search_btn and query:
             with st.spinner("Recherche en cours..."):
                 resultats = rechercher_ticker(query)
-            if resultats:
-                st.markdown("**Sélectionnez un actif :**")
-                cols = st.columns(min(3, len(resultats)))
-                for i, (symbol, name, type_actif, exchange) in enumerate(resultats[:6]):
-                    with cols[i % 3]:
-                        label = f"{symbol} — {name[:25]}{'...' if len(name) > 25 else ''}"
-                        if st.button(label, key=f"select_{symbol}_{i}", use_container_width=True):
-                            st.session_state["analyse_ticker_selectionne"] = symbol
-                            st.session_state["analyse_nom_selectionne"]    = name
-                            st.session_state["analyse_type_selectionne"]   = type_actif
-                            st.rerun()
-            else:
-                st.error("Aucun résultat. Essayez directement avec le ticker (ex: AAPL, BTC-USD).")
-                # Fallback ticker direct
-                if st.button(f"Utiliser '{query}' directement", key="use_direct_ticker"):
-                    st.session_state["analyse_ticker_selectionne"] = query.upper()
-                    st.session_state["analyse_nom_selectionne"]    = query.upper()
-                    st.session_state["analyse_type_selectionne"]   = "Inconnu"
-                    st.rerun()
+            st.session_state["analyse_resultats_recherche"] = resultats
+            st.session_state["analyse_query_en_cours"]      = query
+
+        # Afficher les résultats (persistants entre reruns grâce au session_state)
+        resultats_affiches = st.session_state.get("analyse_resultats_recherche", [])
+        query_en_cours     = st.session_state.get("analyse_query_en_cours", "")
+
+        if resultats_affiches:
+            st.markdown("**Sélectionnez un actif :**")
+            cols = st.columns(min(3, len(resultats_affiches)))
+            for i, (symbol, name, type_actif, exchange) in enumerate(resultats_affiches[:6]):
+                with cols[i % 3]:
+                    display_label = f"{symbol}
+{name[:30]}" + ("..." if len(name) > 30 else "")
+                    if st.button(display_label, key=f"select_{symbol}_{i}", use_container_width=True):
+                        st.session_state["analyse_ticker_selectionne"]   = symbol
+                        st.session_state["analyse_nom_selectionne"]      = name
+                        st.session_state["analyse_type_selectionne"]     = type_actif
+                        st.session_state["analyse_resultats_recherche"]  = []
+                        st.rerun()
+
+        elif query_en_cours and search_btn and not resultats_affiches:
+            st.error("Aucun résultat. Utilisez le ticker direct (ex: AAPL, BTC-USD).")
+            if st.button(f"✅ Utiliser '{query_en_cours}' directement", key="use_direct_ticker"):
+                st.session_state["analyse_ticker_selectionne"]  = query_en_cours.upper()
+                st.session_state["analyse_nom_selectionne"]     = query_en_cours.upper()
+                st.session_state["analyse_type_selectionne"]    = "Inconnu"
+                st.session_state["analyse_resultats_recherche"] = []
+                st.rerun()
 
         # ── Zone d'analyse ───────────────────────────────────
         ticker_sel = st.session_state.get("analyse_ticker_selectionne", "")
