@@ -1215,22 +1215,38 @@ class ValuationCalculator:
                 results["nvt"] = nvt
                 fair_values.append(nvt["fair_value"])
         else:
+            trailing_pe = self.info.get('trailingPE') or 0
+            pb_ratio    = self.info.get('priceToBook') or 0
+            # Growth stock : P/E > 40 ou P/B > 20 -> Graham et P/B biaisant le consensus
+            is_growth_stock = (trailing_pe > 40) or (pb_ratio > 20)
+
             graham = self.graham_valuation()
             if "error" not in graham:
                 results["graham"] = graham
-                fair_values.append(graham["fair_value"])
+                if not is_growth_stock:
+                    fair_values.append(graham["fair_value"])
+                else:
+                    results["graham"]["excluded_from_consensus"] = True
+                    results["graham"]["exclusion_reason"] = f"Growth stock (P/E={trailing_pe:.0f}) - Graham sous-estime les entreprises a forte prime de croissance"
+
             dcf = self.dcf_valuation()
             if "error" not in dcf:
                 results["dcf"] = dcf
                 fair_values.append(dcf["fair_value"])
+
             pe = self.pe_valuation()
             if "error" not in pe:
                 results["pe"] = pe
                 fair_values.append(pe["fair_value"])
+
             pb = self.pb_valuation()
             if "error" not in pb:
                 results["pb"] = pb
-                fair_values.append(pb["fair_value"])
+                if not is_growth_stock:
+                    fair_values.append(pb["fair_value"])
+                else:
+                    results["pb"]["excluded_from_consensus"] = True
+                    results["pb"]["exclusion_reason"] = f"Growth stock (P/B={pb_ratio:.1f}) - P/B non pertinent pour entreprises avec rachats massifs"
         if fair_values:
             consensus_value = np.median(fair_values)
             current_price = self.info.get('currentPrice', 0) or self.info.get('regularMarketPrice', 0)
@@ -2054,6 +2070,9 @@ elif outil == "ANALYSEUR PRO":
                     if "error" in data:
                         st.warning(f"⚠️ {data['error']}")
                     else:
+                        # Badge si méthode exclue du consensus
+                        if data.get("excluded_from_consensus"):
+                            st.warning(f"⚠️ **EXCLU DU CONSENSUS** — {data.get('exclusion_reason', 'Non applicable pour ce type d entreprise')}")
                         col1, col2, col3 = st.columns(3)
                         with col1:
                             st.metric("VALEUR JUSTE", f"${data['fair_value']:.2f}")
@@ -2061,8 +2080,11 @@ elif outil == "ANALYSEUR PRO":
                             st.metric("PRIX ACTUEL", f"${data['current_price']:.2f}")
                         with col3:
                             upside_val = data['upside_pct']
-                            color = "normal" if abs(upside_val) < 10 else ("inverse" if upside_val > 0 else "off")
-                            st.metric("POTENTIEL", f"{upside_val:+.1f}%", delta_color=color)
+                            if data.get("excluded_from_consensus"):
+                                st.metric("POTENTIEL (indicatif)", f"{upside_val:+.1f}%", delta_color="off")
+                            else:
+                                color = "normal" if abs(upside_val) < 10 else ("inverse" if upside_val > 0 else "off")
+                                st.metric("POTENTIEL", f"{upside_val:+.1f}%", delta_color=color)
                         st.markdown("---")
                         st.markdown("**PARAMÈTRES DE LA MÉTHODE:**")
                         if method == "graham":
