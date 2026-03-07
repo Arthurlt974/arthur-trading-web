@@ -306,10 +306,31 @@ def afficher_graphique_analyse(ticker, period="6mo"):
 #  EXPORT PDF
 # ══════════════════════════════════════════════
 
+def _clean(text):
+    """Nettoie le texte pour fpdf latin-1 : remplace les caractères unicode problématiques."""
+    if not text:
+        return ""
+    replacements = {
+        "—": "-", "–": "-", "’": "'", "‘": "'",
+        "“": """, "”": """, "…": "...", "€": "EUR",
+        "é": "e", "è": "e", "ê": "e", "ë": "e",
+        "à": "a", "â": "a", "ä": "a",
+        "ô": "o", "ö": "o", "ù": "u", "û": "u",
+        "ü": "u", "î": "i", "ï": "i", "ç": "c",
+        "É": "E", "È": "E", "À": "A", "Ç": "C",
+        "⚠": "!", "️": "", "📊": "",
+    }
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    return text.encode("latin-1", "replace").decode("latin-1")
+
 def generer_pdf_analyse(analyse):
     """Génère un PDF d'une analyse personnelle."""
     pdf = FPDF()
     pdf.add_page()
+
+    ticker = _clean(analyse.get("ticker", ""))
+    nom    = _clean(analyse.get("nom", ""))
 
     # Header
     pdf.set_fill_color(10, 10, 10)
@@ -318,56 +339,57 @@ def generer_pdf_analyse(analyse):
     pdf.set_font("Arial", "B", 20)
     pdf.cell(0, 15, "AM-TRADING | MON ANALYSE PERSONNELLE", ln=True, align="C")
     pdf.set_font("Arial", "", 11)
-    pdf.cell(0, 8, f"Actif : {analyse.get('ticker', '')} — {analyse.get('nom', '')}", ln=True, align="C")
+    pdf.cell(0, 8, f"Actif : {ticker} - {nom}", ln=True, align="C")
     pdf.ln(5)
 
     # Infos générales
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 8, "INFORMATIONS GÉNÉRALES", ln=True)
+    pdf.cell(0, 8, "INFORMATIONS GENERALES", ln=True)
     pdf.set_font("Arial", "", 10)
-    pdf.cell(90, 7, f"Date d'analyse : {analyse.get('updated_at', 'N/A')[:10]}", ln=False)
-    pdf.cell(90, 7, f"Type : {analyse.get('type_actif', 'N/A')}", ln=True)
+    pdf.cell(90, 7, f"Date : {_clean(analyse.get('updated_at', 'N/A')[:10])}", ln=False)
+    pdf.cell(90, 7, f"Type : {_clean(analyse.get('type_actif', 'N/A'))}", ln=True)
     pdf.cell(90, 7, f"Score personnel : {analyse.get('score_perso', 'N/A')}/10", ln=False)
-    pdf.cell(90, 7, f"Score technique auto : {analyse.get('score_technique', 'N/A')}/10", ln=True)
-    sentiment = analyse.get('sentiment_perso', 'NEUTRE')
+    pdf.cell(90, 7, f"Score technique : {analyse.get('score_technique', 'N/A')}/10", ln=True)
+    sentiment = _clean(analyse.get('sentiment_perso', 'NEUTRE'))
     pdf.cell(90, 7, f"Sentiment : {sentiment}", ln=False)
-    tags = ", ".join(analyse.get("tags", []))
-    pdf.cell(90, 7, f"Tags : {tags if tags else 'Aucun'}", ln=True)
+    tags_raw = analyse.get("tags", [])
+    tags = _clean(", ".join(tags_raw) if tags_raw else "Aucun")
+    pdf.cell(90, 7, f"Tags : {tags}", ln=True)
     pdf.ln(5)
 
     # Notes
     pdf.set_font("Arial", "B", 13)
     pdf.cell(0, 8, "MES NOTES D'ANALYSE", ln=True)
     pdf.set_font("Arial", "", 10)
-    notes = analyse.get("notes", "Aucune note.")
-    notes_clean = notes.encode("latin-1", "replace").decode("latin-1")
+    notes_clean = _clean(analyse.get("notes", "Aucune note."))
     pdf.multi_cell(0, 6, notes_clean)
     pdf.ln(5)
 
-    # Thèse
+    # These
     if analyse.get("these"):
         pdf.set_font("Arial", "B", 13)
-        pdf.cell(0, 8, "THÈSE D'INVESTISSEMENT", ln=True)
+        pdf.cell(0, 8, "THESE D'INVESTISSEMENT", ln=True)
         pdf.set_font("Arial", "", 10)
-        these_clean = analyse.get("these", "").encode("latin-1", "replace").decode("latin-1")
+        these_clean = _clean(analyse.get("these", ""))
         pdf.multi_cell(0, 6, these_clean)
         pdf.ln(5)
 
-    # Niveaux clés
+    # Niveaux cles
     pdf.set_font("Arial", "B", 13)
-    pdf.cell(0, 8, "NIVEAUX CLÉS", ln=True)
+    pdf.cell(0, 8, "NIVEAUX CLES", ln=True)
     pdf.set_font("Arial", "", 10)
-    pdf.cell(60, 7, f"Prix entrée : {analyse.get('prix_entree', 'N/A')}", ln=False)
-    pdf.cell(60, 7, f"Stop Loss : {analyse.get('stop_loss', 'N/A')}", ln=False)
-    pdf.cell(60, 7, f"Take Profit : {analyse.get('take_profit', 'N/A')}", ln=True)
+    pdf.cell(60, 7, f"Prix entree : {_clean(str(analyse.get('prix_entree', 'N/A')))}", ln=False)
+    pdf.cell(60, 7, f"Stop Loss : {_clean(str(analyse.get('stop_loss', 'N/A')))}", ln=False)
+    pdf.cell(60, 7, f"Take Profit : {_clean(str(analyse.get('take_profit', 'N/A')))}", ln=True)
     pdf.ln(8)
 
     # Footer
     pdf.set_text_color(150, 150, 150)
     pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 5, f"Rapport généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')} — AM-Trading Terminal", ln=True, align="C")
-    pdf.cell(0, 5, "⚠️ Ce document ne constitue pas un conseil financier.", ln=True, align="C")
+    date_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+    pdf.cell(0, 5, f"Rapport genere le {date_str} - AM-Trading Terminal", ln=True, align="C")
+    pdf.cell(0, 5, "Ce document ne constitue pas un conseil financier.", ln=True, align="C")
 
     return bytes(pdf.output(dest="S"))
 
