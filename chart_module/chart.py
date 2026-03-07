@@ -177,6 +177,23 @@ html,body{{
 .draw-btn.active{{background:rgba(255,152,0,0.15);color:var(--orange);}}
 .draw-sep{{width:20px;height:1px;background:var(--border2);margin:2px 0;}}
 
+
+/* ── FULLSCREEN BUTTON ── */
+.fs-btn{{
+  width:28px;height:28px;border:1px solid #1e1e1e;
+  background:transparent;color:#4d9fff;
+  font-size:13px;cursor:pointer;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;flex-shrink:0;
+}}
+.fs-btn:hover{{background:rgba(77,159,255,0.1);border-color:#4d9fff;}}
+body.is-fullscreen .fs-btn{{color:#ff6600;border-color:rgba(255,102,0,0.4);}}
+/* En fullscreen : on prend tout l'écran */
+body.is-fullscreen{{
+  position:fixed;top:0;left:0;width:100vw;height:100vh;
+  z-index:99999;background:#000;
+}}
+
 /* ── CHART ZONE ── */
 .chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
 #cvMain{{display:block;cursor:crosshair;}}
@@ -389,6 +406,7 @@ html,body{{
   </div>
   <div class="hdr-right">
     <span class="live-badge {status_cls}" id="apiBadge">{status_txt}</span>
+    <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Plein écran">⛶</button>
   </div>
 </div>
 
@@ -2006,6 +2024,42 @@ function toggleGC() {{
 function toggleOB() {{
   showOB=!showOB; $('btnOB').classList.toggle('on',showOB); render();
 }}
+
+
+// ════════════════════════════════════════════════════════
+//  FULLSCREEN
+// ════════════════════════════════════════════════════════
+function toggleFullscreen() {{
+  const isFS = document.body.classList.toggle('is-fullscreen');
+  const btn  = $('fsBtn');
+  if(btn) btn.title = isFS ? 'Quitter le plein écran' : 'Plein écran';
+  if(btn) btn.textContent = isFS ? '✕' : '⛶';
+
+  // Tenter l'API Fullscreen native si dans un iframe / navigateur
+  try {{
+    if(isFS) {{
+      const el = document.documentElement;
+      if(el.requestFullscreen)            el.requestFullscreen();
+      else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    }} else {{
+      if(document.exitFullscreen)            document.exitFullscreen();
+      else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }}
+  }} catch(e) {{}}
+
+  // Redessiner après resize
+  setTimeout(() => {{ setupCanvas(); render(); }}, 100);
+}}
+
+// Quitter avec Échap
+document.addEventListener('fullscreenchange', () => {{
+  if(!document.fullscreenElement) {{
+    document.body.classList.remove('is-fullscreen');
+    const btn = $('fsBtn');
+    if(btn) {{ btn.title = 'Plein écran'; btn.textContent = '⛶'; }}
+    setTimeout(() => {{ setupCanvas(); render(); }}, 100);
+  }}
+}});
 
 // ════════════════════════════════════════════════════════
 //  PRIX TEMPS RÉEL
