@@ -104,7 +104,7 @@ def render_chart(
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap');
 :root{{
   --bg:#000000;--surface:#0a0a0a;--surface2:#111111;
   --border:#1a1a1a;--border2:#1e1e1e;
@@ -119,27 +119,27 @@ def render_chart(
 *{{margin:0;padding:0;box-sizing:border-box;}}
 html,body{{
   background:var(--bg);color:var(--text);
-  font-family:'DM Sans',sans-serif;font-size:12px;
+  font-family:'DM Sans',sans-serif;font-size:13px;
   width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column;
 }}
 
 /* ── HEADER ── */
 .hdr{{display:flex;align-items:center;background:var(--surface);
   border-bottom:1px solid var(--border2);height:46px;padding:0 12px;gap:0;flex-shrink:0;}}
-.logo{{font-weight:700;font-size:12px;letter-spacing:1.5px;color:var(--orange);
+.logo{{font-weight:700;font-size:12px;letter-spacing:0.8px;color:var(--orange);
   padding-right:14px;border-right:1px solid var(--border2);margin-right:14px;white-space:nowrap;}}
-.pair{{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.3px;margin-right:8px;}}
-.exch{{font-size:9px;color:var(--faint);letter-spacing:0.5px;margin-right:16px;}}
+.pair{{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.2px;margin-right:8px;}}
+.exch{{font-size:11px;color:var(--faint);letter-spacing:0.4px;margin-right:16px;}}
 .price-big{{font-size:20px;font-weight:700;letter-spacing:-0.5px;transition:color .15s;margin-right:6px;}}
 .price-chg{{font-size:11px;padding:2px 7px;border-radius:3px;font-weight:600;margin-right:16px;}}
 .price-chg.up{{background:rgba(38,166,154,0.15);color:var(--bull);}}
 .price-chg.dn{{background:rgba(239,83,80,0.15);color:var(--bear);}}
 .ohlc-row{{display:flex;gap:16px;align-items:center;}}
 .ohlc-item{{display:flex;flex-direction:column;gap:1px;}}
-.ohlc-lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
+.ohlc-lbl{{font-size:11px;color:var(--faint);letter-spacing:0.4px;text-transform:uppercase;}}
 .ohlc-val{{font-size:11px;font-weight:600;}}
 .hdr-right{{margin-left:auto;display:flex;align-items:center;gap:12px;}}
-.live-badge{{font-size:9px;padding:2px 8px;border-radius:2px;letter-spacing:0.5px;font-weight:700;}}
+.live-badge{{font-size:11px;padding:2px 8px;border-radius:2px;letter-spacing:0.4px;font-weight:700;}}
 .live-badge.live{{color:#00e676;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);animation:pulse 1.5s infinite;}}
 .live-badge.sim{{color:var(--orange);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.3);}}
 @keyframes pulse{{0%,100%{{opacity:1;}}50%{{opacity:0.4;}}}}
@@ -149,12 +149,12 @@ html,body{{
   border-bottom:1px solid var(--border2);height:34px;padding:0 8px;gap:2px;flex-shrink:0;}}
 .tf-btn{{padding:3px 9px;border:none;background:transparent;color:var(--muted);
   font-family:'DM Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
-  border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.3px;}}
+  border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.2px;}}
 .tf-btn:hover{{background:var(--surface2);color:var(--text);}}
 .tf-btn.active{{background:rgba(255,152,0,0.12);color:var(--orange);}}
 .tb-sep{{width:1px;height:18px;background:var(--border2);margin:0 4px;}}
 .indicator-btn{{padding:3px 9px;border:1px solid var(--border2);background:transparent;
-  color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;
+  color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;
   border-radius:3px;transition:all .1s;}}
 .indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
@@ -169,14 +169,14 @@ html,body{{
 #tooltip{{
   position:fixed;pointer-events:none;z-index:9999;
   background:var(--surface);border:1px solid var(--border2);
-  padding:8px 12px;border-radius:4px;font-size:10px;
+  padding:8px 12px;border-radius:4px;font-size:11px;
   box-shadow:0 4px 16px rgba(0,0,0,0.6);display:none;
   min-width:160px;
 }}
-#tooltip .tt-date{{color:var(--muted);font-size:9px;margin-bottom:6px;letter-spacing:0.5px;}}
+#tooltip .tt-date{{color:var(--muted);font-size:11px;margin-bottom:6px;letter-spacing:0.4px;}}
 #tooltip .tt-row{{display:flex;justify-content:space-between;gap:16px;margin:2px 0;}}
-#tooltip .tt-lbl{{color:var(--faint);font-size:9px;}}
-#tooltip .tt-val{{font-weight:600;font-size:10px;}}
+#tooltip .tt-lbl{{color:var(--faint);font-size:11px;}}
+#tooltip .tt-val{{font-weight:600;font-size:11px;}}
 
 /* ── BOTTOM BAR ── */
 .bbar{{display:flex;background:var(--surface);border-top:1px solid var(--border2);
@@ -184,7 +184,7 @@ html,body{{
 .bstat{{flex:1;padding:0 14px;border-right:1px solid var(--border);
   display:flex;align-items:center;gap:8px;}}
 .bstat:last-child{{border-right:none;}}
-.bstat .lbl{{font-size:8px;color:var(--faint);letter-spacing:0.5px;text-transform:uppercase;}}
+.bstat .lbl{{font-size:11px;color:var(--faint);letter-spacing:0.4px;text-transform:uppercase;}}
 .bstat .val{{font-size:12px;font-weight:700;}}
 
 ::-webkit-scrollbar{{width:4px;}}
@@ -200,8 +200,8 @@ html,body{{
   display:none;align-items:center;gap:6px;
   padding:3px 12px;border:1px solid rgba(250,190,44,0.35);
   background:rgba(250,190,44,0.07);color:#FABE2C;
-  font-family:'DM Sans',sans-serif;font-size:10px;
-  font-weight:700;letter-spacing:1px;cursor:pointer;
+  font-family:'DM Mono',monospace;font-size:11px;
+  font-weight:700;letter-spacing:0.6px;cursor:pointer;
   border-radius:3px;transition:all .15s;white-space:nowrap;
 }}
 .qp-toggle-btn:hover{{background:rgba(250,190,44,0.14);border-color:rgba(250,190,44,0.6);}}
@@ -225,16 +225,16 @@ html,body{{
 .qp-title{{
   font-family:'DM Sans',sans-serif;
   font-weight:700;font-size:12px;
-  letter-spacing:1.5px;color:#FABE2C;
+  letter-spacing:0.8px;color:#FABE2C;
 }}
-.qp-sub{{font-size:8px;color:var(--muted);margin-left:auto;}}
+.qp-sub{{font-size:11px;color:var(--muted);margin-left:auto;}}
 .qp-tabs{{
   display:flex;background:var(--bg);
   border-bottom:1px solid #2A2A2A;flex-shrink:0;
 }}
 .qp-tab{{
   flex:1;padding:7px 4px;text-align:center;
-  font-size:8px;letter-spacing:1px;color:var(--muted);
+  font-size:11px;letter-spacing:0.4px;color:var(--muted);
   cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;
 }}
 .qp-tab:hover{{color:var(--text2);}}
@@ -258,11 +258,11 @@ html,body{{
 .tool-icon{{font-size:14px;min-width:20px;text-align:center;}}
 .tool-name{{
   font-family:'DM Sans',sans-serif;font-weight:700;
-  font-size:12px;letter-spacing:0.5px;color:var(--text);flex:1;
+  font-size:12px;letter-spacing:0.4px;color:var(--text);flex:1;
 }}
 .tool-card.tc-active .tool-name{{color:#FABE2C;}}
 .tool-card.tc-running .tool-name{{color:var(--orange);}}
-.tool-tag{{font-size:7px;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;}}
+.tool-tag{{font-size:7px;padding:1px 5px;border-radius:2px;letter-spacing:0.2px;}}
 .tag-risk{{background:rgba(255,34,34,0.12);color:#FF6B6B;border:1px solid rgba(255,34,34,0.2);}}
 .tag-sim {{background:rgba(255,102,0,0.12);color:#FF9944;border:1px solid rgba(255,102,0,0.2);}}
 .tag-opt {{background:rgba(0,200,83,0.10);color:#00E676;border:1px solid rgba(0,200,83,0.2);}}
@@ -273,19 +273,19 @@ html,body{{
 }}
 .tool-card.tc-active .tool-body-q{{display:flex;}}
 .field-row{{display:flex;gap:6px;align-items:center;}}
-.field-lbl{{font-size:8px;color:var(--muted);letter-spacing:0.5px;min-width:72px;}}
+.field-lbl{{font-size:11px;color:var(--muted);letter-spacing:0.2px;min-width:72px;}}
 .field-inp{{
   flex:1;background:var(--bg);border:1px solid #2A2A2A;
   color:#FF9944;font-family:'DM Mono',monospace;
-  font-size:10px;padding:3px 7px;border-radius:2px;outline:none;
+  font-size:11px;padding:3px 7px;border-radius:2px;outline:none;
 }}
 .field-inp:focus{{border-color:rgba(255,102,0,0.5);}}
-.field-unit{{font-size:8px;color:var(--muted);min-width:28px;}}
+.field-unit{{font-size:11px;color:var(--muted);min-width:28px;}}
 .run-btn{{
   margin-top:4px;padding:6px;
   background:rgba(255,102,0,0.12);border:1px solid rgba(255,102,0,0.3);
   color:var(--orange);font-family:'DM Sans',sans-serif;font-weight:700;
-  font-size:11px;letter-spacing:1px;cursor:pointer;border-radius:3px;
+  font-size:11px;letter-spacing:0.8px;cursor:pointer;border-radius:3px;
   transition:all .15s;text-align:center;
 }}
 .run-btn:hover{{background:rgba(255,102,0,0.22);border-color:var(--orange);}}
@@ -295,8 +295,8 @@ html,body{{
   display:flex;flex-direction:column;gap:4px;
 }}
 .result-row{{display:flex;justify-content:space-between;align-items:center;}}
-.result-lbl{{font-size:8px;color:var(--muted);}}
-.result-val{{font-size:10px;font-weight:600;}}
+.result-lbl{{font-size:11px;color:var(--muted);}}
+.result-val{{font-size:11px;font-weight:600;}}
 .val-green{{color:var(--green);}} .val-red{{color:var(--red);}}
 .val-orange{{color:#FF9944;}} .val-yellow{{color:#FABE2C;}}
 .result-bar{{height:3px;background:#1A1A1A;border-radius:2px;margin-top:4px;overflow:hidden;}}
@@ -314,9 +314,9 @@ html,body{{
 .mode-btn:hover{{background:var(--surface2);}}
 .mode-icon{{font-size:13px;}}
 .mode-info{{display:flex;flex-direction:column;gap:1px;text-align:left;}}
-.mode-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);}}
-.mode-sub{{font-size:8px;color:var(--faint);}}
-.mode-caret{{font-size:8px;color:var(--faint);transition:transform .15s;margin-left:4px;}}
+.mode-lbl{{font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--text2);}}
+.mode-sub{{font-size:11px;color:var(--faint);}}
+.mode-caret{{font-size:11px;color:var(--faint);transition:transform .15s;margin-left:4px;}}
 .mode-caret.open{{transform:rotate(180deg);}}
 
 /* Couleur selon mode */
@@ -345,11 +345,11 @@ html,body{{
 .mode-opt.active{{background:rgba(255,152,0,0.05);}}
 .mo-icon{{font-size:16px;min-width:20px;}}
 .mo-text{{flex:1;}}
-.mo-lbl{{font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;}}
-.mo-desc{{font-size:9px;color:var(--faint);margin-top:2px;}}
+.mo-lbl{{font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;}}
+.mo-desc{{font-size:11px;color:var(--faint);margin-top:2px;}}
 .mo-check{{font-size:11px;color:var(--orange);opacity:0;}}
 .mode-opt.active .mo-check{{opacity:1;}}
-.mo-badge{{font-size:8px;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;
+.mo-badge{{font-size:11px;padding:1px 5px;border-radius:2px;letter-spacing:0.2px;
   background:rgba(255,152,0,0.1);color:var(--orange);border:1px solid rgba(255,152,0,0.2);}}
 </style>
 </head>
@@ -360,7 +360,7 @@ html,body{{
   <div class="logo">AM<span style="color:#fff">.</span>TERMINAL</div>
   <div class="pair">{pair_disp}</div>
   <div class="exch">{exchange}</div>
-  <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:1px;">{DATA_SOURCE.upper()}</div>
+  <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:11px;padding:2px 7px;border-radius:2px;letter-spacing:0.4px;">{DATA_SOURCE.upper()}</div>
   <div class="price-big" id="curPrice">—</div>
   <div class="price-chg up" id="curChg">—</div>
   <div class="ohlc-row">
