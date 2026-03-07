@@ -389,6 +389,8 @@ html,body{{
   <button class="{cls_bb}" id="btnBB" onclick="toggleBB()">BB</button>
   <button class="{cls_gc}" id="btnGC" onclick="toggleGC()" title="Gaussian Channel">GC</button>
   <button class="{cls_ob}" id="btnOB" onclick="toggleOB()" title="Order Blocks">OB</button>
+  <button class="indicator-btn" id="btnRSI" onclick="toggleRSI()" title="RSI 14">RSI</button>
+  <button class="indicator-btn" id="btnMACD" onclick="toggleMACD()" title="MACD 12/26/9">MACD</button>
 
   <!-- QUANT TOOLS TOGGLE (visible only in quant mode) -->
   <button class="qp-toggle-btn" id="qpToggleBtn" onclick="toggleQuantPanel()">⚙ QUANT TOOLS ▶</button>
@@ -442,6 +444,10 @@ html,body{{
   <canvas id="cvMain"></canvas>
   <div class="vol-sep"></div>
   <canvas id="cvVol"></canvas>
+  <div class="vol-sep" id="rsiSep" style="display:none"></div>
+  <canvas id="cvRSI" style="display:none"></canvas>
+  <div class="vol-sep" id="macdSep" style="display:none"></div>
+  <canvas id="cvMACD" style="display:none"></canvas>
 </div>
 
 <!-- QUANT PANEL (hidden by default, shown in quant mode) -->
@@ -648,7 +654,11 @@ let showMA  = {ma_init_js};
 let showVol = {vol_init_js};
 let showBB  = {bb_init_js};
 let showGC  = false;   // Gaussian Channel
-let showOB  = false;   // Order Blocks
+let showOB   = false;   // Order Blocks
+let showRSI  = false;   // RSI
+let showMACD = false;   // MACD
+const RSI_H  = 80;      // hauteur panneau RSI px
+const MACD_H = 80;      // hauteur panneau MACD px
 
 let VIEW_START = 0, VIEW_END = 0;
 let HOVER_IDX  = -1, HOVER_Y = -1;
@@ -719,10 +729,12 @@ function setupCanvas() {{
   const panelW = (CHART_MODE === 'quant' && quantPanelOpen) ? 320 : 0;
   const W  = (window.innerWidth  || 900) - panelW;
   const fullH = window.innerHeight || 600;
-  // Hauteurs fixes des zones UI
   const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
-  const volH  = showVol ? VPAH : 0;
-  const mainH = Math.max(fullH - hdrH - tbH - bbarH - volH - sepH, 150);
+  const volH  = showVol  ? VPAH   : 0;
+  const rsiH  = showRSI  ? RSI_H  : 0;
+  const macdH = showMACD ? MACD_H : 0;
+  const extrasH = volH + rsiH + macdH + (showVol?1:0) + (showRSI?1:0) + (showMACD?1:0);
+  const mainH = Math.max(fullH - hdrH - tbH - bbarH - extrasH - sepH, 150);
 
   cvMain.width=W; cvMain.height=mainH;
   cvVol.width=W;  cvVol.height=volH;
@@ -730,6 +742,14 @@ function setupCanvas() {{
   cvVol.style.width=W+'px';  cvVol.style.height=volH+'px';
   cvVol.style.display=showVol?'block':'none';
   document.querySelector('.vol-sep').style.display=showVol?'block':'none';
+
+  const cvR=$('cvRSI'), sepR=$('rsiSep');
+  if(cvR){{ cvR.width=W; cvR.height=rsiH; cvR.style.width=W+'px'; cvR.style.height=rsiH+'px'; cvR.style.display=showRSI?'block':'none'; }}
+  if(sepR) sepR.style.display=showRSI?'block':'none';
+
+  const cvMC=$('cvMACD'), sepMC=$('macdSep');
+  if(cvMC){{ cvMC.width=W; cvMC.height=macdH; cvMC.style.width=W+'px'; cvMC.style.height=macdH+'px'; cvMC.style.display=showMACD?'block':'none'; }}
+  if(sepMC) sepMC.style.display=showMACD?'block':'none';
 }}
 
 // ── Calcul MA ──
@@ -756,6 +776,205 @@ function calcBB(data, period=20, mult=2) {{
   return {{ma,upper,lower}};
 }}
 
+
+
+// ════════════════════════════════════════════════════════
+//  RSI — Relative Strength Index (période 14)
+// ════════════════════════════════════════════════════════
+function calcRSI(closes, period=14) {{
+  const rsi = new Array(closes.length).fill(null);
+  if(closes.length < period + 1) return rsi;
+  let avgGain = 0, avgLoss = 0;
+  for(let i=1; i<=period; i++) {{
+    const d = closes[i] - closes[i-1];
+    if(d >= 0) avgGain += d; else avgLoss += Math.abs(d);
+  }}
+  avgGain /= period; avgLoss /= period;
+  rsi[period] = 100 - 100 / (1 + (avgLoss === 0 ? Infinity : avgGain / avgLoss));
+  for(let i=period+1; i<closes.length; i++) {{
+    const d = closes[i] - closes[i-1];
+    const gain = d > 0 ? d : 0;
+    const loss = d < 0 ? Math.abs(d) : 0;
+    avgGain = (avgGain * (period-1) + gain) / period;
+    avgLoss = (avgLoss * (period-1) + loss) / period;
+    rsi[i] = 100 - 100 / (1 + (avgLoss === 0 ? 100 : avgGain / avgLoss));
+  }}
+  return rsi;
+}}
+
+function drawRSI() {{
+  const cv = $('cvRSI');
+  if(!cv || !showRSI) return;
+  const W = cv.width, H = cv.height;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H);
+
+  const N = VIEW_END - VIEW_START;
+  if(N < 2 || H < 10) return;
+
+  const rsiAll = calcRSI(D.c, 14);
+  const rsi = rsiAll.slice(VIEW_START, VIEW_END);
+
+  const CW = (W - PAD.l - PAD.r) / N;
+  const toX = i => PAD.l + i*CW + CW/2;
+  const toY = v => H - 4 - (v / 100) * (H - 8);
+
+  // Zones 70/30
+  const y70 = toY(70), y50 = toY(50), y30 = toY(30);
+
+  // Fill zone surachat (>70)
+  ctx.fillStyle = 'rgba(255,34,34,0.07)';
+  ctx.fillRect(0, 4, W-PAD.r, y70-4);
+  // Fill zone survente (<30)
+  ctx.fillStyle = 'rgba(0,255,65,0.07)';
+  ctx.fillRect(0, y30, W-PAD.r, H-y30-4);
+
+  // Lignes 70 / 50 / 30
+  [[70,'rgba(255,34,34,0.4)'],[50,'rgba(100,100,100,0.4)'],[30,'rgba(0,255,65,0.4)']].forEach(([v,col]) => {{
+    const y = toY(v);
+    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = col; ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText(v, W-PAD.r+4, y+3);
+  }});
+
+  // Courbe RSI colorée (vert si <50, rouge si >50)
+  for(let i=1; i<N; i++) {{
+    if(rsi[i]===null || rsi[i-1]===null) continue;
+    const x1=toX(i-1), y1=toY(rsi[i-1]);
+    const x2=toX(i),   y2=toY(rsi[i]);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+    const avg = (rsi[i]+rsi[i-1])/2;
+    ctx.strokeStyle = avg >= 70 ? '#ff4444' : avg <= 30 ? '#00ff65' : '#e8a838';
+    ctx.lineWidth = 1.5; ctx.stroke();
+  }}
+
+  // Valeur actuelle
+  const lastRSI = rsi.filter(v=>v!==null).pop();
+  if(lastRSI != null) {{
+    const col = lastRSI >= 70 ? '#ff4444' : lastRSI <= 30 ? '#00ff65' : '#e8a838';
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.roundRect(W-PAD.r+2, toY(lastRSI)-8, PAD.r-4, 16, 2);
+    ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 8px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText(lastRSI.toFixed(1), W-PAD.r+5, toY(lastRSI)+3);
+  }}
+
+  // Label
+  ctx.fillStyle='#555'; ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.fillText('RSI(14)', 4, 10);
+}}
+
+// ════════════════════════════════════════════════════════
+//  MACD — Moving Average Convergence Divergence (12/26/9)
+// ════════════════════════════════════════════════════════
+function calcEMA(data, period) {{
+  const ema = new Array(data.length).fill(null);
+  const k = 2 / (period + 1);
+  let started = false;
+  let prev = 0;
+  for(let i=0; i<data.length; i++) {{
+    if(data[i] === null) continue;
+    if(!started) {{ prev = data[i]; ema[i] = prev; started = true; continue; }}
+    prev = data[i] * k + prev * (1 - k);
+    ema[i] = prev;
+  }}
+  return ema;
+}}
+
+function calcMACD(closes, fast=12, slow=26, signal=9) {{
+  const ema12 = calcEMA(closes, fast);
+  const ema26 = calcEMA(closes, slow);
+  const macd  = closes.map((_,i) => (ema12[i]!==null && ema26[i]!==null) ? ema12[i]-ema26[i] : null);
+  const sig   = calcEMA(macd, signal);
+  const hist  = macd.map((v,i) => (v!==null && sig[i]!==null) ? v-sig[i] : null);
+  return {{macd, signal:sig, hist}};
+}}
+
+function drawMACD() {{
+  const cv = $('cvMACD');
+  if(!cv || !showMACD) return;
+  const W = cv.width, H = cv.height;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+
+  const N = VIEW_END - VIEW_START;
+  if(N < 2 || H < 10) return;
+
+  const md = calcMACD(D.c, 12, 26, 9);
+  const macd = md.macd.slice(VIEW_START, VIEW_END);
+  const sig  = md.signal.slice(VIEW_START, VIEW_END);
+  const hist = md.hist.slice(VIEW_START, VIEW_END);
+
+  const vals = [...macd, ...sig, ...hist].filter(v=>v!==null);
+  if(!vals.length) return;
+  const hi = Math.max(...vals), lo = Math.min(...vals);
+  const rng = Math.max(Math.abs(hi), Math.abs(lo)) * 1.1 || 1;
+
+  const CW = (W - PAD.l - PAD.r) / N;
+  const toX = i => PAD.l + i*CW + CW/2;
+  const toY = v => (H/2) - (v/rng)*(H/2 - 4);
+
+  // Ligne zéro
+  ctx.strokeStyle='rgba(100,100,100,0.4)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W-PAD.r,H/2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Histogramme
+  for(let i=0; i<N; i++) {{
+    if(hist[i]===null) continue;
+    const x = PAD.l + i*CW + 1;
+    const bw = Math.max(1, CW-2);
+    const y0 = H/2;
+    const y1 = toY(hist[i]);
+    const bull = hist[i] >= 0;
+    // Couleur selon direction + momentum
+    const prevH = hist[i-1] || 0;
+    let col;
+    if(bull)  col = hist[i] > prevH ? '#00cc44' : '#007722';
+    else      col = hist[i] < prevH ? '#cc0000' : '#882200';
+    ctx.fillStyle = col;
+    ctx.fillRect(x, Math.min(y0,y1), bw, Math.abs(y1-y0));
+  }}
+
+  // Ligne MACD
+  ctx.beginPath(); let s1=false;
+  for(let i=0;i<N;i++) {{
+    if(macd[i]===null) continue;
+    s1?ctx.lineTo(toX(i),toY(macd[i])):ctx.moveTo(toX(i),toY(macd[i]));
+    s1=true;
+  }}
+  ctx.strokeStyle='rgba(100,180,255,0.9)'; ctx.lineWidth=1.5; ctx.stroke();
+
+  // Ligne Signal
+  ctx.beginPath(); let s2=false;
+  for(let i=0;i<N;i++) {{
+    if(sig[i]===null) continue;
+    s2?ctx.lineTo(toX(i),toY(sig[i])):ctx.moveTo(toX(i),toY(sig[i]));
+    s2=true;
+  }}
+  ctx.strokeStyle='rgba(255,165,0,0.9)'; ctx.lineWidth=1.2; ctx.stroke();
+
+  // Valeurs actuelles
+  const lm = macd.filter(v=>v!==null).pop();
+  const ls = sig.filter(v=>v!==null).pop();
+  if(lm!=null) {{
+    ctx.fillStyle='rgba(100,180,255,0.8)'; ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='right';
+    ctx.fillText('M:'+lm.toFixed(4), W-PAD.r-2, 10);
+  }}
+  if(ls!=null) {{
+    ctx.fillStyle='rgba(255,165,0,0.8)'; ctx.textAlign='right';
+    ctx.fillText('S:'+ls.toFixed(4), W-PAD.r-2, 20);
+  }}
+
+  // Label
+  ctx.fillStyle='#555'; ctx.textAlign='left';
+  ctx.fillText('MACD(12,26,9)', 4, 10);
+}}
 
 // ════════════════════════════════════════════════════════
 //  GAUSSIAN CHANNEL [DW] — traduit de Pine Script v4
@@ -1259,7 +1478,7 @@ function drawVol() {{
   ctx.textAlign='left'; ctx.fillText('VOLUME', 4, 10);
 }}
 
-function render() {{ drawMain(); drawVol(); }}
+function render() {{ drawMain(); drawVol(); drawRSI(); drawMACD(); }}
 
 function applyHeaderPrice(price, pct) {{
   const bull=parseFloat(pct)>=0;
@@ -1577,6 +1796,14 @@ function toggleGC() {{
 }}
 function toggleOB() {{
   showOB=!showOB; $('btnOB').classList.toggle('on',showOB); render();
+}}
+function toggleRSI() {{
+  showRSI=!showRSI; $('btnRSI').classList.toggle('on',showRSI);
+  setupCanvas(); render();
+}}
+function toggleMACD() {{
+  showMACD=!showMACD; $('btnMACD').classList.toggle('on',showMACD);
+  setupCanvas(); render();
 }}
 
 // ════════════════════════════════════════════════════════
