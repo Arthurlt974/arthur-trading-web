@@ -104,7 +104,7 @@ def render_chart(
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@700&display=swap');
 :root{{
   --bg:#000000;--surface:#0a0a0a;--surface2:#111111;
   --border:#1a1a1a;--border2:#1e1e1e;
@@ -119,27 +119,27 @@ def render_chart(
 *{{margin:0;padding:0;box-sizing:border-box;}}
 html,body{{
   background:var(--bg);color:var(--text);
-  font-family:'DM Sans',sans-serif;font-size:13px;
+  font-family:'Share Tech Mono',monospace;font-size:12px;
   width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column;
 }}
 
 /* ── HEADER ── */
 .hdr{{display:flex;align-items:center;background:var(--surface);
   border-bottom:1px solid var(--border2);height:46px;padding:0 12px;gap:0;flex-shrink:0;}}
-.logo{{font-weight:700;font-size:12px;letter-spacing:0.8px;color:var(--orange);
+.logo{{font-weight:700;font-size:12px;letter-spacing:2px;color:var(--orange);
   padding-right:14px;border-right:1px solid var(--border2);margin-right:14px;white-space:nowrap;}}
-.pair{{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.2px;margin-right:8px;}}
-.exch{{font-size:11px;color:var(--faint);letter-spacing:0.4px;margin-right:16px;}}
+.pair{{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.5px;margin-right:8px;}}
+.exch{{font-size:9px;color:var(--faint);letter-spacing:1px;margin-right:16px;}}
 .price-big{{font-size:20px;font-weight:700;letter-spacing:-0.5px;transition:color .15s;margin-right:6px;}}
 .price-chg{{font-size:11px;padding:2px 7px;border-radius:3px;font-weight:600;margin-right:16px;}}
 .price-chg.up{{background:rgba(38,166,154,0.15);color:var(--bull);}}
 .price-chg.dn{{background:rgba(239,83,80,0.15);color:var(--bear);}}
 .ohlc-row{{display:flex;gap:16px;align-items:center;}}
 .ohlc-item{{display:flex;flex-direction:column;gap:1px;}}
-.ohlc-lbl{{font-size:11px;color:var(--faint);letter-spacing:0.4px;text-transform:uppercase;}}
+.ohlc-lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
 .ohlc-val{{font-size:11px;font-weight:600;}}
 .hdr-right{{margin-left:auto;display:flex;align-items:center;gap:12px;}}
-.live-badge{{font-size:11px;padding:2px 8px;border-radius:2px;letter-spacing:0.4px;font-weight:700;}}
+.live-badge{{font-size:9px;padding:2px 8px;border-radius:2px;letter-spacing:1px;font-weight:700;}}
 .live-badge.live{{color:#00e676;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);animation:pulse 1.5s infinite;}}
 .live-badge.sim{{color:var(--orange);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.3);}}
 @keyframes pulse{{0%,100%{{opacity:1;}}50%{{opacity:0.4;}}}}
@@ -148,41 +148,16 @@ html,body{{
 .toolbar{{display:flex;align-items:center;background:var(--surface);
   border-bottom:1px solid var(--border2);height:34px;padding:0 8px;gap:2px;flex-shrink:0;}}
 .tf-btn{{padding:3px 9px;border:none;background:transparent;color:var(--muted);
-  font-family:'DM Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
-  border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.2px;}}
+  font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
+  border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.5px;}}
 .tf-btn:hover{{background:var(--surface2);color:var(--text);}}
 .tf-btn.active{{background:rgba(255,152,0,0.12);color:var(--orange);}}
 .tb-sep{{width:1px;height:18px;background:var(--border2);margin:0 4px;}}
 .indicator-btn{{padding:3px 9px;border:1px solid var(--border2);background:transparent;
-  color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;
+  color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;
   border-radius:3px;transition:all .1s;}}
 .indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
-
-
-/* ── DRAWING TOOLBAR (sidebar gauche) ── */
-.draw-sidebar{{
-  position:absolute;left:6px;top:50%;transform:translateY(-50%);
-  display:flex;flex-direction:column;gap:4px;z-index:100;
-}}
-.draw-btn{{
-  width:32px;height:32px;border:1px solid var(--border2);
-  background:var(--surface);color:var(--muted);
-  font-size:14px;cursor:pointer;border-radius:4px;
-  display:flex;align-items:center;justify-content:center;
-  transition:all .15s;position:relative;
-}}
-.draw-btn:hover{{border-color:#333;color:var(--text);background:var(--surface2);}}
-.draw-btn.active{{border-color:var(--orange);color:var(--orange);background:rgba(255,102,0,0.1);}}
-.draw-btn .db-tip{{
-  position:absolute;left:38px;top:50%;transform:translateY(-50%);
-  background:#111;border:1px solid #222;color:#ccc;
-  font-family:'DM Mono',monospace;font-size:10px;
-  padding:3px 8px;border-radius:3px;white-space:nowrap;
-  pointer-events:none;opacity:0;transition:opacity .15s;z-index:200;
-}}
-.draw-btn:hover .db-tip{{opacity:1;}}
-.draw-sep{{height:1px;background:var(--border2);margin:2px 0;}}
 
 /* ── CHART ZONE ── */
 .chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
@@ -194,14 +169,14 @@ html,body{{
 #tooltip{{
   position:fixed;pointer-events:none;z-index:9999;
   background:var(--surface);border:1px solid var(--border2);
-  padding:8px 12px;border-radius:4px;font-size:11px;
+  padding:8px 12px;border-radius:4px;font-size:10px;
   box-shadow:0 4px 16px rgba(0,0,0,0.6);display:none;
   min-width:160px;
 }}
-#tooltip .tt-date{{color:var(--muted);font-size:11px;margin-bottom:6px;letter-spacing:0.4px;}}
+#tooltip .tt-date{{color:var(--muted);font-size:9px;margin-bottom:6px;letter-spacing:1px;}}
 #tooltip .tt-row{{display:flex;justify-content:space-between;gap:16px;margin:2px 0;}}
-#tooltip .tt-lbl{{color:var(--faint);font-size:11px;}}
-#tooltip .tt-val{{font-weight:600;font-size:11px;}}
+#tooltip .tt-lbl{{color:var(--faint);font-size:9px;}}
+#tooltip .tt-val{{font-weight:600;font-size:10px;}}
 
 /* ── BOTTOM BAR ── */
 .bbar{{display:flex;background:var(--surface);border-top:1px solid var(--border2);
@@ -209,7 +184,7 @@ html,body{{
 .bstat{{flex:1;padding:0 14px;border-right:1px solid var(--border);
   display:flex;align-items:center;gap:8px;}}
 .bstat:last-child{{border-right:none;}}
-.bstat .lbl{{font-size:11px;color:var(--faint);letter-spacing:0.4px;text-transform:uppercase;}}
+.bstat .lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
 .bstat .val{{font-size:12px;font-weight:700;}}
 
 ::-webkit-scrollbar{{width:4px;}}
@@ -225,8 +200,8 @@ html,body{{
   display:none;align-items:center;gap:6px;
   padding:3px 12px;border:1px solid rgba(250,190,44,0.35);
   background:rgba(250,190,44,0.07);color:#FABE2C;
-  font-family:'DM Mono',monospace;font-size:11px;
-  font-weight:700;letter-spacing:0.6px;cursor:pointer;
+  font-family:'Share Tech Mono',monospace;font-size:10px;
+  font-weight:700;letter-spacing:1.5px;cursor:pointer;
   border-radius:3px;transition:all .15s;white-space:nowrap;
 }}
 .qp-toggle-btn:hover{{background:rgba(250,190,44,0.14);border-color:rgba(250,190,44,0.6);}}
@@ -248,18 +223,18 @@ html,body{{
   gap:8px;flex-shrink:0;
 }}
 .qp-title{{
-  font-family:'DM Sans',sans-serif;
+  font-family:'Rajdhani',sans-serif;
   font-weight:700;font-size:12px;
-  letter-spacing:0.8px;color:#FABE2C;
+  letter-spacing:2px;color:#FABE2C;
 }}
-.qp-sub{{font-size:11px;color:var(--muted);margin-left:auto;}}
+.qp-sub{{font-size:8px;color:var(--muted);margin-left:auto;}}
 .qp-tabs{{
   display:flex;background:var(--bg);
   border-bottom:1px solid #2A2A2A;flex-shrink:0;
 }}
 .qp-tab{{
   flex:1;padding:7px 4px;text-align:center;
-  font-size:11px;letter-spacing:0.4px;color:var(--muted);
+  font-size:8px;letter-spacing:1px;color:var(--muted);
   cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;
 }}
 .qp-tab:hover{{color:var(--text2);}}
@@ -282,12 +257,12 @@ html,body{{
 }}
 .tool-icon{{font-size:14px;min-width:20px;text-align:center;}}
 .tool-name{{
-  font-family:'DM Sans',sans-serif;font-weight:700;
-  font-size:12px;letter-spacing:0.4px;color:var(--text);flex:1;
+  font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:12px;letter-spacing:1px;color:var(--text);flex:1;
 }}
 .tool-card.tc-active .tool-name{{color:#FABE2C;}}
 .tool-card.tc-running .tool-name{{color:var(--orange);}}
-.tool-tag{{font-size:7px;padding:1px 5px;border-radius:2px;letter-spacing:0.2px;}}
+.tool-tag{{font-size:7px;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;}}
 .tag-risk{{background:rgba(255,34,34,0.12);color:#FF6B6B;border:1px solid rgba(255,34,34,0.2);}}
 .tag-sim {{background:rgba(255,102,0,0.12);color:#FF9944;border:1px solid rgba(255,102,0,0.2);}}
 .tag-opt {{background:rgba(0,200,83,0.10);color:#00E676;border:1px solid rgba(0,200,83,0.2);}}
@@ -298,19 +273,19 @@ html,body{{
 }}
 .tool-card.tc-active .tool-body-q{{display:flex;}}
 .field-row{{display:flex;gap:6px;align-items:center;}}
-.field-lbl{{font-size:11px;color:var(--muted);letter-spacing:0.2px;min-width:72px;}}
+.field-lbl{{font-size:8px;color:var(--muted);letter-spacing:0.5px;min-width:72px;}}
 .field-inp{{
   flex:1;background:var(--bg);border:1px solid #2A2A2A;
-  color:#FF9944;font-family:'DM Mono',monospace;
-  font-size:11px;padding:3px 7px;border-radius:2px;outline:none;
+  color:#FF9944;font-family:'Share Tech Mono',monospace;
+  font-size:10px;padding:3px 7px;border-radius:2px;outline:none;
 }}
 .field-inp:focus{{border-color:rgba(255,102,0,0.5);}}
-.field-unit{{font-size:11px;color:var(--muted);min-width:28px;}}
+.field-unit{{font-size:8px;color:var(--muted);min-width:28px;}}
 .run-btn{{
   margin-top:4px;padding:6px;
   background:rgba(255,102,0,0.12);border:1px solid rgba(255,102,0,0.3);
-  color:var(--orange);font-family:'DM Sans',sans-serif;font-weight:700;
-  font-size:11px;letter-spacing:0.8px;cursor:pointer;border-radius:3px;
+  color:var(--orange);font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:11px;letter-spacing:2px;cursor:pointer;border-radius:3px;
   transition:all .15s;text-align:center;
 }}
 .run-btn:hover{{background:rgba(255,102,0,0.22);border-color:var(--orange);}}
@@ -320,8 +295,8 @@ html,body{{
   display:flex;flex-direction:column;gap:4px;
 }}
 .result-row{{display:flex;justify-content:space-between;align-items:center;}}
-.result-lbl{{font-size:11px;color:var(--muted);}}
-.result-val{{font-size:11px;font-weight:600;}}
+.result-lbl{{font-size:8px;color:var(--muted);}}
+.result-val{{font-size:10px;font-weight:600;}}
 .val-green{{color:var(--green);}} .val-red{{color:var(--red);}}
 .val-orange{{color:#FF9944;}} .val-yellow{{color:#FABE2C;}}
 .result-bar{{height:3px;background:#1A1A1A;border-radius:2px;margin-top:4px;overflow:hidden;}}
@@ -333,15 +308,15 @@ html,body{{
   display:flex;align-items:center;gap:8px;padding:0 12px;height:34px;
   cursor:pointer;background:transparent;border:none;
   border-left:1px solid var(--border2);
-  font-family:'DM Mono',monospace;
+  font-family:'Share Tech Mono',monospace;
   transition:background .12s;
 }}
 .mode-btn:hover{{background:var(--surface2);}}
 .mode-icon{{font-size:13px;}}
 .mode-info{{display:flex;flex-direction:column;gap:1px;text-align:left;}}
-.mode-lbl{{font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--text2);}}
-.mode-sub{{font-size:11px;color:var(--faint);}}
-.mode-caret{{font-size:11px;color:var(--faint);transition:transform .15s;margin-left:4px;}}
+.mode-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);}}
+.mode-sub{{font-size:8px;color:var(--faint);}}
+.mode-caret{{font-size:8px;color:var(--faint);transition:transform .15s;margin-left:4px;}}
 .mode-caret.open{{transform:rotate(180deg);}}
 
 /* Couleur selon mode */
@@ -370,11 +345,11 @@ html,body{{
 .mode-opt.active{{background:rgba(255,152,0,0.05);}}
 .mo-icon{{font-size:16px;min-width:20px;}}
 .mo-text{{flex:1;}}
-.mo-lbl{{font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;}}
-.mo-desc{{font-size:11px;color:var(--faint);margin-top:2px;}}
+.mo-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}}
+.mo-desc{{font-size:9px;color:var(--faint);margin-top:2px;}}
 .mo-check{{font-size:11px;color:var(--orange);opacity:0;}}
 .mode-opt.active .mo-check{{opacity:1;}}
-.mo-badge{{font-size:11px;padding:1px 5px;border-radius:2px;letter-spacing:0.2px;
+.mo-badge{{font-size:8px;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;
   background:rgba(255,152,0,0.1);color:var(--orange);border:1px solid rgba(255,152,0,0.2);}}
 </style>
 </head>
@@ -385,7 +360,7 @@ html,body{{
   <div class="logo">AM<span style="color:#fff">.</span>TERMINAL</div>
   <div class="pair">{pair_disp}</div>
   <div class="exch">{exchange}</div>
-  <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:11px;padding:2px 7px;border-radius:2px;letter-spacing:0.4px;">{DATA_SOURCE.upper()}</div>
+  <div class="live-badge" style="background:rgba(255,152,0,0.08);color:var(--orange);border:1px solid rgba(255,152,0,0.2);font-size:8px;padding:2px 7px;border-radius:2px;letter-spacing:1px;">{DATA_SOURCE.upper()}</div>
   <div class="price-big" id="curPrice">—</div>
   <div class="price-chg up" id="curChg">—</div>
   <div class="ohlc-row">
@@ -416,21 +391,6 @@ html,body{{
   <button class="indicator-btn" id="btnMACD" onclick="toggleMACD()">MACD</button>
   <button class="{cls_gc}" id="btnGC" onclick="toggleGC()" title="Gaussian Channel">GC</button>
   <button class="{cls_ob}" id="btnOB" onclick="toggleOB()" title="Order Blocks">OB</button>
-
-  
-<!-- DRAWING SIDEBAR -->
-<div class="draw-sidebar" id="drawSidebar">
-  <button class="draw-btn" id="dbCursor"  onclick="setDrawTool('cursor')"  title="Curseur">↖<span class="db-tip">Curseur (Esc)</span></button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dbHline"   onclick="setDrawTool('hline')"   >—<span class="db-tip">Ligne horizontale (H)</span></button>
-  <button class="draw-btn" id="dbTrend"   onclick="setDrawTool('trend')"   >╱<span class="db-tip">Ligne de tendance (T)</span></button>
-  <button class="draw-btn" id="dbRect"    onclick="setDrawTool('rect')"    >▭<span class="db-tip">Rectangle (R)</span></button>
-  <button class="draw-btn" id="dbFib"     onclick="setDrawTool('fib')"     >φ<span class="db-tip">Fibonacci (F)</span></button>
-  <button class="draw-btn" id="dbText"    onclick="setDrawTool('text')"    >T<span class="db-tip">Annotation (A)</span></button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dbUndo"    onclick="undoDraw()"             >↩<span class="db-tip">Annuler (Ctrl+Z)</span></button>
-  <button class="draw-btn" id="dbClear"   onclick="clearDrawings()"        >🗑<span class="db-tip">Tout effacer</span></button>
-</div>
 
   <!-- QUANT TOOLS TOGGLE (visible only in quant mode) -->
   <button class="qp-toggle-btn" id="qpToggleBtn" onclick="toggleQuantPanel()">⚙ QUANT TOOLS ▶</button>
@@ -1002,7 +962,7 @@ function drawGaussianChannel(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
   }}
 
   // Légende
-  ctx.font = '9px DM Mono,monospace'; ctx.textAlign='left';
+  ctx.font = '9px Share Tech Mono,monospace'; ctx.textAlign='left';
   ctx.fillStyle='rgba(0,255,136,0.7)';
   ctx.fillText('GC', 8, 30);
 }}
@@ -1056,7 +1016,7 @@ function drawOrderBlocks(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
 
     // Label
     const label = (isBull ? 'Bull OB' : 'Bear OB') + (ob.mitigated ? ' ✗' : '');
-    ctx.font = 'bold 8px DM Mono,monospace';
+    ctx.font = 'bold 8px Share Tech Mono,monospace';
     ctx.fillStyle = isBull ? 'rgba(0,255,180,0.75)' : 'rgba(255,100,100,0.75)';
     ctx.textAlign = 'left';
     ctx.fillText(label, xStart + 4, Math.min(yTop,yBtm) + 10);
@@ -1066,7 +1026,7 @@ function drawOrderBlocks(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
   obs.bear.forEach(ob => drawOB(ob, false));
 
   // Légende
-  ctx.font='9px DM Mono,monospace'; ctx.textAlign='left';
+  ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
   ctx.fillStyle='rgba(8,200,150,0.7)';
   ctx.fillText('OB', 8+25, 30);
 }}
@@ -1104,12 +1064,12 @@ function drawMain() {{
     ctx.strokeStyle='#111111'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     // Prix axe droit
-    ctx.fillStyle='#444444'; ctx.font='10px DM Mono,monospace';
+    ctx.fillStyle='#444444'; ctx.font='10px Share Tech Mono,monospace';
     ctx.textAlign='left'; ctx.fillText(fmt(price), W-PAD.r+6, y+4);
   }}
 
   // ── GRILLE VERTICALE + AXE TEMPS ──
-  ctx.fillStyle='#444444'; ctx.font='9px DM Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#444444'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='center';
   const nTicks=Math.min(10,Math.max(3,Math.floor(N/15)));
   const prevMonth={{val:-1}};
   for(let t=0;t<=nTicks;t++) {{
@@ -1190,7 +1150,7 @@ function drawMain() {{
       ctx.strokeStyle=mc.color; ctx.lineWidth=mc.w; ctx.stroke();
     }});
     // Légende MA
-    ctx.font='9px DM Mono,monospace'; ctx.textAlign='left';
+    ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
     [{{'p':20,'c':'rgba(255,102,0,0.90)'}},{{'p':50,'c':'rgba(255,204,0,0.85)'}},{{'p':200,'c':'rgba(100,180,255,0.80)'}}].forEach((m,i)=>{{
       ctx.fillStyle=m.c;
       ctx.fillText(`MA${{m.p}}`, 8+i*52, 18);
@@ -1243,11 +1203,8 @@ function drawMain() {{
   ctx.beginPath();
   ctx.roundRect(W-PAD.r+2, py-9, PAD.r-4, 18, 2);
   ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='bold 9px DM Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#fff'; ctx.font='bold 9px Share Tech Mono,monospace'; ctx.textAlign='left';
   ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
-
-  // ── DRAWINGS ──
-  renderDrawings(ctx, W, H);
 
   // ── CROSSHAIR ──
   if(HOVER_IDX>=0 && HOVER_IDX<N) {{
@@ -1262,7 +1219,7 @@ function drawMain() {{
       const hp=hi-(HOVER_Y-PAD.t)/((H-PAD.t-PAD.b))*rng;
       ctx.fillStyle='#1a0800';
       ctx.beginPath(); ctx.roundRect(W-PAD.r+2,HOVER_Y-9,PAD.r-4,18,2); ctx.fill();
-      ctx.fillStyle='#e8e8e8'; ctx.font='9px DM Mono,monospace'; ctx.textAlign='left';
+      ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
       ctx.fillText(fmt(hp), W-PAD.r+5, HOVER_Y+4);
     }}
     // Label date en bas
@@ -1271,7 +1228,7 @@ function drawMain() {{
     ctx.fillStyle='#1a0800'; ctx.textAlign='center';
     const tw=ctx.measureText(dateLbl).width+12;
     ctx.beginPath(); ctx.roundRect(x-tw/2, H-PAD.b+2, tw, 16, 2); ctx.fill();
-    ctx.fillStyle='#e8e8e8'; ctx.font='9px DM Mono,monospace';
+    ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace';
     ctx.fillText(dateLbl, x, H-PAD.b+13);
 
     // Mise à jour OHLC header
@@ -1335,7 +1292,7 @@ function drawRSI() {{
     ctx.strokeStyle=col; ctx.lineWidth=1; ctx.setLineDash([3,3]);
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle=col; ctx.font='8px DM Mono,monospace';
+    ctx.fillStyle=col; ctx.font='8px Share Tech Mono,monospace';
     ctx.textAlign='left'; ctx.fillText(v,W-PAD.r+4,y+3);
   }});
 
@@ -1354,11 +1311,11 @@ function drawRSI() {{
     const col=last>=70?'#ff4444':last<=30?'#00ff65':'#e8a838';
     ctx.fillStyle=col;
     ctx.beginPath(); ctx.roundRect(W-PAD.r+2,toY(last)-8,PAD.r-4,16,2); ctx.fill();
-    ctx.fillStyle='#000'; ctx.font='bold 8px DM Mono,monospace'; ctx.textAlign='left';
+    ctx.fillStyle='#000'; ctx.font='bold 8px Share Tech Mono,monospace'; ctx.textAlign='left';
     ctx.fillText(last.toFixed(1),W-PAD.r+5,toY(last)+3);
   }}
 
-  ctx.fillStyle='#555'; ctx.font='8px DM Mono,monospace';
+  ctx.fillStyle='#555'; ctx.font='8px Share Tech Mono,monospace';
   ctx.textAlign='left'; ctx.fillText('RSI(14)',4,10);
 }}
 
@@ -1444,7 +1401,7 @@ function drawMACD() {{
   // Valeurs
   const lm=macd.filter(v=>v!==null).pop();
   const ls=sig.filter(v=>v!==null).pop();
-  ctx.font='8px DM Mono,monospace';
+  ctx.font='8px Share Tech Mono,monospace';
   if(lm!=null){{ ctx.fillStyle='rgba(100,180,255,0.8)'; ctx.textAlign='right'; ctx.fillText('M:'+lm.toFixed(4),W-PAD.r-2,10); }}
   if(ls!=null){{ ctx.fillStyle='rgba(255,165,0,0.8)'; ctx.textAlign='right'; ctx.fillText('S:'+ls.toFixed(4),W-PAD.r-2,20); }}
   ctx.fillStyle='#555'; ctx.textAlign='left'; ctx.fillText('MACD(12,26,9)',4,10);
@@ -1484,7 +1441,7 @@ function drawVol() {{
   ctx.strokeStyle='rgba(255,102,0,0.70)'; ctx.lineWidth=1; ctx.stroke();
 
   // Label
-  ctx.fillStyle='#333333'; ctx.font='8px DM Mono,monospace';
+  ctx.fillStyle='#333333'; ctx.font='8px Share Tech Mono,monospace';
   ctx.textAlign='left'; ctx.fillText('VOLUME', 4, 10);
 }}
 
@@ -1559,49 +1516,14 @@ cvMain.addEventListener('mousemove', e => {{
     setTxt('ttC', fmt(D.c[ri])); setCol('ttC', bull2?'var(--bull)':'var(--bear)');
     setTxt('ttV', fmtV(D.v[ri]));
   }}
-  // Preview dessin en cours
-  if(drawingInProgress && drawStartPx) {{
-    const pt2 = pxToData(mx, my);
-    drawingInProgress.ts2    = pt2.ts;
-    drawingInProgress.price2 = pt2.price;
-  }}
-
   drawMain();
 }});
 
 cvMain.addEventListener('mousedown', e => {{
-  const rect2 = cvMain.getBoundingClientRect();
-  const mx2 = e.clientX - rect2.left;
-  const my2 = e.clientY - rect2.top;
-  const pt  = pxToData(mx2, my2);
-
-  if(DRAW_TOOL !== 'cursor') {{
-    drawStartPx = {{ x: mx2, y: my2, pt }};
-    if(DRAW_TOOL === 'hline') {{
-      // Hline : confirmé au mousedown
-      drawings.push({{ type:'hline', price: pt.price, color:'#ff6600' }});
-      drawingInProgress = null;
-      render();
-    }} else if(DRAW_TOOL === 'text') {{
-      const txt = prompt('Texte de l\'annotation :');
-      if(txt) drawings.push({{ type:'text', ts1: pt.ts, price: pt.price, text: txt, color:'#ffffff' }});
-      render();
-    }} else {{
-      // trend / rect / fib : début du tracé
-      drawingInProgress = {{ type: DRAW_TOOL, ts1: pt.ts, price1: pt.price, ts2: null, price2: null,
-        color: DRAW_COLORS[DRAW_TOOL], fillColor:'rgba(255,102,0,0.08)' }};
-    }}
-    return;
-  }}
   isDragging=true; dragStartX=e.clientX; dragStartView=VIEW_START;
   cvMain.style.cursor='grabbing';
 }});
 window.addEventListener('mouseup', () => {{
-  if(drawingInProgress && drawingInProgress.ts2 !== null) {{
-    drawings.push({{ ...drawingInProgress }});
-    drawingInProgress = null;
-    render();
-  }}
   isDragging=false; cvMain.style.cursor='crosshair';
 }});
 cvMain.addEventListener('mouseleave', () => {{
@@ -1850,193 +1772,6 @@ function toggleGC() {{
 function toggleOB() {{
   showOB=!showOB; $('btnOB').classList.toggle('on',showOB); render();
 }}
-
-
-// ════════════════════════════════════════════════════════
-//  DRAWING TOOLS
-// ════════════════════════════════════════════════════════
-let DRAW_TOOL    = 'cursor';   // 'cursor'|'hline'|'trend'|'rect'|'fib'|'text'
-let drawings     = [];         // [{{type, ...coords, color}}]
-let drawingInProgress = null;  // dessin en cours (pas encore confirmé)
-let drawStartPx  = null;       // {x, y} pixels au mousedown
-
-const DRAW_COLORS = {{
-  hline: '#ff6600', trend: '#00ccff', rect: 'rgba(255,102,0,0.15)',
-  fib: '#ffcc00', text: '#ffffff'
-}};
-
-// Convertit px canvas → {price, idx} logiques
-function pxToData(mx, my) {{
-  const W = cvMain.width, H = cvMain.height;
-  const N = VIEW_END - VIEW_START;
-  const CW = (W - PAD.l - PAD.r) / N;
-  const slice = D.c.slice(VIEW_START, VIEW_END);
-  const hi = Math.max(...D.h.slice(VIEW_START, VIEW_END));
-  const lo = Math.min(...D.l.slice(VIEW_START, VIEW_END));
-  const rng = hi - lo || 1;
-  const idx  = VIEW_START + Math.max(0, Math.min(N-1, Math.floor((mx - PAD.l) / CW)));
-  const price = hi - (my - PAD.t) / (H - PAD.t - PAD.b) * rng;
-  return {{ idx, price, ts: D.t[idx] || 0 }};
-}}
-
-// Convertit {ts, price} → px canvas
-function dataToPx(ts_val, price) {{
-  const W = cvMain.width, H = cvMain.height;
-  const N = VIEW_END - VIEW_START;
-  const CW = (W - PAD.l - PAD.r) / N;
-  const hi = Math.max(...D.h.slice(VIEW_START, VIEW_END));
-  const lo = Math.min(...D.l.slice(VIEW_START, VIEW_END));
-  const rng = hi - lo || 1;
-  // Trouver l'index du ts dans les données visibles
-  let i = D.t.indexOf(ts_val);
-  if(i < 0) {{
-    // Interpoler si ts pas trouvé exactement
-    i = VIEW_START;
-    for(let k=VIEW_START; k<VIEW_END; k++) {{
-      if(D.t[k] <= ts_val) i = k;
-    }}
-  }}
-  const x = PAD.l + (i - VIEW_START) * CW + CW / 2;
-  const y = PAD.t + (hi - price) / rng * (H - PAD.t - PAD.b);
-  return {{ x, y }};
-}}
-
-function setDrawTool(tool) {{
-  DRAW_TOOL = tool;
-  drawingInProgress = null;
-  // Update curseur
-  cvMain.style.cursor = tool === 'cursor' ? 'crosshair' : 'crosshair';
-  // Update boutons sidebar
-  ['cursor','hline','trend','rect','fib','text'].forEach(t => {{
-    const b = $('db' + t.charAt(0).toUpperCase() + t.slice(1));
-    if(b) b.classList.toggle('active', t === tool);
-  }});
-}}
-
-function undoDraw() {{
-  drawings.pop();
-  render();
-}}
-
-function clearDrawings() {{
-  drawings = [];
-  drawingInProgress = null;
-  render();
-}}
-
-// Rendu de tous les dessins sur le canvas
-function renderDrawings(ctx, W, H) {{
-  const N = VIEW_END - VIEW_START;
-  const CW = (W - PAD.l - PAD.r) / N;
-  const hi = Math.max(...D.h.slice(VIEW_START, VIEW_END));
-  const lo = Math.min(...D.l.slice(VIEW_START, VIEW_END));
-  const rng = hi - lo || 1;
-
-  const toX = ts_val => {{
-    let i = D.t.lastIndexOf(ts_val);
-    if(i < 0) {{ for(let k=VIEW_START;k<VIEW_END;k++) {{ if(D.t[k]<=ts_val) i=k; }} }}
-    return PAD.l + (i - VIEW_START) * CW + CW / 2;
-  }};
-  const toY = p => PAD.t + (hi - p) / rng * (H - PAD.t - PAD.b);
-
-  // Dessiner les drawings enregistrés + celui en cours
-  const all = drawingInProgress ? [...drawings, drawingInProgress] : drawings;
-
-  for(const d of all) {{
-    ctx.save();
-    ctx.setLineDash([]);
-
-    if(d.type === 'hline') {{
-      const y = toY(d.price);
-      if(y < PAD.t || y > H - PAD.b) {{ ctx.restore(); continue; }}
-      ctx.strokeStyle = d.color || '#ff6600';
-      ctx.lineWidth = d === drawingInProgress ? 1.5 : 1.5;
-      ctx.setLineDash([6,4]);
-      ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(W - PAD.r, y); ctx.stroke();
-      ctx.setLineDash([]);
-      // Label prix
-      ctx.fillStyle = d.color || '#ff6600';
-      ctx.font = '10px DM Mono,monospace'; ctx.textAlign = 'left';
-      ctx.fillText(fmt(d.price), W - PAD.r + 6, y + 4);
-
-    }} else if(d.type === 'trend') {{
-      if(!d.ts2) {{ ctx.restore(); continue; }}
-      const x1 = toX(d.ts1), y1 = toY(d.price1);
-      const x2 = toX(d.ts2), y2 = toY(d.price2);
-      ctx.strokeStyle = d.color || '#00ccff';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-      // Points de contrôle
-      ctx.fillStyle = d.color || '#00ccff';
-      ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(x2,y2,3,0,Math.PI*2); ctx.fill();
-
-    }} else if(d.type === 'rect') {{
-      if(!d.ts2) {{ ctx.restore(); continue; }}
-      const x1 = toX(d.ts1), y1 = toY(d.price1);
-      const x2 = toX(d.ts2), y2 = toY(d.price2);
-      ctx.fillStyle = d.fillColor || 'rgba(255,102,0,0.08)';
-      ctx.strokeStyle = d.color || '#ff6600';
-      ctx.lineWidth = 1;
-      ctx.fillRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
-      ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
-
-    }} else if(d.type === 'fib') {{
-      if(!d.ts2) {{ ctx.restore(); continue; }}
-      const x1 = toX(d.ts1), y1 = toY(d.price1);
-      const x2 = toX(d.ts2), y2 = toY(d.price2);
-      const xL = Math.min(x1,x2), xR = Math.max(x1,x2);
-      const pHi = Math.max(d.price1, d.price2);
-      const pLo = Math.min(d.price1, d.price2);
-      const diff = pHi - pLo;
-      const FIB_LEVELS = [
-        {{r:0,     col:'#888888', lbl:'0%'}},
-        {{r:0.236, col:'#ff9800', lbl:'23.6%'}},
-        {{r:0.382, col:'#ffcc00', lbl:'38.2%'}},
-        {{r:0.5,   col:'#00ccff', lbl:'50%'}},
-        {{r:0.618, col:'#00ff41', lbl:'61.8%'}},
-        {{r:0.786, col:'#ff6600', lbl:'78.6%'}},
-        {{r:1,     col:'#888888', lbl:'100%'}},
-      ];
-      for(const lv of FIB_LEVELS) {{
-        const price = pLo + diff * (1 - lv.r);
-        const y = toY(price);
-        if(y < PAD.t - 5 || y > H - PAD.b + 5) continue;
-        ctx.strokeStyle = lv.col; ctx.lineWidth = 1;
-        ctx.setLineDash([4,3]);
-        ctx.beginPath(); ctx.moveTo(xL, y); ctx.lineTo(xR, y); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = lv.col; ctx.font = '9px DM Mono,monospace'; ctx.textAlign = 'left';
-        ctx.fillText(lv.lbl + '  ' + fmt(price), xR + 4, y + 3);
-      }}
-      // Zone colorée entre 38.2% et 61.8%
-      const yA = toY(pLo + diff * 0.618);
-      const yB = toY(pLo + diff * 0.382);
-      ctx.fillStyle = 'rgba(0,204,255,0.04)';
-      ctx.fillRect(xL, Math.min(yA,yB), xR-xL, Math.abs(yB-yA));
-
-    }} else if(d.type === 'text') {{
-      const x = toX(d.ts1), y = toY(d.price);
-      ctx.fillStyle = d.color || '#ffffff';
-      ctx.font = 'bold 11px DM Sans,sans-serif'; ctx.textAlign = 'left';
-      ctx.fillText(d.text || '', x, y);
-    }}
-
-    ctx.restore();
-  }}
-}}
-
-// ── Keyboard shortcuts ──
-document.addEventListener('keydown', e => {{
-  if(e.target.tagName === 'INPUT') return;
-  if(e.key === 'Escape') setDrawTool('cursor');
-  if(e.key === 'h' || e.key === 'H') setDrawTool('hline');
-  if(e.key === 't' || e.key === 'T') setDrawTool('trend');
-  if(e.key === 'r' || e.key === 'R') setDrawTool('rect');
-  if(e.key === 'f' || e.key === 'F') setDrawTool('fib');
-  if(e.key === 'a' || e.key === 'A') setDrawTool('text');
-  if((e.ctrlKey||e.metaKey) && e.key === 'z') {{ e.preventDefault(); undoDraw(); }}
-}});
 
 // ════════════════════════════════════════════════════════
 //  PRIX TEMPS RÉEL
