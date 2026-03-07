@@ -2961,6 +2961,7 @@ elif outil == "VALORISATION FONDAMENTALE":
     if "vf_label"       not in st.session_state: st.session_state["vf_label"]       = ""
     if "vf_info"        not in st.session_state: st.session_state["vf_info"]        = {}
     if "vf_devise"      not in st.session_state: st.session_state["vf_devise"]      = "$"
+    if "vf_pending"     not in st.session_state: st.session_state["vf_pending"]     = None
 
     col1, col2 = st.columns([2, 1])
     with col1:
@@ -2976,18 +2977,27 @@ elif outil == "VALORISATION FONDAMENTALE":
     if analyser_clicked:
         vf_input = st.session_state["vf_input_field"].strip()
         if vf_input:
-            resolved = trouver_ticker(vf_input)
-            with st.spinner(f"Analyse de {vf_input} ({resolved}) en cours..."):
-                calculator = ValuationCalculator(resolved)
-                results    = calculator.get_comprehensive_valuation()
-                _info_vf   = calculator.info or {}
-                _devise    = _info_vf.get("currency", "USD")
-                _sym_dev   = "€" if _devise == "EUR" else ("£" if _devise in ("GBP","GBp") else "$")
-                st.session_state["vf_results"] = results
-                st.session_state["vf_symbol"]  = resolved
-                st.session_state["vf_label"]   = vf_input
-                st.session_state["vf_info"]    = _info_vf
-                st.session_state["vf_devise"]  = _sym_dev
+            # Marquer qu'un calcul est demandé
+            st.session_state["vf_pending"] = vf_input
+            st.session_state["vf_results"] = None  # reset affichage
+
+    # Calcul déclenché séparément du bouton pour éviter les problèmes de rerun
+    if st.session_state.get("vf_pending"):
+        vf_input = st.session_state["vf_pending"]
+        st.session_state["vf_pending"] = None  # consommer le pending
+        with st.spinner(f"Analyse de {vf_input} en cours..."):
+            resolved   = trouver_ticker(vf_input)
+            calculator = ValuationCalculator(resolved)
+            results    = calculator.get_comprehensive_valuation()
+            _info_vf   = calculator.info or {}
+            _devise    = _info_vf.get("currency", "USD")
+            _sym_dev   = "€" if _devise == "EUR" else ("£" if _devise in ("GBP","GBp") else "$")
+            st.session_state["vf_results"] = results
+            st.session_state["vf_symbol"]  = resolved
+            st.session_state["vf_label"]   = vf_input
+            st.session_state["vf_info"]    = _info_vf
+            st.session_state["vf_devise"]  = _sym_dev
+        st.rerun()
 
     # Affichage — uniquement les données en cache, jamais de recalcul ici
     if st.session_state["vf_results"] is not None:
