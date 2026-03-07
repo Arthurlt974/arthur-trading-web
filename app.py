@@ -2954,35 +2954,51 @@ elif outil == "VALORISATION FONDAMENTALE":
     st.markdown("## 💰 VALORISATION FONDAMENTALE")
     st.markdown("**Calculez la valeur théorique d'un actif avec plusieurs méthodes d'évaluation**")
 
+    # Init session state — le champ texte est géré via sa propre clé
+    if "vf_input_field" not in st.session_state: st.session_state["vf_input_field"] = "AAPL"
+    if "vf_results"     not in st.session_state: st.session_state["vf_results"]     = None
+    if "vf_symbol"      not in st.session_state: st.session_state["vf_symbol"]      = ""
+    if "vf_label"       not in st.session_state: st.session_state["vf_label"]       = ""
+    if "vf_info"        not in st.session_state: st.session_state["vf_info"]        = {}
+    if "vf_devise"      not in st.session_state: st.session_state["vf_devise"]      = "$"
+
     col1, col2 = st.columns([2, 1])
     with col1:
-        # FIX #5 : accepte nom ou ticker, résolution intelligente
-        vf_input = st.text_input("NOM OU TICKER DE L'ACTIF", value="AAPL",
-                                  help="Ex: Apple, AAPL, Tesla, TSLA, LVMH, MC.PA, BTC-USD")
+        # Pas de value= fixe : la valeur vient du session_state via la clé
+        st.text_input("NOM OU TICKER DE L'ACTIF",
+                      help="Ex: Apple, AAPL, Tesla, TSLA, LVMH, MC.PA, BTC-USD",
+                      key="vf_input_field")
     with col2:
         st.write("")
         st.write("")
-        if st.button("🔍 ANALYSER LA VALORISATION", use_container_width=True):
-            # FIX #7 : forcer recalcul à chaque clic même si même symbole
+        analyser_clicked = st.button("🔍 ANALYSER LA VALORISATION", use_container_width=True, key="vf_btn")
+
+    if analyser_clicked:
+        vf_input = st.session_state["vf_input_field"].strip()
+        if vf_input:
             resolved = trouver_ticker(vf_input)
-            st.session_state["valuation_symbol"] = resolved
-            st.session_state["valuation_input"]  = vf_input
+            with st.spinner(f"Analyse de {vf_input} ({resolved}) en cours..."):
+                calculator = ValuationCalculator(resolved)
+                results    = calculator.get_comprehensive_valuation()
+                _info_vf   = calculator.info or {}
+                _devise    = _info_vf.get("currency", "USD")
+                _sym_dev   = "€" if _devise == "EUR" else ("£" if _devise in ("GBP","GBp") else "$")
+                st.session_state["vf_results"] = results
+                st.session_state["vf_symbol"]  = resolved
+                st.session_state["vf_label"]   = vf_input
+                st.session_state["vf_info"]    = _info_vf
+                st.session_state["vf_devise"]  = _sym_dev
 
-    if "valuation_symbol" in st.session_state:
-        symbol   = st.session_state["valuation_symbol"]
-        vf_label = st.session_state.get("valuation_input", symbol)
-        with st.spinner(f"Analyse fondamentale de {vf_label} ({symbol}) en cours..."):
-            calculator = ValuationCalculator(symbol)
-            results    = calculator.get_comprehensive_valuation()
+    # Affichage — uniquement les données en cache, jamais de recalcul ici
+    if st.session_state["vf_results"] is not None:
+        results  = st.session_state["vf_results"]
+        _info_vf = st.session_state["vf_info"]
+        _sym_dev = st.session_state["vf_devise"]
+        vf_label = st.session_state["vf_label"]
 
-            # FIX #6 : détecter la devise réelle
-            _info_vf = calculator.info or {}
-            _devise  = _info_vf.get("currency", "USD")
-            _sym_dev = "€" if _devise in ("EUR","GBP","GBp") else ("£" if _devise == "GBP" else "$")
-
-            if not results:
-                st.error("❌ Impossible de valoriser cet actif. Vérifiez le ticker ou essayez une période différente.")
-            else:
+        if not results:
+            st.error("❌ Impossible de valoriser cet actif. Vérifiez le ticker ou essayez une période différente.")
+        else:
                 if "consensus" in results:
                     cons    = results["consensus"]
                     upside  = cons["upside_pct"]
@@ -3120,7 +3136,7 @@ elif outil == "VALORISATION FONDAMENTALE":
 
                 st.markdown("---")
                 st.markdown("### ℹ️ INFORMATIONS COMPLÉMENTAIRES")
-                info_vf = calculator.info
+                info_vf = _info_vf  # déjà chargé depuis session_state
                 if info_vf:
                     col_info = st.columns(4)
                     with col_info[0]: st.write(f"**Secteur:** {info_vf.get('sector', 'N/A')}")
