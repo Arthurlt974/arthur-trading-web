@@ -4514,47 +4514,42 @@ elif outil == "HEATMAP MARCHÉ":
                             st.markdown(f"<div style='padding: 12px; background: #ff000022; border-left: 4px solid #ff0000; border-radius: 5px; margin: 8px 0;'><div style='display: flex; justify-content: space-between;'><b style='color: #ff0000; font-size: 16px;'>{row['Ticker']}</b><b style='color: white; font-size: 16px;'>{row['Change']:+.2f}%</b></div><small style='color: #ccc;'>${row['Price']:.2f}</small></div>", unsafe_allow_html=True)
 
                     st.markdown("---")
-                    st.markdown("### 🗺️ TREEMAP VISUEL")
-                    # Couleur progressive : rouge fort → gris → vert fort
-                    def _heat_color(v):
-                        if v >= 3:   return "#00e676"
-                        elif v >= 1: return "#66bb6a"
-                        elif v >= 0: return "#a5d6a7"
-                        elif v >= -1: return "#ef9a9a"
-                        elif v >= -3: return "#e53935"
-                        else:        return "#b71c1c"
-
-                    df_heatmap["color"] = df_heatmap["Change"].apply(_heat_color)
-                    df_heatmap["label"] = df_heatmap.apply(
-                        lambda r: f"{r['Ticker']}<br>{r['Change']:+.2f}%", axis=1)
-                    fig_tree = go.Figure(go.Treemap(
-                        labels=df_heatmap["label"],
-                        parents=df_heatmap["Sector"],
-                        values=[abs(c) + 0.5 for c in df_heatmap["Change"]],
-                        marker=dict(
-                            colors=df_heatmap["color"],
-                            line=dict(color="#111", width=1.5)
-                        ),
-                        textinfo="label",
-                        textfont=dict(size=13, color="white", family="IBM Plex Mono"),
-                        hovertemplate="<b>%{label}</b><extra></extra>",
-                    ))
-                    fig_tree.update_layout(
-                        paper_bgcolor="#0e1117", margin=dict(l=0,r=0,t=10,b=0), height=500,
-                        font=dict(color="white")
-                    )
-                    st.plotly_chart(fig_tree, use_container_width=True)
-                    # Légende couleur
-                    st.markdown("""
-                        <div style='display:flex;gap:12px;font-size:12px;font-family:monospace;margin-top:-10px;'>
-                            <span style='color:#b71c1c'>■ < -3%</span>
-                            <span style='color:#e53935'>■ -3% à -1%</span>
-                            <span style='color:#ef9a9a'>■ -1% à 0%</span>
-                            <span style='color:#a5d6a7'>■ 0% à +1%</span>
-                            <span style='color:#66bb6a'>■ +1% à +3%</span>
-                            <span style='color:#00e676'>■ > +3%</span>
+                    st.markdown("### 🗺️ TREEMAP LIVE — TRADINGVIEW")
+                    # Mapping marché → dataSource TradingView
+                    tv_source_map = {
+                        "S&P 500 Top 30":   ("S&P500",   "sector"),
+                        "NASDAQ Top 20":    ("NASDAQ100","sector"),
+                        "CAC 40":           ("EURONEXT", "sector"),
+                        "Crypto Top 15":    ("Crypto",   "crypto_sector"),
+                        "Secteurs S&P 500": ("SPX500",   "sector"),
+                    }
+                    tv_source, tv_grouping = tv_source_map.get(market_choice, ("S&P500", "sector"))
+                    # Taille bloc & couleur basées sur market_cap / variation
+                    html_tv_heatmap = f"""
+                    <div style="height:520px; border:1px solid #1A1A1A; border-radius:6px; overflow:hidden;">
+                        <div class="tradingview-widget-container" style="height:100%;">
+                            <div class="tradingview-widget-container__widget" style="height:100%;"></div>
+                            <script type="text/javascript"
+                                src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
+                            {{
+                              "exchanges": [],
+                              "dataSource": "{tv_source}",
+                              "grouping": "{tv_grouping}",
+                              "blockSize": "market_cap_basic",
+                              "blockColor": "change",
+                              "locale": "fr",
+                              "colorTheme": "dark",
+                              "hasTopBar": true,
+                              "isDatasetResizable": false,
+                              "isBlockSelectionDisabled": false,
+                              "width": "100%",
+                              "height": "520"
+                            }}
+                            </script>
                         </div>
-                    """, unsafe_allow_html=True)
+                    </div>
+                    """
+                    components.html(html_tv_heatmap, height=530)
 
                     st.markdown("---")
                     st.markdown("### 📊 DISTRIBUTION DES PERFORMANCES")
