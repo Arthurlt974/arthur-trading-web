@@ -434,8 +434,8 @@ def show_analyse_perso():
             cols = st.columns(min(3, len(resultats_affiches)))
             for i, (symbol, name, type_actif, exchange) in enumerate(resultats_affiches[:6]):
                 with cols[i % 3]:
-                    display_label = f"{symbol}
-{name[:30]}" + ("..." if len(name) > 30 else "")
+                    suffix = "..." if len(name) > 30 else ""
+                    display_label = f"{symbol} — {name[:30]}{suffix}"
                     if st.button(display_label, key=f"select_{symbol}_{i}", use_container_width=True):
                         st.session_state["analyse_ticker_selectionne"]   = symbol
                         st.session_state["analyse_nom_selectionne"]      = name
