@@ -159,6 +159,31 @@ html,body{{
 .indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
 
+
+/* ── DRAWING TOOLBAR (sidebar gauche) ── */
+.draw-sidebar{{
+  position:absolute;left:6px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:4px;z-index:100;
+}}
+.draw-btn{{
+  width:32px;height:32px;border:1px solid var(--border2);
+  background:var(--surface);color:var(--muted);
+  font-size:14px;cursor:pointer;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;position:relative;
+}}
+.draw-btn:hover{{border-color:#333;color:var(--text);background:var(--surface2);}}
+.draw-btn.active{{border-color:var(--orange);color:var(--orange);background:rgba(255,102,0,0.1);}}
+.draw-btn .db-tip{{
+  position:absolute;left:38px;top:50%;transform:translateY(-50%);
+  background:#111;border:1px solid #222;color:#ccc;
+  font-family:'DM Mono',monospace;font-size:10px;
+  padding:3px 8px;border-radius:3px;white-space:nowrap;
+  pointer-events:none;opacity:0;transition:opacity .15s;z-index:200;
+}}
+.draw-btn:hover .db-tip{{opacity:1;}}
+.draw-sep{{height:1px;background:var(--border2);margin:2px 0;}}
+
 /* ── CHART ZONE ── */
 .chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
 #cvMain{{display:block;cursor:crosshair;}}
@@ -391,6 +416,21 @@ html,body{{
   <button class="indicator-btn" id="btnMACD" onclick="toggleMACD()">MACD</button>
   <button class="{cls_gc}" id="btnGC" onclick="toggleGC()" title="Gaussian Channel">GC</button>
   <button class="{cls_ob}" id="btnOB" onclick="toggleOB()" title="Order Blocks">OB</button>
+
+  
+<!-- DRAWING SIDEBAR -->
+<div class="draw-sidebar" id="drawSidebar">
+  <button class="draw-btn" id="dbCursor"  onclick="setDrawTool('cursor')"  title="Curseur">↖<span class="db-tip">Curseur (Esc)</span></button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dbHline"   onclick="setDrawTool('hline')"   >—<span class="db-tip">Ligne horizontale (H)</span></button>
+  <button class="draw-btn" id="dbTrend"   onclick="setDrawTool('trend')"   >╱<span class="db-tip">Ligne de tendance (T)</span></button>
+  <button class="draw-btn" id="dbRect"    onclick="setDrawTool('rect')"    >▭<span class="db-tip">Rectangle (R)</span></button>
+  <button class="draw-btn" id="dbFib"     onclick="setDrawTool('fib')"     >φ<span class="db-tip">Fibonacci (F)</span></button>
+  <button class="draw-btn" id="dbText"    onclick="setDrawTool('text')"    >T<span class="db-tip">Annotation (A)</span></button>
+  <div class="draw-sep"></div>
+  <button class="draw-btn" id="dbUndo"    onclick="undoDraw()"             >↩<span class="db-tip">Annuler (Ctrl+Z)</span></button>
+  <button class="draw-btn" id="dbClear"   onclick="clearDrawings()"        >🗑<span class="db-tip">Tout effacer</span></button>
+</div>
 
   <!-- QUANT TOOLS TOGGLE (visible only in quant mode) -->
   <button class="qp-toggle-btn" id="qpToggleBtn" onclick="toggleQuantPanel()">⚙ QUANT TOOLS ▶</button>
@@ -1206,6 +1246,9 @@ function drawMain() {{
   ctx.fillStyle='#fff'; ctx.font='bold 9px DM Mono,monospace'; ctx.textAlign='left';
   ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
 
+  // ── DRAWINGS ──
+  renderDrawings(ctx, W, H);
+
   // ── CROSSHAIR ──
   if(HOVER_IDX>=0 && HOVER_IDX<N) {{
     const x=toX(HOVER_IDX);
@@ -1516,14 +1559,49 @@ cvMain.addEventListener('mousemove', e => {{
     setTxt('ttC', fmt(D.c[ri])); setCol('ttC', bull2?'var(--bull)':'var(--bear)');
     setTxt('ttV', fmtV(D.v[ri]));
   }}
+  // Preview dessin en cours
+  if(drawingInProgress && drawStartPx) {{
+    const pt2 = pxToData(mx, my);
+    drawingInProgress.ts2    = pt2.ts;
+    drawingInProgress.price2 = pt2.price;
+  }}
+
   drawMain();
 }});
 
 cvMain.addEventListener('mousedown', e => {{
+  const rect2 = cvMain.getBoundingClientRect();
+  const mx2 = e.clientX - rect2.left;
+  const my2 = e.clientY - rect2.top;
+  const pt  = pxToData(mx2, my2);
+
+  if(DRAW_TOOL !== 'cursor') {{
+    drawStartPx = {{ x: mx2, y: my2, pt }};
+    if(DRAW_TOOL === 'hline') {{
+      // Hline : confirmé au mousedown
+      drawings.push({{ type:'hline', price: pt.price, color:'#ff6600' }});
+      drawingInProgress = null;
+      render();
+    }} else if(DRAW_TOOL === 'text') {{
+      const txt = prompt('Texte de l\'annotation :');
+      if(txt) drawings.push({{ type:'text', ts1: pt.ts, price: pt.price, text: txt, color:'#ffffff' }});
+      render();
+    }} else {{
+      // trend / rect / fib : début du tracé
+      drawingInProgress = {{ type: DRAW_TOOL, ts1: pt.ts, price1: pt.price, ts2: null, price2: null,
+        color: DRAW_COLORS[DRAW_TOOL], fillColor:'rgba(255,102,0,0.08)' }};
+    }}
+    return;
+  }}
   isDragging=true; dragStartX=e.clientX; dragStartView=VIEW_START;
   cvMain.style.cursor='grabbing';
 }});
 window.addEventListener('mouseup', () => {{
+  if(drawingInProgress && drawingInProgress.ts2 !== null) {{
+    drawings.push({{ ...drawingInProgress }});
+    drawingInProgress = null;
+    render();
+  }}
   isDragging=false; cvMain.style.cursor='crosshair';
 }});
 cvMain.addEventListener('mouseleave', () => {{
@@ -1772,6 +1850,193 @@ function toggleGC() {{
 function toggleOB() {{
   showOB=!showOB; $('btnOB').classList.toggle('on',showOB); render();
 }}
+
+
+// ════════════════════════════════════════════════════════
+//  DRAWING TOOLS
+// ════════════════════════════════════════════════════════
+let DRAW_TOOL    = 'cursor';   // 'cursor'|'hline'|'trend'|'rect'|'fib'|'text'
+let drawings     = [];         // [{{type, ...coords, color}}]
+let drawingInProgress = null;  // dessin en cours (pas encore confirmé)
+let drawStartPx  = null;       // {x, y} pixels au mousedown
+
+const DRAW_COLORS = {{
+  hline: '#ff6600', trend: '#00ccff', rect: 'rgba(255,102,0,0.15)',
+  fib: '#ffcc00', text: '#ffffff'
+}};
+
+// Convertit px canvas → {price, idx} logiques
+function pxToData(mx, my) {{
+  const W = cvMain.width, H = cvMain.height;
+  const N = VIEW_END - VIEW_START;
+  const CW = (W - PAD.l - PAD.r) / N;
+  const slice = D.c.slice(VIEW_START, VIEW_END);
+  const hi = Math.max(...D.h.slice(VIEW_START, VIEW_END));
+  const lo = Math.min(...D.l.slice(VIEW_START, VIEW_END));
+  const rng = hi - lo || 1;
+  const idx  = VIEW_START + Math.max(0, Math.min(N-1, Math.floor((mx - PAD.l) / CW)));
+  const price = hi - (my - PAD.t) / (H - PAD.t - PAD.b) * rng;
+  return {{ idx, price, ts: D.t[idx] || 0 }};
+}}
+
+// Convertit {ts, price} → px canvas
+function dataToPx(ts_val, price) {{
+  const W = cvMain.width, H = cvMain.height;
+  const N = VIEW_END - VIEW_START;
+  const CW = (W - PAD.l - PAD.r) / N;
+  const hi = Math.max(...D.h.slice(VIEW_START, VIEW_END));
+  const lo = Math.min(...D.l.slice(VIEW_START, VIEW_END));
+  const rng = hi - lo || 1;
+  // Trouver l'index du ts dans les données visibles
+  let i = D.t.indexOf(ts_val);
+  if(i < 0) {{
+    // Interpoler si ts pas trouvé exactement
+    i = VIEW_START;
+    for(let k=VIEW_START; k<VIEW_END; k++) {{
+      if(D.t[k] <= ts_val) i = k;
+    }}
+  }}
+  const x = PAD.l + (i - VIEW_START) * CW + CW / 2;
+  const y = PAD.t + (hi - price) / rng * (H - PAD.t - PAD.b);
+  return {{ x, y }};
+}}
+
+function setDrawTool(tool) {{
+  DRAW_TOOL = tool;
+  drawingInProgress = null;
+  // Update curseur
+  cvMain.style.cursor = tool === 'cursor' ? 'crosshair' : 'crosshair';
+  // Update boutons sidebar
+  ['cursor','hline','trend','rect','fib','text'].forEach(t => {{
+    const b = $('db' + t.charAt(0).toUpperCase() + t.slice(1));
+    if(b) b.classList.toggle('active', t === tool);
+  }});
+}}
+
+function undoDraw() {{
+  drawings.pop();
+  render();
+}}
+
+function clearDrawings() {{
+  drawings = [];
+  drawingInProgress = null;
+  render();
+}}
+
+// Rendu de tous les dessins sur le canvas
+function renderDrawings(ctx, W, H) {{
+  const N = VIEW_END - VIEW_START;
+  const CW = (W - PAD.l - PAD.r) / N;
+  const hi = Math.max(...D.h.slice(VIEW_START, VIEW_END));
+  const lo = Math.min(...D.l.slice(VIEW_START, VIEW_END));
+  const rng = hi - lo || 1;
+
+  const toX = ts_val => {{
+    let i = D.t.lastIndexOf(ts_val);
+    if(i < 0) {{ for(let k=VIEW_START;k<VIEW_END;k++) {{ if(D.t[k]<=ts_val) i=k; }} }}
+    return PAD.l + (i - VIEW_START) * CW + CW / 2;
+  }};
+  const toY = p => PAD.t + (hi - p) / rng * (H - PAD.t - PAD.b);
+
+  // Dessiner les drawings enregistrés + celui en cours
+  const all = drawingInProgress ? [...drawings, drawingInProgress] : drawings;
+
+  for(const d of all) {{
+    ctx.save();
+    ctx.setLineDash([]);
+
+    if(d.type === 'hline') {{
+      const y = toY(d.price);
+      if(y < PAD.t || y > H - PAD.b) {{ ctx.restore(); continue; }}
+      ctx.strokeStyle = d.color || '#ff6600';
+      ctx.lineWidth = d === drawingInProgress ? 1.5 : 1.5;
+      ctx.setLineDash([6,4]);
+      ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(W - PAD.r, y); ctx.stroke();
+      ctx.setLineDash([]);
+      // Label prix
+      ctx.fillStyle = d.color || '#ff6600';
+      ctx.font = '10px DM Mono,monospace'; ctx.textAlign = 'left';
+      ctx.fillText(fmt(d.price), W - PAD.r + 6, y + 4);
+
+    }} else if(d.type === 'trend') {{
+      if(!d.ts2) {{ ctx.restore(); continue; }}
+      const x1 = toX(d.ts1), y1 = toY(d.price1);
+      const x2 = toX(d.ts2), y2 = toY(d.price2);
+      ctx.strokeStyle = d.color || '#00ccff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      // Points de contrôle
+      ctx.fillStyle = d.color || '#00ccff';
+      ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x2,y2,3,0,Math.PI*2); ctx.fill();
+
+    }} else if(d.type === 'rect') {{
+      if(!d.ts2) {{ ctx.restore(); continue; }}
+      const x1 = toX(d.ts1), y1 = toY(d.price1);
+      const x2 = toX(d.ts2), y2 = toY(d.price2);
+      ctx.fillStyle = d.fillColor || 'rgba(255,102,0,0.08)';
+      ctx.strokeStyle = d.color || '#ff6600';
+      ctx.lineWidth = 1;
+      ctx.fillRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+      ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+
+    }} else if(d.type === 'fib') {{
+      if(!d.ts2) {{ ctx.restore(); continue; }}
+      const x1 = toX(d.ts1), y1 = toY(d.price1);
+      const x2 = toX(d.ts2), y2 = toY(d.price2);
+      const xL = Math.min(x1,x2), xR = Math.max(x1,x2);
+      const pHi = Math.max(d.price1, d.price2);
+      const pLo = Math.min(d.price1, d.price2);
+      const diff = pHi - pLo;
+      const FIB_LEVELS = [
+        {{r:0,     col:'#888888', lbl:'0%'}},
+        {{r:0.236, col:'#ff9800', lbl:'23.6%'}},
+        {{r:0.382, col:'#ffcc00', lbl:'38.2%'}},
+        {{r:0.5,   col:'#00ccff', lbl:'50%'}},
+        {{r:0.618, col:'#00ff41', lbl:'61.8%'}},
+        {{r:0.786, col:'#ff6600', lbl:'78.6%'}},
+        {{r:1,     col:'#888888', lbl:'100%'}},
+      ];
+      for(const lv of FIB_LEVELS) {{
+        const price = pLo + diff * (1 - lv.r);
+        const y = toY(price);
+        if(y < PAD.t - 5 || y > H - PAD.b + 5) continue;
+        ctx.strokeStyle = lv.col; ctx.lineWidth = 1;
+        ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(xL, y); ctx.lineTo(xR, y); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = lv.col; ctx.font = '9px DM Mono,monospace'; ctx.textAlign = 'left';
+        ctx.fillText(lv.lbl + '  ' + fmt(price), xR + 4, y + 3);
+      }}
+      // Zone colorée entre 38.2% et 61.8%
+      const yA = toY(pLo + diff * 0.618);
+      const yB = toY(pLo + diff * 0.382);
+      ctx.fillStyle = 'rgba(0,204,255,0.04)';
+      ctx.fillRect(xL, Math.min(yA,yB), xR-xL, Math.abs(yB-yA));
+
+    }} else if(d.type === 'text') {{
+      const x = toX(d.ts1), y = toY(d.price);
+      ctx.fillStyle = d.color || '#ffffff';
+      ctx.font = 'bold 11px DM Sans,sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(d.text || '', x, y);
+    }}
+
+    ctx.restore();
+  }}
+}}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', e => {{
+  if(e.target.tagName === 'INPUT') return;
+  if(e.key === 'Escape') setDrawTool('cursor');
+  if(e.key === 'h' || e.key === 'H') setDrawTool('hline');
+  if(e.key === 't' || e.key === 'T') setDrawTool('trend');
+  if(e.key === 'r' || e.key === 'R') setDrawTool('rect');
+  if(e.key === 'f' || e.key === 'F') setDrawTool('fib');
+  if(e.key === 'a' || e.key === 'A') setDrawTool('text');
+  if((e.ctrlKey||e.metaKey) && e.key === 'z') {{ e.preventDefault(); undoDraw(); }}
+}});
 
 // ════════════════════════════════════════════════════════
 //  PRIX TEMPS RÉEL
