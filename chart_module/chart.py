@@ -1594,7 +1594,7 @@ function drawMain() {{
     const y=PAD.t+s*(H-PAD.t-PAD.b)/gridSteps;
     const price=hi-s*rng/gridSteps;
     ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(PAD.l+36,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     ctx.strokeStyle='rgba(255,255,255,0.15)';
     ctx.beginPath(); ctx.moveTo(W-PAD.r,y); ctx.lineTo(W-PAD.r+4,y); ctx.stroke();
     const mid=(hi+lo)/2;
