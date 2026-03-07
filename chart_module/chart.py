@@ -189,6 +189,117 @@ html,body{{
 ::-webkit-scrollbar-track{{background:var(--bg);}}
 ::-webkit-scrollbar-thumb{{background:var(--border2);border-radius:2px;}}
 
+/* ── MAIN LAYOUT ── */
+.main{{display:flex;flex:1;overflow:hidden;}}
+.chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
+
+/* ── QUANT TOGGLE BUTTON (toolbar) ── */
+.qp-toggle-btn{{
+  display:none;align-items:center;gap:6px;
+  padding:3px 12px;border:1px solid rgba(250,190,44,0.35);
+  background:rgba(250,190,44,0.07);color:#FABE2C;
+  font-family:'Share Tech Mono',monospace;font-size:10px;
+  font-weight:700;letter-spacing:1.5px;cursor:pointer;
+  border-radius:3px;transition:all .15s;white-space:nowrap;
+}}
+.qp-toggle-btn:hover{{background:rgba(250,190,44,0.14);border-color:rgba(250,190,44,0.6);}}
+.qp-toggle-btn.qmode{{display:flex;}}
+
+/* ── QUANT PANEL ── */
+.quant-panel{{
+  width:320px;flex-shrink:0;
+  background:var(--surface);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  border-left:1px solid #2A2A2A;
+}}
+.qp-header{{
+  display:flex;align-items:center;
+  height:36px;padding:0 12px;
+  background:var(--surface2);
+  border-bottom:1px solid #2A2A2A;
+  gap:8px;flex-shrink:0;
+}}
+.qp-title{{
+  font-family:'Rajdhani',sans-serif;
+  font-weight:700;font-size:12px;
+  letter-spacing:2px;color:#FABE2C;
+}}
+.qp-sub{{font-size:8px;color:var(--muted);margin-left:auto;}}
+.qp-tabs{{
+  display:flex;background:var(--bg);
+  border-bottom:1px solid #2A2A2A;flex-shrink:0;
+}}
+.qp-tab{{
+  flex:1;padding:7px 4px;text-align:center;
+  font-size:8px;letter-spacing:1px;color:var(--muted);
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;
+}}
+.qp-tab:hover{{color:var(--text2);}}
+.qp-tab.active{{color:#FABE2C;border-bottom-color:#FABE2C;background:rgba(250,190,44,0.04);}}
+.qp-tools{{
+  flex:1;overflow-y:auto;padding:8px;
+  display:flex;flex-direction:column;gap:6px;
+}}
+.qp-tools::-webkit-scrollbar{{width:3px;}}
+.qp-tools::-webkit-scrollbar-thumb{{background:#2A2A2A;}}
+.tool-card{{
+  background:var(--surface2);border:1px solid #1A1A1A;
+  border-radius:4px;cursor:pointer;transition:all .15s;overflow:hidden;
+}}
+.tool-card:hover{{border-color:#2A2A2A;background:var(--surface);}}
+.tool-card.tc-active{{border-color:rgba(250,190,44,0.4);background:rgba(250,190,44,0.04);}}
+.tool-card.tc-running{{border-color:rgba(255,102,0,0.5);}}
+.tool-header-q{{
+  display:flex;align-items:center;padding:7px 10px;gap:8px;
+}}
+.tool-icon{{font-size:14px;min-width:20px;text-align:center;}}
+.tool-name{{
+  font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:12px;letter-spacing:1px;color:var(--text);flex:1;
+}}
+.tool-card.tc-active .tool-name{{color:#FABE2C;}}
+.tool-card.tc-running .tool-name{{color:var(--orange);}}
+.tool-tag{{font-size:7px;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;}}
+.tag-risk{{background:rgba(255,34,34,0.12);color:#FF6B6B;border:1px solid rgba(255,34,34,0.2);}}
+.tag-sim {{background:rgba(255,102,0,0.12);color:#FF9944;border:1px solid rgba(255,102,0,0.2);}}
+.tag-opt {{background:rgba(0,200,83,0.10);color:#00E676;border:1px solid rgba(0,200,83,0.2);}}
+.tag-stat{{background:rgba(100,180,255,0.10);color:#64B5F6;border:1px solid rgba(100,180,255,0.2);}}
+.tool-body-q{{
+  padding:0 10px 10px;display:none;
+  flex-direction:column;gap:6px;border-top:1px solid #1A1A1A;
+}}
+.tool-card.tc-active .tool-body-q{{display:flex;}}
+.field-row{{display:flex;gap:6px;align-items:center;}}
+.field-lbl{{font-size:8px;color:var(--muted);letter-spacing:0.5px;min-width:72px;}}
+.field-inp{{
+  flex:1;background:var(--bg);border:1px solid #2A2A2A;
+  color:#FF9944;font-family:'Share Tech Mono',monospace;
+  font-size:10px;padding:3px 7px;border-radius:2px;outline:none;
+}}
+.field-inp:focus{{border-color:rgba(255,102,0,0.5);}}
+.field-unit{{font-size:8px;color:var(--muted);min-width:28px;}}
+.run-btn{{
+  margin-top:4px;padding:6px;
+  background:rgba(255,102,0,0.12);border:1px solid rgba(255,102,0,0.3);
+  color:var(--orange);font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:11px;letter-spacing:2px;cursor:pointer;border-radius:3px;
+  transition:all .15s;text-align:center;
+}}
+.run-btn:hover{{background:rgba(255,102,0,0.22);border-color:var(--orange);}}
+.result-box{{
+  background:var(--bg);border:1px solid #2A2A2A;
+  border-radius:3px;padding:8px;
+  display:flex;flex-direction:column;gap:4px;
+}}
+.result-row{{display:flex;justify-content:space-between;align-items:center;}}
+.result-lbl{{font-size:8px;color:var(--muted);}}
+.result-val{{font-size:10px;font-weight:600;}}
+.val-green{{color:var(--green);}} .val-red{{color:var(--red);}}
+.val-orange{{color:#FF9944;}} .val-yellow{{color:#FABE2C;}}
+.result-bar{{height:3px;background:#1A1A1A;border-radius:2px;margin-top:4px;overflow:hidden;}}
+.result-bar-fill{{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--orange),#FABE2C);}}
+
 /* ── MODE DROPDOWN ── */
 .mode-wrap{{position:relative;margin-left:auto;}}
 .mode-btn{{
@@ -275,6 +386,9 @@ html,body{{
   <button class="{cls_vol}" id="btnVol" onclick="toggleVol()">Vol</button>
   <button class="{cls_bb}" id="btnBB" onclick="toggleBB()">BB</button>
 
+  <!-- QUANT TOOLS TOGGLE (visible only in quant mode) -->
+  <button class="qp-toggle-btn" id="qpToggleBtn" onclick="toggleQuantPanel()">⚙ QUANT TOOLS ▶</button>
+
   <!-- MODE DROPDOWN -->
   <div class="mode-wrap">
     <button class="mode-btn" id="modeBtn" data-mode="normal" onclick="toggleModeDD()">
@@ -316,12 +430,180 @@ html,body{{
   </div>
 </div>
 
+<!-- MAIN = CHART + QUANT PANEL -->
+<div class="main" id="mainArea">
+
 <!-- ZONE CHART -->
 <div class="chart-zone">
   <canvas id="cvMain"></canvas>
   <div class="vol-sep"></div>
   <canvas id="cvVol"></canvas>
 </div>
+
+<!-- QUANT PANEL (hidden by default, shown in quant mode) -->
+<div class="quant-panel" id="quantPanel" style="display:none">
+  <div class="qp-header">
+    <span style="color:#FABE2C;font-size:14px">⚙</span>
+    <span class="qp-title">QUANT TOOLS</span>
+    <span class="qp-sub" id="qpSub">— · —</span>
+  </div>
+  <div class="qp-tabs">
+    <div class="qp-tab active" onclick="switchQTab(this,'risk')">RISK</div>
+    <div class="qp-tab" onclick="switchQTab(this,'simul')">SIMUL</div>
+    <div class="qp-tab" onclick="switchQTab(this,'optim')">OPTIM</div>
+    <div class="qp-tab" onclick="switchQTab(this,'stats')">STATS</div>
+  </div>
+  <div class="qp-tools">
+
+    <!-- Monte Carlo -->
+    <div class="tool-card tc-active" id="tc-montecarlo">
+      <div class="tool-header-q" onclick="toggleToolCard('tc-montecarlo')">
+        <span class="tool-icon">🎲</span>
+        <span class="tool-name">Monte Carlo</span>
+        <span class="tool-tag tag-sim">JUMP DIFF</span>
+      </div>
+      <div class="tool-body-q">
+        <div class="field-row">
+          <span class="field-lbl">HORIZON</span>
+          <input class="field-inp" value="90" style="max-width:50px">
+          <span class="field-unit">jours</span>
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">SIMULATIONS</span>
+          <input class="field-inp" value="5000" style="max-width:60px">
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">λ JUMPS/AN</span>
+          <input class="field-inp" value="3" style="max-width:40px">
+        </div>
+        <div class="run-btn">▶ AFFICHER SUR GRAPHIQUE</div>
+        <div class="result-box">
+          <div class="result-row"><span class="result-lbl">PRIX MOYEN</span><span class="result-val val-orange">$0.101 (+8.2%)</span></div>
+          <div class="result-row"><span class="result-lbl">P95 HAUSSIER</span><span class="result-val val-green">$0.141 (+51%)</span></div>
+          <div class="result-row"><span class="result-lbl">P5 BAISSIER</span><span class="result-val val-red">$0.051 (-45%)</span></div>
+          <div class="result-row"><span class="result-lbl">PROB. PROFIT</span><span class="result-val val-green">51.2%</span></div>
+          <div class="result-row"><span class="result-lbl">VaR 95%</span><span class="result-val val-red">-$42,510</span></div>
+          <div class="result-bar"><div class="result-bar-fill" style="width:51%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VaR / CVaR -->
+    <div class="tool-card tc-running" id="tc-var">
+      <div class="tool-header-q" onclick="toggleToolCard('tc-var')">
+        <span class="tool-icon">📉</span>
+        <span class="tool-name">VaR / CVaR</span>
+        <span class="tool-tag tag-risk">AVEC LEVIER</span>
+      </div>
+      <div class="tool-body-q">
+        <div class="field-row">
+          <span class="field-lbl">CAPITAL</span>
+          <input class="field-inp" value="10000" style="max-width:70px">
+          <span class="field-unit">USDT</span>
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">LEVIER</span>
+          <input class="field-inp" value="3" style="max-width:40px">
+          <span class="field-unit">x</span>
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">CONFIANCE</span>
+          <input class="field-inp" value="95" style="max-width:40px">
+          <span class="field-unit">%</span>
+        </div>
+        <div class="run-btn" style="background:rgba(255,34,34,0.1);border-color:rgba(255,34,34,0.3);color:#FF6B6B">▶ CALCULER</div>
+        <div class="result-box">
+          <div class="result-row"><span class="result-lbl">VaR 95% (1J)</span><span class="result-val val-red">-$1,240</span></div>
+          <div class="result-row"><span class="result-lbl">CVaR 95%</span><span class="result-val val-red">-$1,890</span></div>
+          <div class="result-row"><span class="result-lbl">LIQUIDATION</span><span class="result-val val-red">$0.062 (-33%)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kelly Criterion -->
+    <div class="tool-card" id="tc-kelly">
+      <div class="tool-header-q" onclick="toggleToolCard('tc-kelly')">
+        <span class="tool-icon">⚖️</span>
+        <span class="tool-name">Kelly Criterion</span>
+        <span class="tool-tag tag-opt">POSITION</span>
+      </div>
+      <div class="tool-body-q">
+        <div class="field-row"><span class="field-lbl">WIN RATE</span><input class="field-inp" value="55" style="max-width:50px"><span class="field-unit">%</span></div>
+        <div class="field-row"><span class="field-lbl">RATIO W/L</span><input class="field-inp" value="1.5" style="max-width:50px"></div>
+        <div class="run-btn" style="background:rgba(0,200,83,0.08);border-color:rgba(0,200,83,0.3);color:#00E676">▶ CALCULER</div>
+      </div>
+    </div>
+
+    <!-- Sharpe / Sortino -->
+    <div class="tool-card" id="tc-sharpe">
+      <div class="tool-header-q" onclick="toggleToolCard('tc-sharpe')">
+        <span class="tool-icon">📊</span>
+        <span class="tool-name">Sharpe / Sortino</span>
+        <span class="tool-tag tag-stat">PERF</span>
+      </div>
+      <div class="tool-body-q">
+        <div class="field-row"><span class="field-lbl">PÉRIODE</span><input class="field-inp" value="30" style="max-width:50px"><span class="field-unit">jours</span></div>
+        <div class="run-btn" style="background:rgba(100,180,255,0.08);border-color:rgba(100,180,255,0.3);color:#64B5F6">▶ CALCULER</div>
+      </div>
+    </div>
+
+    <!-- GARCH -->
+    <div class="tool-card" id="tc-garch">
+      <div class="tool-header-q" onclick="toggleToolCard('tc-garch')">
+        <span class="tool-icon">〰️</span>
+        <span class="tool-name">GARCH Volatility</span>
+        <span class="tool-tag tag-stat">VOL MODEL</span>
+      </div>
+      <div class="tool-body-q">
+        <div class="field-row"><span class="field-lbl">FENÊTRE</span><input class="field-inp" value="50" style="max-width:50px"><span class="field-unit">jours</span></div>
+        <div class="run-btn" style="background:rgba(100,180,255,0.08);border-color:rgba(100,180,255,0.3);color:#64B5F6">▶ CALCULER</div>
+      </div>
+    </div>
+
+    <!-- Correlation Matrix -->
+    <div class="tool-card" id="tc-corr">
+      <div class="tool-header-q" onclick="toggleToolCard('tc-corr')">
+        <span class="tool-icon">🔗</span>
+        <span class="tool-name">Correlation Matrix</span>
+        <span class="tool-tag tag-stat">MULTI-ASSET</span>
+      </div>
+      <div class="tool-body-q">
+        <div class="field-row"><span class="field-lbl">ACTIFS</span><input class="field-inp" value="BTC,ETH,SOL"></div>
+        <div class="run-btn" style="background:rgba(100,180,255,0.08);border-color:rgba(100,180,255,0.3);color:#64B5F6">▶ CALCULER</div>
+      </div>
+    </div>
+
+    <!-- Portfolio Optim -->
+    <div class="tool-card" id="tc-portfolio">
+      <div class="tool-header-q" onclick="toggleToolCard('tc-portfolio')">
+        <span class="tool-icon">🎯</span>
+        <span class="tool-name">Portfolio Optim.</span>
+        <span class="tool-tag tag-opt">MARKOWITZ</span>
+      </div>
+      <div class="tool-body-q">
+        <div class="field-row"><span class="field-lbl">ACTIFS</span><input class="field-inp" value="BTC,ETH,SOL,DOGE"></div>
+        <div class="run-btn" style="background:rgba(0,200,83,0.08);border-color:rgba(0,200,83,0.3);color:#00E676">▶ OPTIMISER</div>
+      </div>
+    </div>
+
+    <!-- ML Predictions -->
+    <div class="tool-card" id="tc-ml">
+      <div class="tool-header-q" onclick="toggleToolCard('tc-ml')">
+        <span class="tool-icon">🤖</span>
+        <span class="tool-name">ML Predictions</span>
+        <span class="tool-tag tag-sim">BETA</span>
+      </div>
+      <div class="tool-body-q">
+        <div class="field-row"><span class="field-lbl">MODÈLE</span><input class="field-inp" value="LSTM" style="max-width:70px"></div>
+        <div class="field-row"><span class="field-lbl">HORIZON</span><input class="field-inp" value="7" style="max-width:50px"><span class="field-unit">jours</span></div>
+        <div class="run-btn">▶ PRÉDIRE</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- end .main -->
 
 <!-- TOOLTIP -->
 <div id="tooltip">
@@ -428,7 +710,8 @@ const fmtDate = ts => {{
 }};
 
 function setupCanvas() {{
-  const W  = window.innerWidth  || 900;
+  const panelW = (CHART_MODE === 'quant' && quantPanelOpen) ? 320 : 0;
+  const W  = (window.innerWidth  || 900) - panelW;
   const fullH = window.innerHeight || 600;
   // Hauteurs fixes des zones UI
   const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
@@ -924,6 +1207,37 @@ async function reloadOHLCVCoinGecko(tf) {{
   }}
 }}
 
+// ════════════════════════════════════════════════════════
+//  QUANT PANEL
+// ════════════════════════════════════════════════════════
+let quantPanelOpen = true;
+
+function toggleQuantPanel() {{
+  quantPanelOpen = !quantPanelOpen;
+  const qPanel = $('quantPanel');
+  const btn    = $('qpToggleBtn');
+  if(qPanel) qPanel.style.display = quantPanelOpen ? 'flex' : 'none';
+  if(btn)    btn.textContent = quantPanelOpen ? '⚙ QUANT TOOLS ▶' : '⚙ QUANT TOOLS ◀';
+  setupCanvas(); render();
+}}
+
+function switchQTab(el, tab) {{
+  document.querySelectorAll('.qp-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}}
+
+function toggleToolCard(id) {{
+  const card = $(id);
+  if(!card) return;
+  const wasActive = card.classList.contains('tc-active');
+  // Close all
+  document.querySelectorAll('.tool-card').forEach(c => {{
+    c.classList.remove('tc-active');
+    c.classList.remove('tc-running');
+  }});
+  if(!wasActive) card.classList.add('tc-active');
+}}
+
 function toggleModeDD() {{
   $('modeDD').classList.toggle('open');
   $('modeCaret').classList.toggle('open');
@@ -952,13 +1266,23 @@ function pickMode(key, lbl, sub, icon) {{
   $('modeDD').classList.remove('open');
   $('modeCaret').classList.remove('open');
 
-  // ─────────────────────────────────────────────
-  //  TODO : logique par mode
-  //  CHART_MODE === 'normal' → bougies + MA + Vol
-  //  CHART_MODE === 'pro'    → + RSI + MACD + panels
-  //  CHART_MODE === 'quant'  → + signaux algo + patterns
-  // ─────────────────────────────────────────────
-  console.log('[AM.Terminal] Mode →', key);
+  // ── Gestion du panneau QUANT ──
+  const isQuant = key === 'quant';
+  const qpBtn   = $('qpToggleBtn');
+  const qPanel  = $('quantPanel');
+  if(qpBtn) qpBtn.classList.toggle('qmode', isQuant);
+  if(qPanel) {{
+    if(isQuant) {{
+      quantPanelOpen = true;
+      qPanel.style.display = 'flex';
+      qpBtn.textContent = '⚙ QUANT TOOLS ▶';
+      // Update sub label
+      const sub = $('qpSub');
+      if(sub) sub.textContent = (window.CURRENT_SYMBOL || '{binance_symbol}') + ' · ' + (window.CURRENT_TF || '{active_tf}').toUpperCase();
+    }} else {{
+      qPanel.style.display = 'none';
+    }}
+  }}
   render();
 }}
 
