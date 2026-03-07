@@ -104,7 +104,7 @@ def render_chart(
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap');
 :root{{
   --bg:#000000;--surface:#0a0a0a;--surface2:#111111;
   --border:#1a1a1a;--border2:#1e1e1e;
@@ -119,17 +119,17 @@ def render_chart(
 *{{margin:0;padding:0;box-sizing:border-box;}}
 html,body{{
   background:var(--bg);color:var(--text);
-  font-family:'Share Tech Mono',monospace;font-size:12px;
+  font-family:'DM Sans',sans-serif;font-size:12px;
   width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column;
 }}
 
 /* ── HEADER ── */
 .hdr{{display:flex;align-items:center;background:var(--surface);
   border-bottom:1px solid var(--border2);height:46px;padding:0 12px;gap:0;flex-shrink:0;}}
-.logo{{font-weight:700;font-size:12px;letter-spacing:2px;color:var(--orange);
+.logo{{font-weight:700;font-size:12px;letter-spacing:1.5px;color:var(--orange);
   padding-right:14px;border-right:1px solid var(--border2);margin-right:14px;white-space:nowrap;}}
-.pair{{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.5px;margin-right:8px;}}
-.exch{{font-size:9px;color:var(--faint);letter-spacing:1px;margin-right:16px;}}
+.pair{{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0.3px;margin-right:8px;}}
+.exch{{font-size:9px;color:var(--faint);letter-spacing:0.5px;margin-right:16px;}}
 .price-big{{font-size:20px;font-weight:700;letter-spacing:-0.5px;transition:color .15s;margin-right:6px;}}
 .price-chg{{font-size:11px;padding:2px 7px;border-radius:3px;font-weight:600;margin-right:16px;}}
 .price-chg.up{{background:rgba(38,166,154,0.15);color:var(--bull);}}
@@ -139,7 +139,7 @@ html,body{{
 .ohlc-lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
 .ohlc-val{{font-size:11px;font-weight:600;}}
 .hdr-right{{margin-left:auto;display:flex;align-items:center;gap:12px;}}
-.live-badge{{font-size:9px;padding:2px 8px;border-radius:2px;letter-spacing:1px;font-weight:700;}}
+.live-badge{{font-size:9px;padding:2px 8px;border-radius:2px;letter-spacing:0.5px;font-weight:700;}}
 .live-badge.live{{color:#00e676;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);animation:pulse 1.5s infinite;}}
 .live-badge.sim{{color:var(--orange);background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.3);}}
 @keyframes pulse{{0%,100%{{opacity:1;}}50%{{opacity:0.4;}}}}
@@ -148,34 +148,16 @@ html,body{{
 .toolbar{{display:flex;align-items:center;background:var(--surface);
   border-bottom:1px solid var(--border2);height:34px;padding:0 8px;gap:2px;flex-shrink:0;}}
 .tf-btn{{padding:3px 9px;border:none;background:transparent;color:var(--muted);
-  font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
-  border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.5px;}}
+  font-family:'DM Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;
+  border-radius:3px;transition:all .1s;text-transform:uppercase;letter-spacing:0.3px;}}
 .tf-btn:hover{{background:var(--surface2);color:var(--text);}}
 .tf-btn.active{{background:rgba(255,152,0,0.12);color:var(--orange);}}
 .tb-sep{{width:1px;height:18px;background:var(--border2);margin:0 4px;}}
 .indicator-btn{{padding:3px 9px;border:1px solid var(--border2);background:transparent;
-  color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;
+  color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;
   border-radius:3px;transition:all .1s;}}
 .indicator-btn:hover{{background:var(--surface2);color:var(--text);}}
 .indicator-btn.on{{color:var(--orange);border-color:rgba(255,152,0,0.4);}}
-
-
-/* ── DRAWING TOOLBAR ── */
-.draw-toolbar{{
-  width:36px;flex-shrink:0;background:var(--surface);
-  border-right:1px solid var(--border2);
-  display:flex;flex-direction:column;align-items:center;
-  padding:6px 0;gap:2px;z-index:10;
-}}
-.draw-btn{{
-  width:26px;height:26px;background:transparent;border:none;
-  color:var(--muted);font-size:13px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  border-radius:3px;transition:all .1s;
-}}
-.draw-btn:hover{{background:var(--surface2);color:var(--text);}}
-.draw-btn.active{{background:rgba(255,152,0,0.15);color:var(--orange);}}
-.draw-sep{{width:20px;height:1px;background:var(--border2);margin:2px 0;}}
 
 /* ── CHART ZONE ── */
 .chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
@@ -191,7 +173,7 @@ html,body{{
   box-shadow:0 4px 16px rgba(0,0,0,0.6);display:none;
   min-width:160px;
 }}
-#tooltip .tt-date{{color:var(--muted);font-size:9px;margin-bottom:6px;letter-spacing:1px;}}
+#tooltip .tt-date{{color:var(--muted);font-size:9px;margin-bottom:6px;letter-spacing:0.5px;}}
 #tooltip .tt-row{{display:flex;justify-content:space-between;gap:16px;margin:2px 0;}}
 #tooltip .tt-lbl{{color:var(--faint);font-size:9px;}}
 #tooltip .tt-val{{font-weight:600;font-size:10px;}}
@@ -202,7 +184,7 @@ html,body{{
 .bstat{{flex:1;padding:0 14px;border-right:1px solid var(--border);
   display:flex;align-items:center;gap:8px;}}
 .bstat:last-child{{border-right:none;}}
-.bstat .lbl{{font-size:8px;color:var(--faint);letter-spacing:1px;text-transform:uppercase;}}
+.bstat .lbl{{font-size:8px;color:var(--faint);letter-spacing:0.5px;text-transform:uppercase;}}
 .bstat .val{{font-size:12px;font-weight:700;}}
 
 ::-webkit-scrollbar{{width:4px;}}
@@ -218,8 +200,8 @@ html,body{{
   display:none;align-items:center;gap:6px;
   padding:3px 12px;border:1px solid rgba(250,190,44,0.35);
   background:rgba(250,190,44,0.07);color:#FABE2C;
-  font-family:'Share Tech Mono',monospace;font-size:10px;
-  font-weight:700;letter-spacing:1.5px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:10px;
+  font-weight:700;letter-spacing:1px;cursor:pointer;
   border-radius:3px;transition:all .15s;white-space:nowrap;
 }}
 .qp-toggle-btn:hover{{background:rgba(250,190,44,0.14);border-color:rgba(250,190,44,0.6);}}
@@ -241,9 +223,9 @@ html,body{{
   gap:8px;flex-shrink:0;
 }}
 .qp-title{{
-  font-family:'Rajdhani',sans-serif;
+  font-family:'DM Sans',sans-serif;
   font-weight:700;font-size:12px;
-  letter-spacing:2px;color:#FABE2C;
+  letter-spacing:1.5px;color:#FABE2C;
 }}
 .qp-sub{{font-size:8px;color:var(--muted);margin-left:auto;}}
 .qp-tabs{{
@@ -275,8 +257,8 @@ html,body{{
 }}
 .tool-icon{{font-size:14px;min-width:20px;text-align:center;}}
 .tool-name{{
-  font-family:'Rajdhani',sans-serif;font-weight:700;
-  font-size:12px;letter-spacing:1px;color:var(--text);flex:1;
+  font-family:'DM Sans',sans-serif;font-weight:700;
+  font-size:12px;letter-spacing:0.5px;color:var(--text);flex:1;
 }}
 .tool-card.tc-active .tool-name{{color:#FABE2C;}}
 .tool-card.tc-running .tool-name{{color:var(--orange);}}
@@ -294,7 +276,7 @@ html,body{{
 .field-lbl{{font-size:8px;color:var(--muted);letter-spacing:0.5px;min-width:72px;}}
 .field-inp{{
   flex:1;background:var(--bg);border:1px solid #2A2A2A;
-  color:#FF9944;font-family:'Share Tech Mono',monospace;
+  color:#FF9944;font-family:'DM Mono',monospace;
   font-size:10px;padding:3px 7px;border-radius:2px;outline:none;
 }}
 .field-inp:focus{{border-color:rgba(255,102,0,0.5);}}
@@ -302,8 +284,8 @@ html,body{{
 .run-btn{{
   margin-top:4px;padding:6px;
   background:rgba(255,102,0,0.12);border:1px solid rgba(255,102,0,0.3);
-  color:var(--orange);font-family:'Rajdhani',sans-serif;font-weight:700;
-  font-size:11px;letter-spacing:2px;cursor:pointer;border-radius:3px;
+  color:var(--orange);font-family:'DM Sans',sans-serif;font-weight:700;
+  font-size:11px;letter-spacing:1px;cursor:pointer;border-radius:3px;
   transition:all .15s;text-align:center;
 }}
 .run-btn:hover{{background:rgba(255,102,0,0.22);border-color:var(--orange);}}
@@ -326,7 +308,7 @@ html,body{{
   display:flex;align-items:center;gap:8px;padding:0 12px;height:34px;
   cursor:pointer;background:transparent;border:none;
   border-left:1px solid var(--border2);
-  font-family:'Share Tech Mono',monospace;
+  font-family:'DM Mono',monospace;
   transition:background .12s;
 }}
 .mode-btn:hover{{background:var(--surface2);}}
@@ -363,7 +345,7 @@ html,body{{
 .mode-opt.active{{background:rgba(255,152,0,0.05);}}
 .mo-icon{{font-size:16px;min-width:20px;}}
 .mo-text{{flex:1;}}
-.mo-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}}
+.mo-lbl{{font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;}}
 .mo-desc{{font-size:9px;color:var(--faint);margin-top:2px;}}
 .mo-check{{font-size:11px;color:var(--orange);opacity:0;}}
 .mode-opt.active .mo-check{{opacity:1;}}
@@ -456,24 +438,6 @@ html,body{{
 
 <!-- MAIN = CHART + QUANT PANEL -->
 <div class="main" id="mainArea">
-
-<!-- DRAWING TOOLBAR -->
-<div class="draw-toolbar" id="drawToolbar">
-  <button class="draw-btn active" id="dBtn_cursor" onclick="setDrawTool('cursor')" title="Curseur">&#9654;</button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dBtn_line"  onclick="setDrawTool('line')"  title="Ligne de tendance">&#9135;</button>
-  <button class="draw-btn" id="dBtn_hline" onclick="setDrawTool('hline')" title="Ligne horizontale">&#8212;</button>
-  <button class="draw-btn" id="dBtn_vline" onclick="setDrawTool('vline')" title="Ligne verticale">&#124;</button>
-  <button class="draw-btn" id="dBtn_ray"   onclick="setDrawTool('ray')"   title="Rayon">&#8599;</button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dBtn_fibo"  onclick="setDrawTool('fibo')"  title="Fibonacci">&#966;</button>
-  <button class="draw-btn" id="dBtn_rect"  onclick="setDrawTool('rect')"  title="Rectangle">&#9645;</button>
-  <button class="draw-btn" id="dBtn_range" onclick="setDrawTool('range')" title="Intervalle de prix">&#8597;</button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dBtn_text"  onclick="setDrawTool('text')"  title="Texte">T</button>
-  <div class="draw-sep"></div>
-  <button class="draw-btn" id="dBtn_clear" onclick="clearDrawings()"       title="Effacer" style="color:#ff4444;font-size:11px">&#10006;</button>
-</div>
 
 <!-- ZONE CHART -->
 <div class="chart-zone">
@@ -763,7 +727,7 @@ const fmtDate = ts => {{
 
 function setupCanvas() {{
   const panelW = (CHART_MODE === 'quant' && quantPanelOpen) ? 320 : 0;
-  const W  = (window.innerWidth  || 900) - panelW - 36;
+  const W  = (window.innerWidth  || 900) - panelW;
   const fullH = window.innerHeight || 600;
   const hdrH  = 46, tbH = 34, bbarH = 36, sepH = 1;
   const volH  = showVol  ? VPAH   : 0;
@@ -998,7 +962,7 @@ function drawGaussianChannel(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
   }}
 
   // Légende
-  ctx.font = '9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.font = '9px DM Mono,monospace'; ctx.textAlign='left';
   ctx.fillStyle='rgba(0,255,136,0.7)';
   ctx.fillText('GC', 8, 30);
 }}
@@ -1052,7 +1016,7 @@ function drawOrderBlocks(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
 
     // Label
     const label = (isBull ? 'Bull OB' : 'Bear OB') + (ob.mitigated ? ' ✗' : '');
-    ctx.font = 'bold 8px Share Tech Mono,monospace';
+    ctx.font = 'bold 8px DM Mono,monospace';
     ctx.fillStyle = isBull ? 'rgba(0,255,180,0.75)' : 'rgba(255,100,100,0.75)';
     ctx.textAlign = 'left';
     ctx.fillText(label, xStart + 4, Math.min(yTop,yBtm) + 10);
@@ -1062,7 +1026,7 @@ function drawOrderBlocks(ctx, W, H, toX, toY, VIEW_START, VIEW_END) {{
   obs.bear.forEach(ob => drawOB(ob, false));
 
   // Légende
-  ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.font='9px DM Mono,monospace'; ctx.textAlign='left';
   ctx.fillStyle='rgba(8,200,150,0.7)';
   ctx.fillText('OB', 8+25, 30);
 }}
@@ -1100,12 +1064,12 @@ function drawMain() {{
     ctx.strokeStyle='#111111'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     // Prix axe droit
-    ctx.fillStyle='#444444'; ctx.font='10px Share Tech Mono,monospace';
+    ctx.fillStyle='#444444'; ctx.font='10px DM Mono,monospace';
     ctx.textAlign='left'; ctx.fillText(fmt(price), W-PAD.r+6, y+4);
   }}
 
   // ── GRILLE VERTICALE + AXE TEMPS ──
-  ctx.fillStyle='#444444'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#444444'; ctx.font='9px DM Mono,monospace'; ctx.textAlign='center';
   const nTicks=Math.min(10,Math.max(3,Math.floor(N/15)));
   const prevMonth={{val:-1}};
   for(let t=0;t<=nTicks;t++) {{
@@ -1186,7 +1150,7 @@ function drawMain() {{
       ctx.strokeStyle=mc.color; ctx.lineWidth=mc.w; ctx.stroke();
     }});
     // Légende MA
-    ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.font='9px DM Mono,monospace'; ctx.textAlign='left';
     [{{'p':20,'c':'rgba(255,102,0,0.90)'}},{{'p':50,'c':'rgba(255,204,0,0.85)'}},{{'p':200,'c':'rgba(100,180,255,0.80)'}}].forEach((m,i)=>{{
       ctx.fillStyle=m.c;
       ctx.fillText(`MA${{m.p}}`, 8+i*52, 18);
@@ -1239,11 +1203,8 @@ function drawMain() {{
   ctx.beginPath();
   ctx.roundRect(W-PAD.r+2, py-9, PAD.r-4, 18, 2);
   ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='bold 9px Share Tech Mono,monospace'; ctx.textAlign='left';
+  ctx.fillStyle='#fff'; ctx.font='bold 9px DM Mono,monospace'; ctx.textAlign='left';
   ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
-
-  // ── DRAWINGS ──
-  drawAllDrawings(ctx, W, H);
 
   // ── CROSSHAIR ──
   if(HOVER_IDX>=0 && HOVER_IDX<N) {{
@@ -1258,7 +1219,7 @@ function drawMain() {{
       const hp=hi-(HOVER_Y-PAD.t)/((H-PAD.t-PAD.b))*rng;
       ctx.fillStyle='#1a0800';
       ctx.beginPath(); ctx.roundRect(W-PAD.r+2,HOVER_Y-9,PAD.r-4,18,2); ctx.fill();
-      ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
+      ctx.fillStyle='#e8e8e8'; ctx.font='9px DM Mono,monospace'; ctx.textAlign='left';
       ctx.fillText(fmt(hp), W-PAD.r+5, HOVER_Y+4);
     }}
     // Label date en bas
@@ -1267,7 +1228,7 @@ function drawMain() {{
     ctx.fillStyle='#1a0800'; ctx.textAlign='center';
     const tw=ctx.measureText(dateLbl).width+12;
     ctx.beginPath(); ctx.roundRect(x-tw/2, H-PAD.b+2, tw, 16, 2); ctx.fill();
-    ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace';
+    ctx.fillStyle='#e8e8e8'; ctx.font='9px DM Mono,monospace';
     ctx.fillText(dateLbl, x, H-PAD.b+13);
 
     // Mise à jour OHLC header
@@ -1331,7 +1292,7 @@ function drawRSI() {{
     ctx.strokeStyle=col; ctx.lineWidth=1; ctx.setLineDash([3,3]);
     ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W-PAD.r,y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle=col; ctx.font='8px Share Tech Mono,monospace';
+    ctx.fillStyle=col; ctx.font='8px DM Mono,monospace';
     ctx.textAlign='left'; ctx.fillText(v,W-PAD.r+4,y+3);
   }});
 
@@ -1350,11 +1311,11 @@ function drawRSI() {{
     const col=last>=70?'#ff4444':last<=30?'#00ff65':'#e8a838';
     ctx.fillStyle=col;
     ctx.beginPath(); ctx.roundRect(W-PAD.r+2,toY(last)-8,PAD.r-4,16,2); ctx.fill();
-    ctx.fillStyle='#000'; ctx.font='bold 8px Share Tech Mono,monospace'; ctx.textAlign='left';
+    ctx.fillStyle='#000'; ctx.font='bold 8px DM Mono,monospace'; ctx.textAlign='left';
     ctx.fillText(last.toFixed(1),W-PAD.r+5,toY(last)+3);
   }}
 
-  ctx.fillStyle='#555'; ctx.font='8px Share Tech Mono,monospace';
+  ctx.fillStyle='#555'; ctx.font='8px DM Mono,monospace';
   ctx.textAlign='left'; ctx.fillText('RSI(14)',4,10);
 }}
 
@@ -1440,7 +1401,7 @@ function drawMACD() {{
   // Valeurs
   const lm=macd.filter(v=>v!==null).pop();
   const ls=sig.filter(v=>v!==null).pop();
-  ctx.font='8px Share Tech Mono,monospace';
+  ctx.font='8px DM Mono,monospace';
   if(lm!=null){{ ctx.fillStyle='rgba(100,180,255,0.8)'; ctx.textAlign='right'; ctx.fillText('M:'+lm.toFixed(4),W-PAD.r-2,10); }}
   if(ls!=null){{ ctx.fillStyle='rgba(255,165,0,0.8)'; ctx.textAlign='right'; ctx.fillText('S:'+ls.toFixed(4),W-PAD.r-2,20); }}
   ctx.fillStyle='#555'; ctx.textAlign='left'; ctx.fillText('MACD(12,26,9)',4,10);
@@ -1480,7 +1441,7 @@ function drawVol() {{
   ctx.strokeStyle='rgba(255,102,0,0.70)'; ctx.lineWidth=1; ctx.stroke();
 
   // Label
-  ctx.fillStyle='#333333'; ctx.font='8px Share Tech Mono,monospace';
+  ctx.fillStyle='#333333'; ctx.font='8px DM Mono,monospace';
   ctx.textAlign='left'; ctx.fillText('VOLUME', 4, 10);
 }}
 
@@ -1512,155 +1473,6 @@ function updateStats() {{
   // OHLC header = dernière bougie
   setTxt('ho',fmt(D.o[N-1])); setTxt('hh',fmt(D.h[N-1]));
   setTxt('hl',fmt(D.l[N-1])); setTxt('hc',fmt(D.c[N-1]));
-}}
-
-
-// ════════════════════════════════════════════════════════
-//  OUTILS DE DESSIN
-// ════════════════════════════════════════════════════════
-let DRAW_TOOL = 'cursor';
-let drawings  = [];
-let drawPending = null;  // dessin en cours (1er point posé)
-
-function setDrawTool(tool) {{
-  DRAW_TOOL = tool;
-  document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
-  const btn = $('dBtn_'+tool);
-  if(btn) btn.classList.add('active');
-  cvMain.style.cursor = tool === 'cursor' ? 'crosshair' : tool === 'text' ? 'text' : 'crosshair';
-  drawPending = null;
-}}
-
-function clearDrawings() {{
-  drawings = []; drawPending = null; render();
-}}
-
-// Convertir pixel → prix/index
-function pxToPrice(y) {{
-  const H = cvMain.height;
-  const N = VIEW_END - VIEW_START;
-  const slice = arr => arr.slice(VIEW_START, VIEW_END);
-  const hi = Math.max(...slice(D.h));
-  const lo = Math.min(...slice(D.l));
-  const rng = (hi - lo) || 1;
-  return hi - ((y - PAD.t) / (H - PAD.t - PAD.b)) * rng;
-}}
-function pxToIdx(x) {{
-  const W = cvMain.width;
-  const N = VIEW_END - VIEW_START;
-  const CW = (W - PAD.l - PAD.r) / N;
-  return VIEW_START + Math.max(0, Math.min(N-1, Math.floor((x - PAD.l) / CW)));
-}}
-// Convertir prix/index → pixel
-function priceToY(price) {{
-  const H = cvMain.height;
-  const N = VIEW_END - VIEW_START;
-  const slice = arr => arr.slice(VIEW_START, VIEW_END);
-  const hi = Math.max(...slice(D.h));
-  const lo = Math.min(...slice(D.l));
-  const rng = (hi - lo) || 1;
-  return PAD.t + ((hi - price) / rng) * (H - PAD.t - PAD.b);
-}}
-function idxToX(idx) {{
-  const W = cvMain.width;
-  const N = VIEW_END - VIEW_START;
-  const CW = (W - PAD.l - PAD.r) / N;
-  return PAD.l + (idx - VIEW_START) * CW + CW / 2;
-}}
-
-// Dessiner tous les drawings sur le canvas principal
-function drawAllDrawings(ctx, W, H) {{
-  drawings.forEach(d => drawSingle(ctx, d, W, H));
-  if(drawPending) drawSingle(ctx, drawPending, W, H);
-}}
-
-function drawSingle(ctx, d, W, H) {{
-  ctx.save();
-  ctx.strokeStyle = d.color || '#FABE2C';
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([]);
-
-  const x1 = idxToX(d.i1), y1 = priceToY(d.p1);
-  const x2 = d.i2 != null ? idxToX(d.i2) : x1;
-  const y2 = d.p2 != null ? priceToY(d.p2) : y1;
-
-  if(d.type === 'line') {{
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    // Petits cercles aux extrémités
-    ctx.fillStyle = d.color||'#FABE2C';
-    ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x2,y2,3,0,Math.PI*2); ctx.fill();
-
-  }} else if(d.type === 'hline') {{
-    ctx.setLineDash([4,4]);
-    ctx.beginPath(); ctx.moveTo(0,y1); ctx.lineTo(W-PAD.r,y1); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle=d.color||'#FABE2C'; ctx.font='8px Share Tech Mono,monospace';
-    ctx.textAlign='right'; ctx.fillText(fmt(d.p1), W-PAD.r-4, y1-3);
-
-  }} else if(d.type === 'vline') {{
-    ctx.setLineDash([4,4]);
-    ctx.beginPath(); ctx.moveTo(x1,PAD.t); ctx.lineTo(x1,H-PAD.b); ctx.stroke();
-    ctx.setLineDash([]);
-
-  }} else if(d.type === 'ray') {{
-    // Étendre jusqu'au bord droit
-    const dx = x2 - x1, dy = y2 - y1;
-    const t = dx !== 0 ? (W - PAD.r - x1) / dx : 999;
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1+dx*t, y1+dy*t); ctx.stroke();
-    ctx.fillStyle=d.color||'#FABE2C';
-    ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill();
-
-  }} else if(d.type === 'rect') {{
-    if(d.i2==null) {{ ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill(); }}
-    else {{
-      ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
-      ctx.fillStyle = 'rgba(250,190,44,0.06)';
-      ctx.fillRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
-    }}
-
-  }} else if(d.type === 'fibo') {{
-    if(d.i2==null) {{ ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill(); }}
-    else {{
-      const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
-      const cols   = ['#888','#26a69a','#66bb6a','#FABE2C','#ff9800','#ef5350','#888'];
-      levels.forEach((lv, li) => {{
-        const p = d.p1 + (d.p2 - d.p1) * lv;
-        const y = priceToY(p);
-        ctx.strokeStyle = cols[li]; ctx.lineWidth=1; ctx.setLineDash([3,3]);
-        ctx.beginPath(); ctx.moveTo(Math.min(x1,x2), y); ctx.lineTo(Math.max(x1,x2), y); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle=cols[li]; ctx.font='8px Share Tech Mono,monospace';
-        ctx.textAlign='left';
-        ctx.fillText((lv*100).toFixed(1)+'%  '+fmt(p), Math.min(x1,x2)+4, y-2);
-      }});
-    }}
-
-  }} else if(d.type === 'range') {{
-    if(d.i2==null) {{ ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill(); }}
-    else {{
-      const yTop=Math.min(y1,y2), yBot=Math.max(y1,y2);
-      const pTop=d.p1>d.p2?d.p1:d.p2, pBot=d.p1<d.p2?d.p1:d.p2;
-      const bull=pTop>pBot;
-      ctx.strokeStyle=bull?'rgba(38,166,154,0.9)':'rgba(239,83,80,0.9)';
-      ctx.fillStyle=bull?'rgba(38,166,154,0.08)':'rgba(239,83,80,0.08)';
-      ctx.fillRect(Math.min(x1,x2), yTop, Math.abs(x2-x1), yBot-yTop);
-      ctx.strokeRect(Math.min(x1,x2), yTop, Math.abs(x2-x1), yBot-yTop);
-      const pct=((pTop-pBot)/pBot*100).toFixed(2);
-      ctx.fillStyle=bull?'rgba(38,166,154,0.9)':'rgba(239,83,80,0.9)';
-      ctx.font='bold 10px Share Tech Mono,monospace'; ctx.textAlign='center';
-      ctx.fillText((bull?'▲ +':'▼ ')+pct+'%', (Math.min(x1,x2)+Math.max(x1,x2))/2, (yTop+yBot)/2+4);
-      ctx.font='8px Share Tech Mono,monospace'; ctx.textAlign='right';
-      ctx.fillText(fmt(pTop), Math.max(x1,x2)-4, yTop-3);
-      ctx.fillText(fmt(pBot), Math.max(x1,x2)-4, yBot+10);
-    }}
-
-  }} else if(d.type === 'text') {{
-    ctx.fillStyle=d.color||'#FABE2C';
-    ctx.font='bold 12px Share Tech Mono,monospace'; ctx.textAlign='left';
-    ctx.fillText(d.label||'', x1+2, y1);
-  }}
-  ctx.restore();
 }}
 
 // ════════════════════════════════════════════════════════
@@ -1704,52 +1516,15 @@ cvMain.addEventListener('mousemove', e => {{
     setTxt('ttC', fmt(D.c[ri])); setCol('ttC', bull2?'var(--bull)':'var(--bear)');
     setTxt('ttV', fmtV(D.v[ri]));
   }}
-  // Mise à jour dessin en cours
-  if(drawPending) {{
-    const rect2=cvMain.getBoundingClientRect();
-    drawPending.i2=pxToIdx(e.clientX-rect2.left);
-    drawPending.p2=pxToPrice(e.clientY-rect2.top);
-  }}
   drawMain();
 }});
 
 cvMain.addEventListener('mousedown', e => {{
-  if(DRAW_TOOL !== 'cursor') {{
-    const rect=cvMain.getBoundingClientRect();
-    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
-    const price=pxToPrice(my), idx=pxToIdx(mx);
-
-    if(DRAW_TOOL==='hline') {{
-      drawings.push({{type:'hline',i1:idx,p1:price,i2:null,p2:null}});
-      drawPending=null; render(); return;
-    }}
-    if(DRAW_TOOL==='vline') {{
-      drawings.push({{type:'vline',i1:idx,p1:price,i2:null,p2:null}});
-      drawPending=null; render(); return;
-    }}
-    if(DRAW_TOOL==='text') {{
-      const lbl=prompt('Texte :'); if(!lbl) return;
-      drawings.push({{type:'text',i1:idx,p1:price,i2:null,p2:null,label:lbl}});
-      drawPending=null; render(); return;
-    }}
-    // Outils 2 points : line, ray, fibo, rect, range
-    if(!drawPending) {{
-      drawPending={{type:DRAW_TOOL,i1:idx,p1:price,i2:idx,p2:price}};
-    }} else {{
-      drawPending.i2=idx; drawPending.p2=price;
-      drawings.push({{...drawPending}});
-      drawPending=null;
-      setDrawTool('cursor');
-      render();
-    }}
-    return;
-  }}
   isDragging=true; dragStartX=e.clientX; dragStartView=VIEW_START;
   cvMain.style.cursor='grabbing';
 }});
 window.addEventListener('mouseup', () => {{
-  isDragging=false;
-  if(DRAW_TOOL==='cursor') cvMain.style.cursor='crosshair';
+  isDragging=false; cvMain.style.cursor='crosshair';
 }});
 cvMain.addEventListener('mouseleave', () => {{
   HOVER_IDX=-1; HOVER_Y=-1;
@@ -1773,15 +1548,6 @@ cvMain.addEventListener('wheel', e => {{
   VIEW_START=s; VIEW_END=en;
   render();
 }},{{passive:false}});
-
-
-// Raccourcis clavier
-document.addEventListener('keydown', e => {{
-  if(e.key==='Escape') {{ drawPending=null; setDrawTool('cursor'); render(); }}
-  if((e.ctrlKey||e.metaKey) && e.key==='z') {{
-    drawings.pop(); drawPending=null; render();
-  }}
-}});
 
 // ════════════════════════════════════════════════════════
 //  TIMEFRAME & INDICATEURS
