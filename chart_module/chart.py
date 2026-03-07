@@ -351,6 +351,33 @@ html,body{{
 .mode-opt.active .mo-check{{opacity:1;}}
 .mo-badge{{font-size:8px;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;
   background:rgba(255,152,0,0.1);color:var(--orange);border:1px solid rgba(255,152,0,0.2);}}
+
+/* ── DRAWING TOOLBAR ── */
+.draw-toolbar{{
+  position:absolute;left:0;top:0;bottom:0;
+  width:36px;background:var(--surface);
+  border-right:1px solid var(--border2);
+  display:flex;flex-direction:column;align-items:center;
+  padding:6px 0;gap:2px;z-index:100;
+}}
+.draw-btn{{
+  width:28px;height:28px;border:1px solid transparent;
+  background:transparent;color:var(--muted);
+  border-radius:4px;cursor:pointer;font-size:13px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .12s;position:relative;
+}}
+.draw-btn:hover{{background:var(--surface2);color:var(--text);border-color:var(--border2);}}
+.draw-btn.active{{background:rgba(255,152,0,0.15);color:var(--orange);border-color:rgba(255,152,0,0.5);}}
+.draw-sep{{width:20px;height:1px;background:var(--border2);margin:2px 0;}}
+.draw-btn[title]:hover::after{{
+  content:attr(title);position:absolute;left:34px;top:50%;transform:translateY(-50%);
+  background:var(--surface);border:1px solid var(--border2);
+  color:var(--text);font-family:'Share Tech Mono',monospace;font-size:9px;
+  padding:3px 8px;border-radius:3px;white-space:nowrap;z-index:9999;
+  pointer-events:none;letter-spacing:0.5px;
+}}
+
 </style>
 </head>
 <body>
@@ -440,8 +467,25 @@ html,body{{
 <div class="main" id="mainArea">
 
 <!-- ZONE CHART -->
-<div class="chart-zone">
-  <canvas id="cvMain"></canvas>
+<div class="chart-zone" style="position:relative">
+  <!-- DRAWING TOOLBAR -->
+  <div class="draw-toolbar" id="drawToolbar">
+    <button class="draw-btn active" id="dBtn_cursor" onclick="setDrawTool('cursor')" title="Curseur">&#9654;</button>
+    <div class="draw-sep"></div>
+    <button class="draw-btn" id="dBtn_line"   onclick="setDrawTool('line')"   title="Ligne de tendance">&#9135;</button>
+    <button class="draw-btn" id="dBtn_hline"  onclick="setDrawTool('hline')"  title="Ligne horizontale">&#8212;</button>
+    <button class="draw-btn" id="dBtn_vline"  onclick="setDrawTool('vline')"  title="Ligne verticale">&#124;</button>
+    <button class="draw-btn" id="dBtn_ray"    onclick="setDrawTool('ray')"    title="Rayon">&#8599;</button>
+    <div class="draw-sep"></div>
+    <button class="draw-btn" id="dBtn_fibo"   onclick="setDrawTool('fibo')"   title="Retracement Fibonacci">&#966;</button>
+    <button class="draw-btn" id="dBtn_rect"   onclick="setDrawTool('rect')"   title="Rectangle">&#9645;</button>
+    <button class="draw-btn" id="dBtn_range"  onclick="setDrawTool('range')"  title="Intervalle de prix">&#8597;</button>
+    <div class="draw-sep"></div>
+    <button class="draw-btn" id="dBtn_text"   onclick="setDrawTool('text')"   title="Texte">T</button>
+    <div class="draw-sep"></div>
+    <button class="draw-btn" id="dBtn_clear"  onclick="clearDrawings()"       title="Tout effacer" style="color:#ff4444;font-size:11px">&#10006;</button>
+  </div>
+  <canvas id="cvMain" style="margin-left:36px"></canvas>
   <div class="vol-sep"></div>
   <canvas id="cvVol"></canvas>
   <div class="vol-sep" id="rsiSep" style="display:none"></div>
@@ -976,6 +1020,295 @@ function drawMACD() {{
   ctx.fillText('MACD(12,26,9)', 4, 10);
 }}
 
+
+// ════════════════════════════════════════════════════════
+//  DRAWING ENGINE — Outils de dessin TradingView-style
+// ════════════════════════════════════════════════════════
+let DRAW_TOOL    = 'cursor';   // outil actif
+let drawings     = [];         // dessins finalisés
+let drawingInProgress = null;  // dessin en cours
+let drawHoverPt  = null;       // point courant souris (pour preview)
+
+// Convertit pixel → prix et index de bougie
+function pxToPrice(y, H, hi, lo) {{
+  const rng = hi - lo || 1;
+  return hi - (y - PAD.t) / (H - PAD.t - PAD.b) * rng;
+}}
+function pxToIdx(mx, W, N) {{
+  const CW = (W - PAD.l - PAD.r) / N;
+  return Math.max(0, Math.min(N-1, Math.floor((mx - PAD.l) / CW)));
+}}
+
+function setDrawTool(tool) {{
+  DRAW_TOOL = tool;
+  document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+  const btn = $('dBtn_' + tool);
+  if(btn) btn.classList.add('active');
+  // Curseur CSS
+  if(tool === 'cursor') cvMain.style.cursor = 'crosshair';
+  else if(tool === 'text') cvMain.style.cursor = 'text';
+  else cvMain.style.cursor = 'crosshair';
+  drawingInProgress = null;
+}}
+
+function clearDrawings() {{
+  drawings = [];
+  drawingInProgress = null;
+  render();
+}}
+
+// ── Calcul des niveaux Fibonacci ──
+const FIBO_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const FIBO_COLORS = [
+  'rgba(255,200,0,0.85)',
+  'rgba(100,200,255,0.8)',
+  'rgba(100,255,150,0.8)',
+  'rgba(255,255,255,0.8)',
+  'rgba(100,255,150,0.8)',
+  'rgba(100,200,255,0.8)',
+  'rgba(255,200,0,0.85)',
+];
+
+// ── Draw un dessin finalisé ou en preview ──
+function drawSingleDrawing(ctx, d, W, H, toX, toY, hi, lo, N, isPreview=false) {{
+  const alpha = isPreview ? 0.6 : 1.0;
+  ctx.globalAlpha = alpha;
+
+  // Convertir les coordonnées stockées (prix + barIdx) en pixels
+  const x1 = d.x1 !== undefined ? toX(d.x1 - VIEW_START) : null;
+  const x2 = d.x2 !== undefined ? toX(d.x2 - VIEW_START) : null;
+  const y1 = d.p1 !== undefined ? toY(d.p1) : null;
+  const y2 = d.p2 !== undefined ? toY(d.p2) : null;
+
+  ctx.strokeStyle = d.color || 'rgba(255,180,0,0.9)';
+  ctx.fillStyle   = d.color || 'rgba(255,180,0,0.9)';
+  ctx.lineWidth   = d.width || 1.5;
+  ctx.setLineDash([]);
+  ctx.font = '9px Share Tech Mono,monospace';
+
+  if(d.type === 'line') {{
+    // Ligne de tendance étendue entre x1 et x2
+    if(x1===null||x2===null||y1===null||y2===null) {{ ctx.globalAlpha=1; return; }}
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    // Points d'ancrage
+    [{{x:x1,y:y1}},{{x:x2,y:y2}}].forEach(pt => {{
+      ctx.beginPath(); ctx.arc(pt.x,pt.y,3,0,Math.PI*2);
+      ctx.fillStyle=d.color||'rgba(255,180,0,0.9)'; ctx.fill();
+    }});
+
+  }} else if(d.type === 'ray') {{
+    // Rayon : part de x1/y1, s'étend jusqu'au bord droit
+    if(x1===null||x2===null||y1===null||y2===null) {{ ctx.globalAlpha=1; return; }}
+    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
+    const ext = (W - PAD.r - x1);
+    const ex = x1 + dx/len*ext*100, ey = y1 + dy/len*ext*100;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(ex,ey); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill();
+
+  }} else if(d.type === 'hline') {{
+    // Ligne horizontale infinie
+    if(y1===null) {{ ctx.globalAlpha=1; return; }}
+    ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(0,y1); ctx.lineTo(W-PAD.r,y1); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign='right';
+    ctx.fillText(fmt(d.p1), W-PAD.r-4, y1-3);
+
+  }} else if(d.type === 'vline') {{
+    // Ligne verticale
+    if(x1===null) {{ ctx.globalAlpha=1; return; }}
+    ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(x1,PAD.t); ctx.lineTo(x1,H-PAD.b); ctx.stroke();
+    ctx.setLineDash([]);
+
+  }} else if(d.type === 'rect') {{
+    // Rectangle
+    if(x1===null||x2===null||y1===null||y2===null) {{ ctx.globalAlpha=1; return; }}
+    const rx=Math.min(x1,x2), ry=Math.min(y1,y2);
+    const rw=Math.abs(x2-x1), rh=Math.abs(y2-y1);
+    ctx.fillStyle='rgba(255,180,0,0.06)'; ctx.fillRect(rx,ry,rw,rh);
+    ctx.strokeStyle=d.color||'rgba(255,180,0,0.8)';
+    ctx.strokeRect(rx,ry,rw,rh);
+
+  }} else if(d.type === 'range') {{
+    // Intervalle de prix (zone horizontale avec labels)
+    if(y1===null||y2===null) {{ ctx.globalAlpha=1; return; }}
+    const yt=Math.min(y1,y2), yb=Math.max(y1,y2);
+    const pt=Math.max(d.p1,d.p2), pb=Math.min(d.p1,d.p2);
+    const pct = ((pt-pb)/pb*100).toFixed(2);
+    const bull = d.p2 > d.p1;
+
+    // Fill
+    ctx.fillStyle = bull ? 'rgba(0,255,65,0.07)' : 'rgba(255,34,34,0.07)';
+    ctx.fillRect(0, yt, W-PAD.r, yb-yt);
+
+    // Lignes bord
+    const lc = bull ? 'rgba(0,255,65,0.7)' : 'rgba(255,34,34,0.7)';
+    ctx.strokeStyle=lc; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(0,yt); ctx.lineTo(W-PAD.r,yt); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,yb); ctx.lineTo(W-PAD.r,yb); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Labels prix
+    ctx.fillStyle=lc; ctx.textAlign='right'; ctx.font='9px Share Tech Mono,monospace';
+    ctx.fillText(fmt(pt), W-PAD.r-4, yt-3);
+    ctx.fillText(fmt(pb), W-PAD.r-4, yb+10);
+
+    // Label variation au centre
+    ctx.textAlign='center'; ctx.font='bold 10px Share Tech Mono,monospace';
+    ctx.fillStyle = bull ? 'rgba(0,255,65,0.9)' : 'rgba(255,34,34,0.9)';
+    ctx.fillText((bull?'▲ +':'▼ ')+pct+'%', (W-PAD.r)/2, (yt+yb)/2+4);
+
+  }} else if(d.type === 'fibo') {{
+    // Retracement Fibonacci
+    if(x1===null||x2===null||y1===null||y2===null) {{ ctx.globalAlpha=1; return; }}
+    const priceRange = d.p2 - d.p1;
+    FIBO_LEVELS.forEach((lvl, fi) => {{
+      const p = d.p1 + priceRange * lvl;
+      const yf = toY(p);
+      ctx.strokeStyle = FIBO_COLORS[fi]; ctx.lineWidth=1;
+      ctx.setLineDash(lvl===0||lvl===1 ? [] : [4,3]);
+      ctx.beginPath(); ctx.moveTo(x1,yf); ctx.lineTo(W-PAD.r,yf); ctx.stroke();
+      ctx.setLineDash([]);
+      // Labels
+      ctx.fillStyle = FIBO_COLORS[fi];
+      ctx.textAlign='left'; ctx.font='8px Share Tech Mono,monospace';
+      ctx.fillText((lvl*100).toFixed(1)+'%  '+fmt(p), x1+4, yf-2);
+    }});
+    // Ligne diagonale
+    ctx.strokeStyle='rgba(255,200,0,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,4]);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.setLineDash([]);
+    // Points
+    ctx.fillStyle='rgba(255,200,0,0.9)';
+    ctx.beginPath(); ctx.arc(x1,y1,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x2,y2,3,0,Math.PI*2); ctx.fill();
+
+  }} else if(d.type === 'text') {{
+    if(x1===null||y1===null) {{ ctx.globalAlpha=1; return; }}
+    ctx.font='bold 12px Share Tech Mono,monospace';
+    ctx.fillStyle=d.color||'rgba(255,220,80,0.95)';
+    ctx.textAlign='left';
+    // Fond semi-transparent
+    const tw = ctx.measureText(d.label||'').width + 8;
+    ctx.fillStyle='rgba(0,0,0,0.55)';
+    ctx.fillRect(x1-2, y1-13, tw, 16);
+    ctx.fillStyle=d.color||'rgba(255,220,80,0.95)';
+    ctx.fillText(d.label||'', x1+2, y1);
+  }}
+
+  ctx.globalAlpha = 1;
+}}
+
+// ── Dessine tous les objets sur le canvas principal ──
+function drawAllDrawings(ctx, W, H, toX, toY, hi, lo, N) {{
+  drawings.forEach(d => drawSingleDrawing(ctx, d, W, H, toX, toY, hi, lo, N));
+  // Preview dessin en cours
+  if(drawingInProgress && drawHoverPt) {{
+    drawSingleDrawing(ctx, drawingInProgress, W, H, toX, toY, hi, lo, N, true);
+  }}
+}}
+
+// ── Gestion input texte ──
+function promptText(x1, p1, barIdx) {{
+  const label = prompt('Texte à afficher :');
+  if(label) {{
+    drawings.push({{ type:'text', x1:barIdx, p1, label, color:'rgba(255,220,80,0.95)' }});
+    render();
+  }}
+}}
+
+// ── Helpers coordonnées souris ──
+function getChartCoords(e) {{
+  const rect = cvMain.getBoundingClientRect();
+  const mx = e.clientX - rect.left - 36; // -36 pour la toolbar
+  const my = e.clientY - rect.top;
+  const W  = cvMain.width;
+  const H  = cvMain.height;
+  const N  = VIEW_END - VIEW_START;
+
+  const slice = arr => arr.slice(VIEW_START, VIEW_END);
+  const ls = slice(D.l), hs = slice(D.h);
+  const minP = Math.min(...ls), maxP = Math.max(...hs);
+  const pad  = Math.max((maxP-minP)*0.05, maxP*0.001);
+  const lo = minP-pad, hi = maxP+pad;
+
+  const idx = Math.max(0, Math.min(N-1, Math.floor((mx - PAD.l) / ((W-PAD.l-PAD.r)/N))));
+  const price = pxToPrice(my, H, hi, lo);
+  const barIdx = VIEW_START + idx;
+
+  return {{ mx, my, idx, price, barIdx, W, H, hi, lo, N }};
+}}
+
+// ════════════════════════════════════════════════════════
+//  ÉVÉNEMENTS SOURIS — Drawing Engine
+// ════════════════════════════════════════════════════════
+function onDrawMouseDown(e) {{
+  if(DRAW_TOOL === 'cursor') return false;
+  e.stopPropagation();
+  const c = getChartCoords(e);
+
+  if(DRAW_TOOL === 'hline') {{
+    drawings.push({{ type:'hline', p1:c.price, color:'rgba(255,180,0,0.85)' }});
+    render(); return true;
+  }}
+  if(DRAW_TOOL === 'vline') {{
+    drawings.push({{ type:'vline', x1:c.barIdx, p1:c.price, color:'rgba(180,180,255,0.7)' }});
+    render(); return true;
+  }}
+  if(DRAW_TOOL === 'text') {{
+    promptText(c.mx, c.price, c.barIdx);
+    return true;
+  }}
+
+  // Outils à 2 points
+  const colorMap = {{
+    line:'rgba(255,180,0,0.9)',
+    ray:'rgba(255,140,0,0.9)',
+    rect:'rgba(100,180,255,0.8)',
+    range:'rgba(0,220,100,0.8)',
+    fibo:'rgba(255,200,0,0.9)',
+  }};
+  drawingInProgress = {{
+    type: DRAW_TOOL,
+    x1: c.barIdx, p1: c.price,
+    x2: c.barIdx, p2: c.price,
+    color: colorMap[DRAW_TOOL] || 'rgba(255,180,0,0.9)',
+  }};
+  return true;
+}}
+
+function onDrawMouseMove(e) {{
+  if(DRAW_TOOL === 'cursor' || !drawingInProgress) return false;
+  const c = getChartCoords(e);
+  drawingInProgress.x2 = c.barIdx;
+  drawingInProgress.p2 = c.price;
+  drawHoverPt = c;
+  return true;
+}}
+
+function onDrawMouseUp(e) {{
+  if(DRAW_TOOL === 'cursor' || !drawingInProgress) return false;
+  const c = getChartCoords(e);
+  drawingInProgress.x2 = c.barIdx;
+  drawingInProgress.p2 = c.price;
+  drawings.push({{...drawingInProgress}});
+  drawingInProgress = null;
+  drawHoverPt = null;
+  render();
+  return true;
+}}
+
+// Supprimer le dernier dessin avec Ctrl+Z
+document.addEventListener('keydown', e => {{
+  if((e.ctrlKey||e.metaKey) && e.key==='z') {{
+    drawings.pop(); render();
+  }}
+  if(e.key === 'Escape') {{
+    drawingInProgress = null; setDrawTool('cursor'); render();
+  }}
+}});
+
 // ════════════════════════════════════════════════════════
 //  GAUSSIAN CHANNEL [DW] — traduit de Pine Script v4
 // ════════════════════════════════════════════════════════
@@ -1405,6 +1738,9 @@ function drawMain() {{
   ctx.fillStyle='#fff'; ctx.font='bold 9px Share Tech Mono,monospace'; ctx.textAlign='left';
   ctx.fillText(fmt(lastC), W-PAD.r+5, py+4);
 
+  // ── DRAWINGS ──
+  drawAllDrawings(ctx, W, H, toX, toY, hi, lo, N);
+
   // ── CROSSHAIR ──
   if(HOVER_IDX>=0 && HOVER_IDX<N) {{
     const x=toX(HOVER_IDX);
@@ -1517,6 +1853,10 @@ cvMain.addEventListener('mousemove', e => {{
   const my=e.clientY-rect.top;
   HOVER_Y=my;
 
+  if(DRAW_TOOL !== 'cursor') {{
+    if(onDrawMouseMove(e)) {{ render(); }}
+  }}
+
   if(isDragging) {{
     const N=VIEW_END-VIEW_START;
     const CW=(cvMain.width-PAD.l-PAD.r)/N;
@@ -1553,10 +1893,18 @@ cvMain.addEventListener('mousemove', e => {{
 }});
 
 cvMain.addEventListener('mousedown', e => {{
+  if(DRAW_TOOL !== 'cursor') {{
+    onDrawMouseDown(e);
+    return;
+  }}
   isDragging=true; dragStartX=e.clientX; dragStartView=VIEW_START;
   cvMain.style.cursor='grabbing';
 }});
-window.addEventListener('mouseup', () => {{
+window.addEventListener('mouseup', e => {{
+  if(DRAW_TOOL !== 'cursor') {{
+    onDrawMouseUp(e);
+    return;
+  }}
   isDragging=false; cvMain.style.cursor='crosshair';
 }});
 cvMain.addEventListener('mouseleave', () => {{
