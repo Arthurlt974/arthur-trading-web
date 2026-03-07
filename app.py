@@ -6,6 +6,7 @@ import feedparser
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
+import time
 import plotly.graph_objects as go
 import numpy as np
 from fpdf import FPDF
@@ -949,7 +950,10 @@ class ValuationCalculator:
                 future_fcf = fcf * ((1 + growth_rate) ** year)
                 discounted_fcf = future_fcf / ((1 + discount_rate) ** year)
                 projected_fcf.append({'year': year, 'fcf': future_fcf, 'discounted_fcf': discounted_fcf})
-            terminal_value = (fcf * ((1 + growth_rate) ** years) * (1 + 0.02)) / (discount_rate - 0.02)
+            terminal_growth = 0.02
+            if discount_rate <= terminal_growth:
+                discount_rate = terminal_growth + 0.03  # garde un spread minimum de 3%
+            terminal_value = (fcf * ((1 + growth_rate) ** years) * (1 + terminal_growth)) / (discount_rate - terminal_growth)
             discounted_terminal_value = terminal_value / ((1 + discount_rate) ** years)
             enterprise_value = sum([p['discounted_fcf'] for p in projected_fcf]) + discounted_terminal_value
             shares_outstanding = self.info.get('sharesOutstanding', 0)
@@ -1034,10 +1038,18 @@ class ValuationCalculator:
                     pass
             book_value = self.info.get('bookValue', 0)
             pb_ratio = self.info.get('priceToBook', 0)
-            if book_value == 0:
+            if book_value == 0 or book_value is None:
                 return {"error": "Valeur comptable non disponible"}
-            industry_pb = pb_ratio * 0.9
-            fair_value = book_value * industry_pb
+            # P/B cible sectoriel basé sur le secteur — pas circulaire
+            sector = self.info.get('sector', '')
+            sector_pb_map = {
+                'Technology': 6.0, 'Financial Services': 1.5, 'Healthcare': 4.0,
+                'Consumer Cyclical': 3.5, 'Consumer Defensive': 4.0, 'Industrials': 3.0,
+                'Energy': 1.8, 'Basic Materials': 2.0, 'Real Estate': 1.5,
+                'Communication Services': 3.5, 'Utilities': 1.5,
+            }
+            target_pb = sector_pb_map.get(sector, 3.0)  # 3.0 par défaut si secteur inconnu
+            fair_value = book_value * target_pb
             upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
             return {
                 "method": "Price/Book",
@@ -1045,8 +1057,8 @@ class ValuationCalculator:
                 "current_price": round(current_price, 2),
                 "upside_pct": round(upside, 2),
                 "book_value": round(book_value, 2),
-                "current_pb": round(pb_ratio, 2),
-                "target_pb": round(industry_pb, 2)
+                "current_pb": round(pb_ratio, 2) if pb_ratio else 0,
+                "target_pb": round(target_pb, 2)
             }
         except Exception as e:
             return {"error": f"Erreur P/B: {str(e)}"}
@@ -1105,10 +1117,17 @@ class ValuationCalculator:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
                     pass
-            eps = self.info.get('trailingEps') or self.info.get('forwardEps', 0)
-            book_value = self.info.get('bookValue', 0)
-            if eps <= 0 or book_value <= 0:
-                return {"error": "EPS ou Book Value non disponible"}
+            eps = self.info.get('trailingEps') or 0
+            # N'utiliser forwardEps que si trailingEps absent ET forwardEps positif
+            if eps <= 0:
+                forward = self.info.get('forwardEps') or 0
+                if forward > 0:
+                    eps = forward
+            book_value = self.info.get('bookValue') or 0
+            if eps <= 0:
+                return {"error": "EPS négatif ou nul — Graham non applicable"}
+            if book_value <= 0:
+                return {"error": "Book Value non disponible ou négatif"}
             fair_value = (22.5 * eps * book_value) ** 0.5
             upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
             return {
@@ -1125,7 +1144,13 @@ class ValuationCalculator:
     def get_comprehensive_valuation(self):
         results = {}
         fair_values = []
-        is_crypto = "-USD" in self.symbol or self.symbol in ["BTC", "ETH", "BNB"]
+        # Détection crypto élargie — NVT uniquement pour cryptos
+        crypto_symbols = ["BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "DOGE", "AVAX"]
+        is_crypto = (
+            "-USD" in self.symbol or
+            any(self.symbol.upper().startswith(c) for c in crypto_symbols) or
+            self.info.get('quoteType', '') == 'CRYPTOCURRENCY'
+        )
         if is_crypto:
             nvt = self.nvt_valuation()
             if "error" not in nvt:
@@ -1150,8 +1175,18 @@ class ValuationCalculator:
                 fair_values.append(pb["fair_value"])
         if fair_values:
             consensus_value = np.median(fair_values)
-            current_price = self.info.get('currentPrice', 0)
-            consensus_upside = ((consensus_value - current_price) / current_price) * 100 if current_price > 0 else 0
+            current_price = self.info.get('currentPrice', 0) or self.info.get('regularMarketPrice', 0)
+            # Fallback history si prix toujours à 0
+            if not current_price or current_price == 0:
+                try:
+                    hist = self.ticker.history(period="1d")
+                    if not hist.empty:
+                        current_price = float(hist['Close'].iloc[-1])
+                except:
+                    pass
+            if not current_price or current_price == 0:
+                return {}  # Impossible de calculer sans prix valide
+            consensus_upside = ((consensus_value - current_price) / current_price) * 100
             if consensus_upside > 20:
                 recommendation = "ACHAT FORT"
             elif consensus_upside > 10:
@@ -1176,7 +1211,7 @@ class ValuationCalculator:
 #  FONCTIONS UTILITAIRES PARTAGÉES
 # ============================================================
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=300)  # 5 minutes — évite le spam Yahoo Finance
 def get_ticker_info(ticker):
     try:
         data = yf.Ticker(ticker)
@@ -1184,7 +1219,7 @@ def get_ticker_info(ticker):
     except:
         return None
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=300)  # 5 minutes
 def get_ticker_history(ticker, period="2d"):
     try:
         data = yf.Ticker(ticker)
@@ -1193,13 +1228,22 @@ def get_ticker_history(ticker, period="2d"):
         return pd.DataFrame()
 
 def trouver_ticker(nom):
+    """Recherche le ticker Yahoo Finance — avec timeout et fallback robuste"""
+    nom = nom.strip()
+    if not nom:
+        return "AAPL"
     try:
         url = f"https://query2.finance.yahoo.com/v1/finance/search?q={nom}"
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers).json()
-        return response['quotes'][0]['symbol'] if response.get('quotes') else nom
-    except:
-        return nom
+        response = requests.get(url, headers=headers, timeout=5).json()
+        quotes = response.get('quotes', [])
+        # Préférer les actions (EQUITY) aux autres types
+        for q in quotes:
+            if q.get('quoteType') in ('EQUITY', 'ETF'):
+                return q['symbol']
+        return quotes[0]['symbol'] if quotes else nom.upper()
+    except Exception:
+        return nom.upper()
 
 def calculer_score_sentiment(ticker):
     try:
@@ -1909,13 +1953,15 @@ elif outil == "ANALYSEUR PRO":
         c3.metric("POTENTIAL", f"{marge_pourcent:+.2f}%" if val_consensus > 0 else "N/A")
         c4.metric("SECTOR", secteur)
 
-        if recommendation != "N/A":
+        if recommendation != "N/A" and methods_count > 0:
             if "ACHAT" in recommendation:
-                st.success(f"**RECOMMANDATION : {recommendation}** 🚀")
+                st.success(f"**RECOMMANDATION : {recommendation}** 🚀 — Basé sur {methods_count} méthode(s)")
             elif "VENTE" in recommendation:
-                st.error(f"**RECOMMANDATION : {recommendation}** ⚠️")
+                st.error(f"**RECOMMANDATION : {recommendation}** ⚠️ — Basé sur {methods_count} méthode(s)")
             else:
-                st.info(f"**RECOMMANDATION : {recommendation}** ⚖️")
+                st.info(f"**RECOMMANDATION : {recommendation}** ⚖️ — Basé sur {methods_count} méthode(s)")
+        elif methods_count == 0:
+            st.warning("⚠️ Données insuffisantes pour générer une recommandation fiable.")
 
         st.caption(f"Basé sur {methods_count} méthode(s) de valorisation : Graham + DCF + P/E + P/B")
         st.markdown("---")
@@ -2003,8 +2049,9 @@ elif outil == "ANALYSEUR PRO":
             elif dette_equity < 100: score += 3; positifs.append("» DEBT UNDER CONTROL [+3]")
             elif dette_equity > 200: score -= 4; negatifs.append("!! HIGH LEVERAGE [-4]")
 
-        if 10 < payout <= 80:  score += 4; positifs.append("» SUSTAINABLE DIVIDEND [+4]")
-        elif payout > 95:      score -= 4; negatifs.append("!! PAYOUT RISK [-4]")
+        if 10 < payout <= 80:   score += 4; positifs.append("» SUSTAINABLE DIVIDEND [+4]")
+        elif payout > 95:       score -= 4; negatifs.append("!! PAYOUT RISK [-4]")
+        elif payout == 0:       score += 1; positifs.append("» NO DIVIDEND (GROWTH) [+1]")  # Growth stock neutre
         if marge_pourcent > 30:  score += 5; positifs.append("» CONSENSUS DISCOUNT [+5]")
         elif marge_pourcent > 15: score += 3; positifs.append("» MODERATE DISCOUNT [+3]")
 
@@ -2077,11 +2124,11 @@ elif outil == "ANALYSEUR PRO":
                     if (maintenant - pub_time) < secondes_par_jour:
                         trouve_24h = True
                         clean_title = entry.title.split(' - ')[0]
-                        source = entry.source.get('title', 'Finance')
+                        source = entry.source.get('title', 'Finance') if hasattr(entry, 'source') and entry.source else 'Finance'
                         prefix = "■ INV |" if "investing" in source.lower() else "»"
                         with st.expander(f"{prefix} {clean_title}"):
                             st.write(f"**SOURCE :** {source}")
-                            st.caption(f"🕒 TIMESTAMP : {entry.published}")
+                            st.caption(f"🕒 TIMESTAMP : {entry.get('published', 'N/A')}")
                             st.link_button("OPEN ARTICLE", entry.link)
                 if not trouve_24h:
                     st.info("NO RECENT NEWS IN THE LAST 24H.")
@@ -2089,11 +2136,11 @@ elif outil == "ANALYSEUR PRO":
             with tab_action_archive:
                 for entry in articles[:12]:
                     clean_title = entry.title.split(' - ')[0]
-                    source = entry.source.get('title', 'Finance')
+                    source = entry.source.get('title', 'Finance') if hasattr(entry, 'source') and entry.source else 'Finance'
                     prefix = "■ INV |" if "investing" in source.lower() else "•"
                     with st.expander(f"{prefix} {clean_title}"):
                         st.write(f"**SOURCE :** {source}")
-                        st.caption(f"📅 DATE : {entry.published}")
+                        st.caption(f"📅 DATE : {entry.get('published', 'N/A')}")
                         st.link_button("VIEW ARCHIVE", entry.link)
         except Exception:
             st.error("ERROR FETCHING NEWS FEED.")
