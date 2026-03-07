@@ -440,7 +440,7 @@ def _show_dashboard():
             item = m["item"]
             st.markdown(f"""
             <div class="comm-row">
-                <span style="color:#aaa;font-family:'DM Sans', Arial, sans-serif;font-size:11px;">
+                <span style="color:#4d9fff;font-family:'DM Sans', Arial, sans-serif;font-size:11px;">
                     {item['emoji']} {item['name']}</span>
                 <span style="color:#00ff41;font-family:'DM Sans', Arial, sans-serif;
                              font-size:13px;font-weight:700;">+{d['change']:.2f}%</span>
@@ -453,7 +453,7 @@ def _show_dashboard():
             item = m["item"]
             st.markdown(f"""
             <div class="comm-row">
-                <span style="color:#aaa;font-family:'DM Sans', Arial, sans-serif;font-size:11px;">
+                <span style="color:#4d9fff;font-family:'DM Sans', Arial, sans-serif;font-size:11px;">
                     {item['emoji']} {item['name']}</span>
                 <span style="color:#ff2222;font-family:'DM Sans', Arial, sans-serif;
                              font-size:13px;font-weight:700;">{d['change']:.2f}%</span>
@@ -1132,7 +1132,7 @@ def _show_commodity_info(item, data):
                     letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;">
             📖 ANALYSE FONDAMENTALE — {item['name']}
         </div>
-        <p style="color:#888;font-size:11px;font-family:'DM Sans', Arial, sans-serif;
+        <p style="color:#4d9fff;font-size:11px;font-family:'DM Sans', Arial, sans-serif;
                   line-height:1.7;margin-bottom:10px;">{info['desc']}</p>
         <div style="color:#ffcc00;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
                     letter-spacing:0.4px;margin-bottom:6px;">DRIVERS PRINCIPAUX</div>
@@ -1140,7 +1140,7 @@ def _show_commodity_info(item, data):
             {''.join(f"<span style='background:#1a0800;border:1px solid #2a1400;color:#ff6600;font-size:9px;font-family:DM Sans, Arial, sans-serif;padding:3px 8px;letter-spacing:0.4px;'>{d}</span>" for d in info['drivers'])}
         </div>
         <div style="color:#333;font-size:9px;font-family:'DM Sans', Arial, sans-serif;
-                    letter-spacing:0.4px;">📅 SAISONNALITÉ : <span style="color:#555;">{info['saisonnalite']}</span>
+                    letter-spacing:0.4px;">📅 SAISONNALITÉ : <span style="color:#4d9fff;">{info['saisonnalite']}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1290,7 +1290,7 @@ El Niño impacte les productions d'Asie-Pacifique.
                         border-left:3px solid {a['color']};padding:12px 14px;margin-bottom:8px;">
                 <div style="color:{a['color']};font-family:'DM Sans', Arial, sans-serif;
                             font-size:10px;letter-spacing:0.4px;margin-bottom:6px;">{a['titre']}</div>
-                <p style="color:#777;font-size:10px;font-family:'DM Sans', Arial, sans-serif;
+                <p style="color:#4d9fff;font-size:10px;font-family:'DM Sans', Arial, sans-serif;
                           line-height:1.7;margin:0;">{a['contenu']}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -1310,7 +1310,7 @@ El Niño impacte les productions d'Asie-Pacifique.
             st.markdown(f"""
             <div style="display:flex;justify-content:space-between;align-items:center;
                         padding:6px 10px;border-bottom:1px solid #0d0d0d;">
-                <span style="color:#aaa;font-family:'DM Sans', Arial, sans-serif;
+                <span style="color:#4d9fff;font-family:'DM Sans', Arial, sans-serif;
                              font-size:10px;">{rapport}</span>
                 <span style="color:{color};font-family:'DM Sans', Arial, sans-serif;
                              font-size:9px;letter-spacing:0.4px;">{timing}</span>
