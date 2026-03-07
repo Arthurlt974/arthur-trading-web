@@ -986,6 +986,25 @@ class ValuationCalculator:
         except Exception as e:
             return {"error": f"Erreur DCF: {str(e)}"}
 
+    def _get_sector_multiples(self):
+        """Retourne les multiples P/E et P/B de référence par secteur — basés sur moyennes historiques réelles"""
+        sector = self.info.get('sector', '')
+        # (median_pe, median_pb) — sources: Damodaran NYU 2024
+        sector_map = {
+            'Technology':             (28.0, 8.0),
+            'Consumer Cyclical':      (22.0, 4.5),
+            'Consumer Defensive':     (22.0, 5.0),
+            'Financial Services':     (13.0, 1.5),
+            'Healthcare':             (24.0, 4.5),
+            'Industrials':            (22.0, 3.5),
+            'Energy':                 (12.0, 1.8),
+            'Basic Materials':        (14.0, 2.0),
+            'Real Estate':            (30.0, 2.0),
+            'Communication Services': (20.0, 3.5),
+            'Utilities':              (17.0, 1.8),
+        }
+        return sector_map.get(sector, (20.0, 3.0))
+
     def pe_valuation(self, target_pe=None):
         try:
             current_price = self.info.get('currentPrice', 0)
@@ -996,22 +1015,33 @@ class ValuationCalculator:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
                     pass
-            trailing_pe = self.info.get('trailingPE', 0)
-            forward_pe = self.info.get('forwardPE', 0)
-            trailing_eps = self.info.get('trailingEps', 0)
-            forward_eps = self.info.get('forwardEps', 0)
+            trailing_pe  = self.info.get('trailingPE')  or 0
+            trailing_eps = self.info.get('trailingEps') or 0
+            forward_eps  = self.info.get('forwardEps')  or 0
+
             if target_pe is None:
-                target_pe = trailing_pe if trailing_pe else 15
+                sector_pe, _ = self._get_sector_multiples()
+                # P/E cible = moyenne entre P/E sectoriel et P/E actuel plafonné
+                # → évite de juste multiplier par le P/E actuel (circulaire)
+                if trailing_pe > 0:
+                    # On plafonne le P/E actuel à 2× la médiane sectorielle
+                    capped_pe = min(trailing_pe, sector_pe * 2)
+                    target_pe = (sector_pe + capped_pe) / 2
+                else:
+                    target_pe = sector_pe
+
+            # Préférer Forward EPS (plus representatif du futur)
             if forward_eps > 0:
                 fair_value = forward_eps * target_pe
-                eps_used = forward_eps
-                eps_type = "Forward EPS"
+                eps_used   = forward_eps
+                eps_type   = "Forward EPS"
             elif trailing_eps > 0:
                 fair_value = trailing_eps * target_pe
-                eps_used = trailing_eps
-                eps_type = "Trailing EPS"
+                eps_used   = trailing_eps
+                eps_type   = "Trailing EPS"
             else:
                 return {"error": "EPS non disponible"}
+
             upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
             return {
                 "method": "P/E Ratio",
@@ -1019,7 +1049,7 @@ class ValuationCalculator:
                 "current_price": round(current_price, 2),
                 "upside_pct": round(upside, 2),
                 "current_pe": round(trailing_pe, 2) if trailing_pe else "N/A",
-                "target_pe": round(target_pe, 2) if target_pe else "N/A",
+                "target_pe": round(target_pe, 2),
                 "eps": round(eps_used, 2),
                 "eps_type": eps_type
             }
@@ -1036,21 +1066,21 @@ class ValuationCalculator:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
                     pass
-            book_value = self.info.get('bookValue', 0)
-            pb_ratio = self.info.get('priceToBook', 0)
+            book_value = self.info.get('bookValue') or 0
+            pb_ratio   = self.info.get('priceToBook') or 0
             if book_value == 0 or book_value is None:
                 return {"error": "Valeur comptable non disponible"}
-            # P/B cible sectoriel basé sur le secteur — pas circulaire
-            sector = self.info.get('sector', '')
-            sector_pb_map = {
-                'Technology': 6.0, 'Financial Services': 1.5, 'Healthcare': 4.0,
-                'Consumer Cyclical': 3.5, 'Consumer Defensive': 4.0, 'Industrials': 3.0,
-                'Energy': 1.8, 'Basic Materials': 2.0, 'Real Estate': 1.5,
-                'Communication Services': 3.5, 'Utilities': 1.5,
-            }
-            target_pb = sector_pb_map.get(sector, 3.0)  # 3.0 par défaut si secteur inconnu
+
+            # Cas particulier : book value très faible / négatif (rachats d'actions agressifs)
+            # Ex : Apple BV=$6 avec prix=$257 → P/B actuel = 43 → méthode peu fiable
+            if pb_ratio > 20:
+                return {"error": f"P/B actuel trop élevé ({pb_ratio:.1f}×) — méthode P/B non pertinente pour cette entreprise (rachats massifs d'actions)"}
+
+            _, sector_pb = self._get_sector_multiples()
+            # P/B cible = médiane sectorielle (source Damodaran)
+            target_pb  = sector_pb
             fair_value = book_value * target_pb
-            upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
+            upside     = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
             return {
                 "method": "Price/Book",
                 "fair_value": round(fair_value, 2),
@@ -1108,6 +1138,15 @@ class ValuationCalculator:
             return {"error": f"Erreur NVT: {str(e)}"}
 
     def graham_valuation(self):
+        """
+        Graham Number modernisé :
+        - Formule classique : √(22.5 × EPS × BV) — adaptée aux industriels/value
+        - Pour entreprises tech/growth à fort P/B : on utilise la formule de Graham
+          avec le coefficient ajusté au secteur (au lieu de 22.5 fixe)
+          Graham_coeff = median_sector_PE × median_sector_PB × 0.75 (marge de sécurité 25%)
+        - Si book value < 0 ou très faible (< EPS), on utilise une version EPS-only :
+          fair_value = EPS × (8.5 + 2 × growth_rate) — formule Graham 1962 révisée
+        """
         try:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
@@ -1117,18 +1156,36 @@ class ValuationCalculator:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
                     pass
+
             eps = self.info.get('trailingEps') or 0
-            # N'utiliser forwardEps que si trailingEps absent ET forwardEps positif
             if eps <= 0:
                 forward = self.info.get('forwardEps') or 0
                 if forward > 0:
                     eps = forward
-            book_value = self.info.get('bookValue') or 0
             if eps <= 0:
                 return {"error": "EPS négatif ou nul — Graham non applicable"}
-            if book_value <= 0:
-                return {"error": "Book Value non disponible ou négatif"}
-            fair_value = (22.5 * eps * book_value) ** 0.5
+
+            book_value  = self.info.get('bookValue') or 0
+            sector_pe, sector_pb = self._get_sector_multiples()
+            pb_ratio    = self.info.get('priceToBook') or 0
+            growth_rate = self.info.get('earningsGrowth') or self.info.get('revenueGrowth') or 0.05
+
+            # Cas 1 : Book Value très faible (rachats agressifs, ex: Apple, Buybacks)
+            # → P/B actuel >> médiane sectorielle → on passe sur formule Graham 1962
+            if book_value <= 0 or (pb_ratio > 0 and pb_ratio > sector_pb * 3):
+                # Formule Graham 1962 : V = EPS × (8.5 + 2g) × (4.4 / AAA_bond_rate)
+                # AAA bond rate actuel ~4.5%
+                aaa_rate   = 4.5
+                g_pct      = max(0, min(growth_rate * 100, 25))  # plafonné à 25%
+                fair_value = eps * (8.5 + 2 * g_pct) * (4.4 / aaa_rate)
+                method_note = "Graham 1962 (EPS × croissance) — Book Value non représentatif"
+            else:
+                # Cas 2 : formule classique avec coefficient sectoriel
+                # coeff = PE_sectoriel × PB_sectoriel × 0.75 (marge sécurité 25%)
+                graham_coeff = sector_pe * sector_pb * 0.75
+                fair_value   = (graham_coeff * eps * book_value) ** 0.5
+                method_note  = f"Graham classique (coeff sectoriel {graham_coeff:.1f})"
+
             upside = ((fair_value - current_price) / current_price) * 100 if current_price > 0 else 0
             return {
                 "method": "Graham",
@@ -1136,7 +1193,8 @@ class ValuationCalculator:
                 "current_price": round(current_price, 2),
                 "upside_pct": round(upside, 2),
                 "eps": round(eps, 2),
-                "book_value": round(book_value, 2)
+                "book_value": round(book_value, 2) if book_value > 0 else "N/A (rachats)",
+                "method_note": method_note
             }
         except Exception as e:
             return {"error": f"Erreur Graham: {str(e)}"}
@@ -2010,9 +2068,10 @@ elif outil == "ANALYSEUR PRO":
                         if method == "graham":
                             col_param = st.columns(3)
                             with col_param[0]: st.info(f"**EPS:** ${data['eps']:.2f}")
-                            with col_param[1]: st.info(f"**Book Value:** ${data['book_value']:.2f}")
-                            with col_param[2]: st.info(f"**Formule:** √(22.5 × EPS × BV)")
-                            st.caption("📚 Formule de Benjamin Graham - Investissement Value")
+                            bv_display = data['book_value'] if isinstance(data['book_value'], str) else f"${data['book_value']:.2f}"
+                            with col_param[1]: st.info(f"**Book Value:** {bv_display}")
+                            with col_param[2]: st.info(f"**Méthode:** {data.get('method_note', 'Graham classique')[:30]}")
+                            st.caption(f"📚 {data.get('method_note', 'Formule de Benjamin Graham')}")
                         elif method == "pe":
                             col_param = st.columns(3)
                             with col_param[0]: st.info(f"**P/E Actuel:** {data['current_pe']}")
