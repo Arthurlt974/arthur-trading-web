@@ -236,20 +236,18 @@ def show_interface_pro():
             tv_symbol = raw_ticker # TradingView gère bien les actions US en direct (ex: AAPL)
 
         # 1. GRAPHIQUE PRINCIPAL
-        html_chart = f"""
-        <div style="height:500px; border: 1px solid #1A1A1A; border-radius: 4px; overflow: hidden; margin-top: 10px;">
-            <div id="tv_chart_main"></div>
-            <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-            <script type="text/javascript">
-            new TradingView.widget({{
-                "width": "100%", "height": "500", "symbol": "{tv_symbol}",
-                "interval": "D", "theme": "dark", "style": "1", "locale": "fr",
-                "toolbar_bg": "#000000", "enable_publishing": false, "container_id": "tv_chart_main"
-            }});
-            </script>
-        </div>
-        """
-        components.html(html_chart, height=515)
+        from chart_module import render_chart
+        import time as _t
+        _chart_html = render_chart(
+            symbol=raw_ticker,
+            interval="1d",
+            limit=200,
+            height=600,
+            pair_label=raw_ticker,
+            exchange="Yahoo Finance",
+            show_ma=True,
+        ) + f"<!-- {raw_ticker}:{int(_t.time()*1000)} -->"
+        components.html(_chart_html, height=610, scrolling=False)
 
         st.markdown("<br>", unsafe_allow_html=True)
         
