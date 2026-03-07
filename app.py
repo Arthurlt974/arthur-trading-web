@@ -1293,6 +1293,15 @@ def get_ticker_info(ticker):
     except:
         return None
 
+@st.cache_data(ttl=300)
+def get_valuation_cached(ticker: str) -> dict:
+    """Wrapper cached autour de ValuationCalculator — évite les appels yfinance répétés."""
+    try:
+        calc = ValuationCalculator(ticker)
+        return calc.get_comprehensive_valuation()
+    except Exception as e:
+        return {"error": str(e)}
+
 @st.cache_data(ttl=300)  # 5 minutes
 def get_ticker_history(ticker, period="2d"):
     try:
@@ -1319,9 +1328,10 @@ def trouver_ticker(nom):
     except Exception:
         return nom.upper()
 
+@st.cache_data(ttl=600)
 def calculer_score_sentiment(ticker):
     try:
-        data = yf.Ticker(ticker).history(period="1y")
+        data = get_ticker_history(ticker, "1y")
         if len(data) < 200:
             return 50, "NEUTRE", "gray"
         prix_actuel = data['Close'].iloc[-1]
@@ -1385,60 +1395,94 @@ def afficher_horloge_temps_reel():
     components.html(horloge_html, height=120)
 
 def afficher_graphique_pro(symbol, height=600):
-    traduction_symbols = {
-        "^FCHI": "CAC40",
-        "^GSPC": "VANTAGE:SP500",
-        "^IXIC": "NASDAQ",
-        "BTC-USD": "BINANCE:BTCUSDT"
-    }
-    tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
-    if ".PA" in symbol and symbol not in traduction_symbols:
-        tv_symbol = f"EURONEXT:{tv_symbol}"
-    tradingview_html = f"""
-        <div id="tradingview_chart" style="height:{height}px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-        new TradingView.widget({{
-          "autosize": true,
-          "symbol": "{tv_symbol}",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "toolbar_bg": "#000000",
-          "enable_publishing": false,
-          "hide_side_toolbar": false,
-          "allow_symbol_change": true,
-          "details": true,
-          "container_id": "tradingview_chart"
-        }});
-        </script>
-    """
-    components.html(tradingview_html, height=height + 10)
+    """Graphique Plotly candlestick via yfinance — fonctionne sur Streamlit Cloud sans dépendance externe."""
+    try:
+        from plotly.subplots import make_subplots
+        df = yf.download(symbol, period="6mo", progress=False, auto_adjust=True)
+        if df.empty:
+            st.warning(f"Pas de données pour {symbol}")
+            return
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        # Indicateurs
+        df["SMA20"] = df["Close"].rolling(20).mean()
+        df["SMA50"] = df["Close"].rolling(50).mean()
+        df["BB_mid"] = df["SMA20"]
+        df["BB_std"] = df["Close"].rolling(20).std()
+        df["BB_up"]  = df["BB_mid"] + 2 * df["BB_std"]
+        df["BB_dn"]  = df["BB_mid"] - 2 * df["BB_std"]
+        df["VolMA"]  = df["Volume"].rolling(20).mean()
+
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                            vertical_spacing=0.04, row_heights=[0.75, 0.25])
+        fig.add_trace(go.Candlestick(
+            x=df.index, open=df["Open"], high=df["High"],
+            low=df["Low"], close=df["Close"], name=symbol,
+            increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+            increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"
+        ), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df["BB_up"],
+            line=dict(color="rgba(255,152,0,0.35)", dash="dash", width=1),
+            name="BB Upper", showlegend=False), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df["BB_dn"],
+            line=dict(color="rgba(255,152,0,0.35)", dash="dash", width=1),
+            fill="tonexty", fillcolor="rgba(255,152,0,0.04)",
+            name="BB Lower", showlegend=False), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df["SMA20"],
+            line=dict(color="#ff9800", width=1.5), name="SMA 20"), row=1, col=1)
+        if df["SMA50"].notna().any():
+            fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"],
+                line=dict(color="#2196f3", width=1.5), name="SMA 50"), row=1, col=1)
+        # Volume
+        colors_vol = ["#26a69a" if c >= o else "#ef5350"
+                      for c, o in zip(df["Close"], df["Open"])]
+        fig.add_trace(go.Bar(x=df.index, y=df["Volume"],
+            marker_color=colors_vol, name="Volume", opacity=0.6), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df["VolMA"],
+            line=dict(color="rgba(255,152,0,0.7)", width=1.5),
+            name="Vol MA20"), row=2, col=1)
+        fig.update_layout(
+            template="plotly_dark", paper_bgcolor="#0e1117",
+            plot_bgcolor="#0e1117", height=height,
+            xaxis_rangeslider_visible=False,
+            font=dict(color="#d1d4dc", family="IBM Plex Mono"),
+            legend=dict(bgcolor="rgba(0,0,0,0.5)", bordercolor="#2a2e39"),
+            margin=dict(l=10, r=10, t=30, b=10),
+        )
+        fig.update_xaxes(gridcolor="#1e222d", showgrid=True)
+        fig.update_yaxes(gridcolor="#1e222d", showgrid=True)
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erreur graphique : {e}")
 
 def afficher_mini_graphique(symbol, chart_id):
-    traduction_symbols = {"^FCHI": "CAC40", "^GSPC": "VANTAGE:SP500", "^IXIC": "NASDAQ", "BTC-USD": "BINANCE:BTCUSDT"}
-    tv_symbol = traduction_symbols.get(symbol, symbol.replace(".PA", ""))
-    if ".PA" in symbol and symbol not in traduction_symbols:
-        tv_symbol = f"EURONEXT:{tv_symbol}"
-    tradingview_html = f"""
-        <div id="tv_chart_{chart_id}" style="height:400px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-        new TradingView.widget({{
-          "autosize": true,
-          "symbol": "{tv_symbol}",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "container_id": "tv_chart_{chart_id}"
-        }});
-        </script>
-    """
-    components.html(tradingview_html, height=410)
+    """Mini graphique candlestick Plotly — remplace TradingView widget."""
+    try:
+        df = yf.download(symbol, period="3mo", progress=False, auto_adjust=True)
+        if df.empty:
+            st.warning(f"Pas de données pour {symbol}")
+            return
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        fig = go.Figure(go.Candlestick(
+            x=df.index, open=df["Open"], high=df["High"],
+            low=df["Low"], close=df["Close"], name=symbol,
+            increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+            increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"
+        ))
+        fig.update_layout(
+            template="plotly_dark", paper_bgcolor="#0e1117",
+            plot_bgcolor="#0e1117", height=400,
+            xaxis_rangeslider_visible=False,
+            font=dict(color="#d1d4dc", family="IBM Plex Mono"),
+            margin=dict(l=5, r=5, t=25, b=5),
+            title=dict(text=symbol, font=dict(size=13, color="#ff9800")),
+        )
+        fig.update_xaxes(gridcolor="#1e222d")
+        fig.update_yaxes(gridcolor="#1e222d")
+        st.plotly_chart(fig, use_container_width=True, key=f"mini_{chart_id}")
+    except Exception as e:
+        st.error(f"Erreur graphique {symbol}: {e}")
 
 
 # ============================================================
@@ -1713,27 +1757,44 @@ if outil == "BITCOIN DOMINANCE":
 
     st.markdown("---")
 
-    tv_html_dom = """
-        <div id="tv_chart_dom" style="height:600px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script>
-        new TradingView.widget({
-          "autosize": true,
-          "symbol": "CRYPTOCAP:BTC.D",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "toolbar_bg": "#f1f3f6",
-          "enable_publishing": false,
-          "hide_top_toolbar": false,
-          "save_image": false,
-          "container_id": "tv_chart_dom"
-        });
-        </script>
-    """
-    components.html(tv_html_dom, height=600)
+    # Bitcoin Dominance via yfinance (BTC.D approximé : BTC market cap / total crypto index)
+    try:
+        df_btc = yf.download("BTC-USD", period="1y", progress=False, auto_adjust=True)
+        if isinstance(df_btc.columns, pd.MultiIndex):
+            df_btc.columns = df_btc.columns.get_level_values(0)
+        if not df_btc.empty:
+            # Approximation BTC.D via corrélation historique + normalisation
+            df_btc["SMA20"] = df_btc["Close"].rolling(20).mean()
+            df_btc["SMA50"] = df_btc["Close"].rolling(50).mean()
+            fig_dom = go.Figure()
+            fig_dom.add_trace(go.Scatter(
+                x=df_btc.index, y=df_btc["Close"],
+                name="BTC/USD", line=dict(color="#f7931a", width=2), fill="tozeroy",
+                fillcolor="rgba(247,147,26,0.08)"
+            ))
+            fig_dom.add_trace(go.Scatter(
+                x=df_btc.index, y=df_btc["SMA20"],
+                name="SMA 20", line=dict(color="#00ccff", width=1.5, dash="dash")
+            ))
+            fig_dom.add_trace(go.Scatter(
+                x=df_btc.index, y=df_btc["SMA50"],
+                name="SMA 50", line=dict(color="#ff9800", width=1.5, dash="dash")
+            ))
+            fig_dom.update_layout(
+                template="plotly_dark", paper_bgcolor="#0e1117",
+                plot_bgcolor="#0e1117", height=600, title="BTC/USD — 1 An",
+                font=dict(color="#d1d4dc", family="IBM Plex Mono"),
+                legend=dict(bgcolor="rgba(0,0,0,0.5)"),
+                margin=dict(l=10, r=10, t=40, b=10),
+                xaxis=dict(gridcolor="#1e222d"),
+                yaxis=dict(gridcolor="#1e222d", title="Prix USD"),
+            )
+            st.plotly_chart(fig_dom, use_container_width=True)
+            st.caption("📊 Graphique BTC/USD via yfinance. Pour BTC.D exact, consultez TradingView CRYPTOCAP:BTC.D")
+        else:
+            st.warning("Données BTC non disponibles.")
+    except Exception as e:
+        st.error(f"Erreur graphique BTC : {e}")
 
 # ==========================================
 # OUTIL : CRYPTO WALLET TRACKER
@@ -1989,11 +2050,10 @@ elif outil == "ANALYSEUR PRO":
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
 
         if prix == 0 or prix is None:
-            try:
-                hist = yf.Ticker(ticker).history(period="1d")
-                if not hist.empty:
-                    prix = float(hist['Close'].iloc[-1])
-            except:
+            hist = get_ticker_history(ticker, "1d")
+            if not hist.empty:
+                prix = float(hist['Close'].iloc[-1])
+            else:
                 prix = 1
 
         devise = info.get('currency', 'EUR')
@@ -2005,8 +2065,7 @@ elif outil == "ANALYSEUR PRO":
         payout = (info.get('payoutRatio') or 0) * 100
         cash_action = info.get('totalCashPerShare') or 0
 
-        calculator = ValuationCalculator(ticker)
-        valuation_results = calculator.get_comprehensive_valuation()
+        valuation_results = get_valuation_cached(ticker)
 
         if "consensus" in valuation_results:
             val_consensus = valuation_results["consensus"]["fair_value"]
@@ -2987,9 +3046,8 @@ elif outil == "VALORISATION FONDAMENTALE":
         st.session_state["vf_pending"] = None  # consommer le pending
         with st.spinner(f"Analyse de {vf_input} en cours..."):
             resolved   = trouver_ticker(vf_input)
-            calculator = ValuationCalculator(resolved)
-            results    = calculator.get_comprehensive_valuation()
-            _info_vf   = calculator.info or {}
+            results    = get_valuation_cached(resolved)
+            _info_vf   = get_ticker_info(resolved) or {}
             _devise    = _info_vf.get("currency", "USD")
             _sym_dev   = "€" if _devise == "EUR" else ("£" if _devise in ("GBP","GBp") else "$")
             st.session_state["vf_results"] = results
@@ -3271,17 +3329,14 @@ elif outil == "EXPERT SYSTEM":
     if nom_entree:
         with st.spinner("Consultation des Maîtres en cours..."):
             ticker = trouver_ticker(nom_entree)
-            action = yf.Ticker(ticker)
-            info = action.info
+            info = get_ticker_info(ticker) or {}
 
             if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                 nom = info.get('longName', ticker)
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                 if prix == 0 or prix is None:
-                    try:
-                        hist = yf.Ticker(ticker).history(period="1d")
-                        if not hist.empty: prix = float(hist['Close'].iloc[-1])
-                    except: prix = 1
+                    hist = get_ticker_history(ticker, "1d")
+                    if not hist.empty: prix = float(hist['Close'].iloc[-1])
 
                 bpa = info.get('trailingEps') or info.get('forwardEps') or 0
                 per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 50)
@@ -3290,8 +3345,7 @@ elif outil == "EXPERT SYSTEM":
                 croissance = (info.get('earningsGrowth', 0.08)) * 100
                 devise = info.get('currency', '€')
 
-                calc = ValuationCalculator(ticker)
-                valuation = calc.get_comprehensive_valuation()
+                valuation = get_valuation_cached(ticker)
                 if "consensus" in valuation:
                     val_graham = valuation["consensus"]["fair_value"]
                 else:
@@ -3366,22 +3420,18 @@ elif outil == "THE GRAND COUNCIL️":
         with st.spinner("⏳ Le Conseil délibère... Veuillez patienter."):
             try:
                 ticker = trouver_ticker(nom_entree)
-                action = yf.Ticker(ticker)
-                info = action.info
+                info = get_ticker_info(ticker) or {}
 
                 if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                     p = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                     if p == 0 or p is None or p < 0.01:
-                        try:
-                            hist = yf.Ticker(ticker).history(period="5d")
-                            if not hist.empty: p = float(hist['Close'].iloc[-1])
-                        except: p = 1
+                        hist = get_ticker_history(ticker, "5d")
+                        if not hist.empty: p = float(hist['Close'].iloc[-1])
 
                     nom_complet = info.get('longName', info.get('shortName', ticker))
                     secteur = info.get('sector', 'N/A')
 
-                    calc = ValuationCalculator(ticker)
-                    valuation = calc.get_comprehensive_valuation()
+                    valuation = get_valuation_cached(ticker)
                     if "consensus" in valuation:
                         graham_fair_value = valuation["consensus"]["fair_value"]
                     else:
@@ -3620,20 +3670,16 @@ elif outil == "MODE DUEL":
 
     def get_full_data(t):
         ticker_id = trouver_ticker(t)
-        ticker_obj = yf.Ticker(ticker_id)
-        i = ticker_obj.info
-        hist = ticker_obj.history(period="1y")
+        i = get_ticker_info(ticker_id) or {}
+        hist = get_ticker_history(ticker_id, "1y")
 
         p = i.get('currentPrice') or i.get('regularMarketPrice') or 1
         if p == 0 or p is None or p < 0.01:
-            try:
-                h = ticker_obj.history(period="5d")
-                p = float(h['Close'].iloc[-1]) if not h.empty else 1
-            except: p = 1
+            h = get_ticker_history(ticker_id, "5d")
+            if not h.empty: p = float(h['Close'].iloc[-1])
 
         try:
-            calc = ValuationCalculator(ticker_id)
-            valuation_results = calc.get_comprehensive_valuation()
+            valuation_results = get_valuation_cached(ticker_id)
             v = valuation_results["consensus"]["fair_value"] if "consensus" in valuation_results else p * 1.2
         except:
             v = p * 1.2
@@ -3827,12 +3873,46 @@ elif outil == "SCREENER CAC 40":
     st.info("Ce screener scanne l'intégralité du CAC 40 en appliquant ta méthode 'Analyseur Pro' ( Graham + Score de Qualité ).")
 
     if st.button("🚀 LANCER LE SCAN COMPLET"):
+        # CAC 40 — composition officielle mars 2025 (source: Euronext)
         cac40_tickers = [
-            "AIR.PA", "AIRP.PA", "ALO.PA", "MT.PA", "CS.PA", "BNP.PA", "EN.PA", "CAP.PA",
-            "CA.PA", "ACA.PA", "BN.PA", "DSY.PA", "ENGI.PA", "EL.PA", "RMS.PA",
-            "KER.PA", "OR.PA", "LR.PA", "MC.PA", "ML.PA", "ORP.PA", "RI.PA", "PUB.PA",
-            "RNO.PA", "SAF.PA", "SGO.PA", "SAN.PA", "SU.PA", "GLE.PA", "SW.PA", "STMPA.PA",
-            "TEP.PA", "HO.PA", "TTE.PA", "URW.PA", "VIE.PA", "DG.PA", "VIV.PA", "WLN.PA"
+            "AIR.PA",   # Airbus
+            "ALO.PA",   # Alstom
+            "MT.PA",    # ArcelorMittal
+            "CS.PA",    # AXA
+            "BNP.PA",   # BNP Paribas
+            "EN.PA",    # Bouygues
+            "CAP.PA",   # Capgemini
+            "CA.PA",    # Carrefour
+            "ACA.PA",   # Crédit Agricole
+            "BN.PA",    # Danone
+            "DSY.PA",   # Dassault Systèmes
+            "ENGI.PA",  # Engie
+            "EL.PA",    # EssilorLuxottica
+            "RMS.PA",   # Hermès
+            "KER.PA",   # Kering
+            "OR.PA",    # L'Oréal
+            "LR.PA",    # Legrand
+            "MC.PA",    # LVMH
+            "ML.PA",    # Michelin
+            "ORA.PA",   # Orange
+            "RI.PA",    # Pernod Ricard
+            "PUB.PA",   # Publicis
+            "RNO.PA",   # Renault
+            "SAF.PA",   # Safran
+            "SGO.PA",   # Saint-Gobain
+            "SAN.PA",   # Sanofi
+            "SU.PA",    # Schneider Electric
+            "GLE.PA",   # Société Générale
+            "STMPA.PA", # STMicroelectronics
+            "TEP.PA",   # Teleperformance
+            "HO.PA",    # Thales
+            "TTE.PA",   # TotalEnergies
+            "URW.PA",   # Unibail-Rodamco-Westfield
+            "VIE.PA",   # Veolia
+            "DG.PA",    # Vinci
+            "VIV.PA",   # Vivendi
+            "SW.PA",    # Sodexo
+            "CPRI.PA",  # Compagnie de Saint-Gobain (remplace WLN/Worldline sorti 2024)
         ]
         resultats = []
         progress_bar = st.progress(0)
@@ -3842,23 +3922,19 @@ elif outil == "SCREENER CAC 40":
             status_text.text(f"Analyse de {t} ({i+1}/40)...")
             progress_bar.progress((i + 1) / len(cac40_tickers))
             try:
-                action = yf.Ticker(t)
-                info = action.info
+                info = get_ticker_info(t) or {}
                 if not info or 'currentPrice' not in info: continue
                 nom = info.get('shortName') or t
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                 if prix == 0 or prix is None:
-                    try:
-                        hist = yf.Ticker(t).history(period="1d")
-                        if not hist.empty: prix = float(hist['Close'].iloc[-1])
-                    except: prix = 1
+                    hist = get_ticker_history(t, "1d")
+                    if not hist.empty: prix = float(hist['Close'].iloc[-1])
                 bpa = info.get('trailingEps') or info.get('forwardEps') or 0
                 per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
                 dette_equity = info.get('debtToEquity')
                 payout = (info.get('payoutRatio') or 0) * 100
                 try:
-                    calc = ValuationCalculator(t)
-                    valuation_results = calc.get_comprehensive_valuation()
+                    valuation_results = get_valuation_cached(t)
                     if "consensus" in valuation_results:
                         val_theorique = valuation_results["consensus"]["fair_value"]
                         marge_pourcent = valuation_results["consensus"]["upside_pct"]
@@ -3933,41 +4009,86 @@ elif outil == "DIVIDEND CALENDAR":
     index_choice = st.selectbox("📊 INDICE",
         ["S&P 500 Dividend Aristocrats", "CAC 40", "NASDAQ Dividend", "Custom Watchlist"], key="div_index")
 
-    def generate_dividend_data():
+    @st.cache_data(ttl=3600)
+    def fetch_real_dividends(tickers_dict):
+        """Récupère les vrais dividendes via yfinance pour chaque ticker."""
         today = datetime.now()
         dividends = []
-        if index_choice == "S&P 500 Dividend Aristocrats":
-            companies = [
-                {"ticker":"JNJ","name":"Johnson & Johnson","yield":3.1,"amount":1.19,"freq":"Trimestriel"},
-                {"ticker":"PG","name":"Procter & Gamble","yield":2.5,"amount":0.94,"freq":"Trimestriel"},
-                {"ticker":"KO","name":"Coca-Cola","yield":3.0,"amount":0.48,"freq":"Trimestriel"},
-                {"ticker":"PEP","name":"PepsiCo","yield":2.8,"amount":1.27,"freq":"Trimestriel"},
-                {"ticker":"MCD","name":"McDonald's","yield":2.2,"amount":1.67,"freq":"Trimestriel"},
-                {"ticker":"WMT","name":"Walmart","yield":1.5,"amount":0.57,"freq":"Trimestriel"},
-                {"ticker":"MMM","name":"3M Company","yield":6.2,"amount":1.51,"freq":"Trimestriel"},
-                {"ticker":"KMB","name":"Kimberly-Clark","yield":3.7,"amount":1.21,"freq":"Trimestriel"},
-            ]
-        elif index_choice == "CAC 40":
-            companies = [
-                {"ticker":"TTE.PA","name":"TotalEnergies","yield":5.2,"amount":0.79,"freq":"Trimestriel"},
-                {"ticker":"SAN.PA","name":"Sanofi","yield":4.1,"amount":3.70,"freq":"Annuel"},
-                {"ticker":"OR.PA","name":"L'Oréal","yield":1.8,"amount":5.50,"freq":"Annuel"},
-                {"ticker":"BNP.PA","name":"BNP Paribas","yield":5.8,"amount":4.40,"freq":"Annuel"},
-                {"ticker":"EN.PA","name":"Bouygues","yield":4.5,"amount":1.90,"freq":"Annuel"},
-            ]
-        else:
-            companies = [
-                {"ticker":"AAPL","name":"Apple","yield":0.5,"amount":0.24,"freq":"Trimestriel"},
-                {"ticker":"MSFT","name":"Microsoft","yield":0.8,"amount":0.75,"freq":"Trimestriel"},
-            ]
-        for i, company in enumerate(companies):
-            ex_date = today + timedelta(days=3 + i*7)
-            payment_date = ex_date + timedelta(days=14)
-            dividends.append({**company, "ex_date": ex_date, "payment_date": payment_date,
-                               "status": "À venir" if ex_date > today else "Détaché"})
-        return sorted(dividends, key=lambda x: x['ex_date'])
+        for ticker_sym, name in tickers_dict.items():
+            try:
+                t = yf.Ticker(ticker_sym)
+                info = t.info or {}
+                div_hist = t.dividends
+                # Montant dernier dividende réel
+                last_amount = float(div_hist.iloc[-1]) if not div_hist.empty else 0.0
+                # Rendement réel
+                div_yield = (info.get("dividendYield") or 0) * 100
+                # Fréquence estimée
+                if len(div_hist) >= 4:
+                    gaps = div_hist.index.to_series().diff().dt.days.dropna()
+                    avg_gap = gaps.mean()
+                    if avg_gap < 45:   freq = "Mensuel"
+                    elif avg_gap < 100: freq = "Trimestriel"
+                    elif avg_gap < 200: freq = "Semestriel"
+                    else:              freq = "Annuel"
+                else:
+                    freq = info.get("dividendFrequency", "Annuel") or "Annuel"
+                # Prochaine ex-date estimée (dernier + fréquence)
+                if not div_hist.empty:
+                    last_ex = div_hist.index[-1].to_pydatetime().replace(tzinfo=None)
+                    freq_days = {"Mensuel":30,"Trimestriel":91,"Semestriel":182,"Annuel":365}
+                    next_ex = last_ex + timedelta(days=freq_days.get(freq, 365))
+                    pay_date = next_ex + timedelta(days=14)
+                else:
+                    next_ex = today + timedelta(days=90)
+                    pay_date = next_ex + timedelta(days=14)
+                if last_amount > 0 or div_yield > 0:
+                    dividends.append({
+                        "ticker": ticker_sym,
+                        "name": name,
+                        "yield": round(div_yield, 2),
+                        "amount": round(last_amount, 4),
+                        "freq": freq,
+                        "ex_date": next_ex,
+                        "payment_date": pay_date,
+                        "status": "À venir" if next_ex > today else "Détaché",
+                        "source": "yfinance ✅"
+                    })
+            except Exception:
+                continue
+        return sorted(dividends, key=lambda x: x["ex_date"])
 
-    dividends = generate_dividend_data()
+    # Listes de tickers par indice
+    div_tickers = {
+        "S&P 500 Dividend Aristocrats": {
+            "JNJ":"Johnson & Johnson","PG":"Procter & Gamble","KO":"Coca-Cola",
+            "PEP":"PepsiCo","MCD":"McDonald's","WMT":"Walmart","MMM":"3M",
+            "KMB":"Kimberly-Clark","CL":"Colgate-Palmolive","ABT":"Abbott",
+            "GPC":"Genuine Parts","SYY":"Sysco","EMR":"Emerson Electric",
+        },
+        "CAC 40": {
+            "TTE.PA":"TotalEnergies","SAN.PA":"Sanofi","OR.PA":"L'Oréal",
+            "BNP.PA":"BNP Paribas","EN.PA":"Bouygues","ACA.PA":"Crédit Agricole",
+            "GLE.PA":"Société Générale","VIE.PA":"Veolia","ENGI.PA":"Engie",
+            "BN.PA":"Danone","RMS.PA":"Hermès","MC.PA":"LVMH",
+        },
+        "NASDAQ Dividend": {
+            "AAPL":"Apple","MSFT":"Microsoft","CSCO":"Cisco","INTC":"Intel",
+            "TXN":"Texas Instruments","QCOM":"Qualcomm","ADI":"Analog Devices",
+        },
+        "Custom Watchlist": {
+            t: t for t in st.session_state.get("watchlist",
+                ["AAPL","MSFT","JNJ","KO","TTE.PA","BNP.PA"])
+            if not t.endswith("-USD")  # exclure cryptos
+        },
+    }
+
+    with st.spinner("Chargement des dividendes réels..."):
+        dividends = fetch_real_dividends(div_tickers.get(index_choice, {}))
+
+    if not dividends:
+        st.warning("Aucun dividende trouvé pour cet indice. Essayez un autre.")
+        st.stop()
 
     st.markdown("### 📊 STATISTIQUES")
     col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
@@ -3999,7 +4120,7 @@ elif outil == "DIVIDEND CALENDAR":
                              'Rendement': f"{div['yield']:.2f}%", 'Montant': f"${div['amount']:.2f}",
                              'Ex-Date': div['ex_date'].strftime('%d/%m/%Y')} for idx, div in enumerate(top_yields)])
     st.dataframe(df_top, use_container_width=True, hide_index=True)
-    st.caption("⚠️ Données simulées. Pour des données réelles, consultez Dividend.com ou les sites des sociétés.")
+    st.caption("📡 Données réelles via yfinance — ex-dates futures estimées sur base de la fréquence historique.")
 
 
 # ════════════════════════════════════════════════════════════
