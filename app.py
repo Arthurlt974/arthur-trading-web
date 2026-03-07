@@ -19,6 +19,7 @@ from firebase_auth import render_auth_page, render_user_sidebar, _save_current_s
 import interface_economie
 import interface_forex
 import interface_matieres_premieres
+import interface_analyse_perso
 
 
 # ══════════════════════════════════════════════
@@ -1685,9 +1686,13 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
+    "📊 MON ESPACE ANALYSE", "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
 ])
 st.sidebar.markdown("---")
+
+if categorie == "📊 MON ESPACE ANALYSE":
+    interface_analyse_perso.show_analyse_perso()
+    st.stop()
 
 if categorie == "MARCHÉ CRYPTO":
     outil = st.sidebar.radio("MODULES CRYPTO :", [
