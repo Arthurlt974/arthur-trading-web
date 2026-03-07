@@ -8,13 +8,54 @@ import random
 from .config import DATA_SOURCE, DEFAULT_LIMIT, FALLBACK_TO_MOCK, COINGECKO_IDS
 
 
+def _is_stock(symbol: str) -> bool:
+    """Détecte si le symbole est une action (pas une crypto).
+    Logique : pas de suffixe USDT/BTC, pas dans la liste crypto connue,
+    et ressemble à un ticker boursier (lettres + éventuellement .PA, .L, etc.)
+    """
+    s = symbol.upper().strip()
+    # Suffixes crypto évidents
+    if s.endswith("USDT") or s.endswith("BUSD") or s.endswith("BTC") or s.endswith("ETH"):
+        return False
+    # Suffixes yfinance boursiers
+    if "." in s:  # AAPL, MC.PA, BNP.PA, TSLA, etc.
+        return True
+    # Cryptos connues (symboles courts)
+    known_cryptos = {
+        "BTC","ETH","SOL","XRP","ADA","DOT","AVAX","DOGE","MATIC","LINK",
+        "UNI","ATOM","LTC","BCH","NEAR","FTM","SAND","MANA","AAVE","CRV",
+        "BNB","TRX","SHIB","PEPE","TON","SUI","APT","ARB","OP","INJ",
+        "BITCOIN","ETHEREUM","SOLANA","RIPPLE","CARDANO","POLKADOT",
+    }
+    if s in known_cryptos:
+        return False
+    # Si ça ressemble à un ticker US (2-5 lettres majuscules sans chiffres) → action
+    import re
+    if re.match(r'^[A-Z]{1,5}$', s):
+        return True
+    return False
+
+
 def fetch_ohlcv(symbol: str, interval: str, limit: int = DEFAULT_LIMIT) -> tuple[list[dict], bool]:
     """
     Retourne (candles, is_live).
     candles  : [{t, o, h, l, c, v}, ...]
     is_live  : True si données réelles
+    Auto-détecte les actions et route vers yfinance.
     """
     src = DATA_SOURCE.lower()
+
+    # ── Auto-routing : si c'est une action → yfinance direct ──
+    if _is_stock(symbol) and src not in ("yfinance",):
+        print(f"[chart_module] {symbol} détecté comme action → yfinance")
+        try:
+            return _from_yfinance(symbol, interval, limit), True
+        except Exception as e:
+            print(f"[chart_module] yfinance erreur ({symbol}): {e}")
+            if FALLBACK_TO_MOCK:
+                return _mock(symbol, interval, limit), False
+            raise
+
     try:
         if src == "coingecko":
             return _from_coingecko(symbol, interval, limit), True
