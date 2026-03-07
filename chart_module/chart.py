@@ -229,6 +229,14 @@ body.is-fullscreen{{
 /* ── MAIN LAYOUT ── */
 .main{{display:flex;flex:1;overflow:hidden;}}
 .chart-zone{{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}}
+/* Zones invisibles pour curseur sur axes */
+.axis-y-zone{{position:absolute;right:0;top:0;bottom:24px;width:72px;cursor:ns-resize;z-index:10;}}
+.axis-x-zone{{position:absolute;left:0;right:72px;bottom:0;height:24px;cursor:ew-resize;z-index:10;}}
+.axis-reset-btn{{position:absolute;right:74px;bottom:26px;width:14px;height:14px;
+  background:#1a1a1a;border:1px solid #2a2a2a;color:#4d9fff;font-size:8px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  border-radius:2px;z-index:20;opacity:0.7;}}
+.axis-reset-btn:hover{{opacity:1;color:#ff6600;border-color:#ff6600;}}
 
 /* ── QUANT TOGGLE BUTTON (toolbar) ── */
 .qp-toggle-btn{{
@@ -498,6 +506,10 @@ body.is-fullscreen{{
 <!-- ZONE CHART -->
 <div class="chart-zone">
   <canvas id="cvMain"></canvas>
+  <!-- Zones de drag axes -->
+  <div class="axis-y-zone"  id="axisY"></div>
+  <div class="axis-x-zone"  id="axisX"></div>
+  <div class="axis-reset-btn" id="axisReset" onclick="resetAxisScale()" title="Réinitialiser le zoom des axes">⊙</div>
   <div class="vol-sep"></div>
   <canvas id="cvVol"></canvas>
   <div class="vol-sep" id="rsiSep" style="display:none"></div>
@@ -705,6 +717,14 @@ const D = {{ t:[], o:[], h:[], l:[], c:[], v:[] }};
 //  CONFIG RENDU
 // ════════════════════════════════════════════════════════
 const PAD  = {{l:0, r:72, t:8, b:24}};
+
+// ── Axis scaling (TradingView style) ──
+let PRICE_SCALE  = 1.0;   // multiplicateur zoom vertical (>1 = zoomé)
+let PRICE_OFFSET = 0.0;   // décalage vertical en % du range
+let TIME_SCALE   = 1.0;   // multiplicateur zoom horizontal (>1 = plus de bougies)
+
+// État drag axes
+let axisDrag = null;  // {{type:'y'|'x', startY, startX, startScale, startOffset, startN, startStart}}
 const VPAH = 80;   // hauteur volume
 let showMA  = {ma_init_js};
 let showVol = {vol_init_js};
@@ -1106,7 +1126,12 @@ function drawMain() {{
   const CW=(W-PAD.l-PAD.r)/N;
   const BW=Math.max(1, CW*0.75);
   const toX=i=>PAD.l+i*CW+CW/2;
-  const toY=p=>PAD.t+(hi-p)/rng*(H-PAD.t-PAD.b);
+  // Axis scale : zoom Y via PRICE_SCALE, pan Y via PRICE_OFFSET
+  const midP   = (hi+lo)/2 + PRICE_OFFSET*rng;
+  const scaledRng = rng / PRICE_SCALE;
+  const sHi    = midP + scaledRng/2;
+  const sLo    = midP - scaledRng/2;
+  const toY=p=>PAD.t+(sHi-p)/scaledRng*(H-PAD.t-PAD.b);
 
   // ── FOND ──
   ctx.fillStyle='#000000';
@@ -1275,7 +1300,7 @@ function drawMain() {{
     if(HOVER_Y>0) {{
       ctx.beginPath(); ctx.moveTo(0,HOVER_Y); ctx.lineTo(W-PAD.r,HOVER_Y); ctx.stroke();
       // Tag prix crosshair à droite
-      const hp=hi-(HOVER_Y-PAD.t)/((H-PAD.t-PAD.b))*rng;
+      const hp=sHi-(HOVER_Y-PAD.t)/((H-PAD.t-PAD.b))*scaledRng;
       ctx.fillStyle='#1a0800';
       ctx.beginPath(); ctx.roundRect(W-PAD.r+2,HOVER_Y-9,PAD.r-4,18,2); ctx.fill();
       ctx.fillStyle='#e8e8e8'; ctx.font='9px Share Tech Mono,monospace'; ctx.textAlign='left';
@@ -1801,6 +1826,103 @@ document.addEventListener('keydown', e => {{
   if((e.ctrlKey||e.metaKey) && e.key==='z') {{
     drawings.pop(); drawPending=null; render();
   }}
+}});
+
+
+// ════════════════════════════════════════════════════════
+//  AXIS SCALE (TradingView style)
+// ════════════════════════════════════════════════════════
+const axisY = document.getElementById('axisY');
+const axisX = document.getElementById('axisX');
+
+function resetAxisScale() {{
+  PRICE_SCALE  = 1.0;
+  PRICE_OFFSET = 0.0;
+  render();
+}}
+
+// ── Drag axe Y (droite) : zoom vertical ──
+axisY.addEventListener('mousedown', e => {{
+  e.preventDefault();
+  const N = VIEW_END - VIEW_START;
+  const slice_h = D.h.slice(VIEW_START, VIEW_END);
+  const slice_l = D.l.slice(VIEW_START, VIEW_END);
+  const hi = Math.max(...slice_h);
+  const lo = Math.min(...slice_l);
+  const rng = (hi - lo) || 1;
+  axisDrag = {{
+    type: 'y',
+    startY: e.clientY,
+    startScale: PRICE_SCALE,
+    startOffset: PRICE_OFFSET,
+  }};
+}});
+
+// ── Drag axe X (bas) : zoom horizontal ──
+axisX.addEventListener('mousedown', e => {{
+  e.preventDefault();
+  axisDrag = {{
+    type: 'x',
+    startX: e.clientX,
+    startN: VIEW_END - VIEW_START,
+    startStart: VIEW_START,
+    startEnd: VIEW_END,
+  }};
+}});
+
+window.addEventListener('mousemove', e => {{
+  if(!axisDrag) return;
+
+  if(axisDrag.type === 'y') {{
+    // Drag vers le haut = zoom in (PRICE_SCALE augmente)
+    // Drag vers le bas  = zoom out
+    const dy = axisDrag.startY - e.clientY;
+    const factor = 1 + dy * 0.005;
+    PRICE_SCALE = Math.max(0.1, Math.min(20, axisDrag.startScale * factor));
+
+    // Shift+drag = pan vertical
+    if(e.shiftKey) {{
+      const panDy = e.clientY - axisDrag.startY;
+      PRICE_OFFSET = axisDrag.startOffset + (panDy / cvMain.height) * 0.5;
+    }}
+    render();
+  }}
+
+  if(axisDrag.type === 'x') {{
+    // Drag vers la droite = zoom out (plus de bougies visibles)
+    // Drag vers la gauche = zoom in  (moins de bougies)
+    const dx = e.clientX - axisDrag.startX;
+    const totalN = D.t.length;
+    const currentN = axisDrag.startN;
+    const factor = 1 + dx * 0.008;
+    const newN = Math.max(20, Math.min(totalN, Math.round(currentN * factor)));
+
+    // Centrer sur la position de départ
+    const center = Math.floor((axisDrag.startStart + axisDrag.startEnd) / 2);
+    let s = Math.max(0, center - Math.floor(newN / 2));
+    let en = s + newN;
+    if(en > totalN) {{ en = totalN; s = Math.max(0, en - newN); }}
+    VIEW_START = s; VIEW_END = en;
+    render();
+  }}
+}});
+
+window.addEventListener('mouseup', () => {{
+  axisDrag = null;
+}});
+
+// Double-clic axe Y = reset zoom vertical
+axisY.addEventListener('dblclick', () => {{
+  PRICE_SCALE  = 1.0;
+  PRICE_OFFSET = 0.0;
+  render();
+}});
+
+// Double-clic axe X = fit all
+axisX.addEventListener('dblclick', () => {{
+  VIEW_START = 0;
+  VIEW_END   = D.t.length;
+  render();
 }});
 
 // ════════════════════════════════════════════════════════
