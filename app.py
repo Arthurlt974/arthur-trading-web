@@ -4021,8 +4021,26 @@ elif outil == "DIVIDEND CALENDAR":
                 div_hist = t.dividends
                 # Montant dernier dividende réel
                 last_amount = float(div_hist.iloc[-1]) if not div_hist.empty else 0.0
-                # Rendement réel
-                div_yield = (info.get("dividendYield") or 0) * 100
+
+                # Rendement réel — yfinance retourne parfois 0.03 (décimal) parfois 3.0 (%)
+                # On normalise : si > 1.0 c'est déjà un %, si <= 1.0 on multiplie par 100
+                raw_yield = info.get("dividendYield") or 0
+                if raw_yield > 1.0:
+                    div_yield = round(float(raw_yield), 2)          # déjà en %
+                else:
+                    div_yield = round(float(raw_yield) * 100, 2)    # décimal → %
+                # Sanity check : un rendement > 25% est suspect → recalcul depuis price+amount
+                if div_yield > 25 and last_amount > 0:
+                    price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+                    if price > 0:
+                        # Annualiser le dernier dividende
+                        freq_mult = {"Mensuel": 12, "Trimestriel": 4, "Semestriel": 2, "Annuel": 1}
+                        # Estimation fréquence rapide
+                        _gaps = div_hist.index.to_series().diff().dt.days.dropna() if len(div_hist) >= 2 else pd.Series([365])
+                        _avg = _gaps.mean() if len(_gaps) > 0 else 365
+                        _freq = "Mensuel" if _avg < 45 else ("Trimestriel" if _avg < 100 else ("Semestriel" if _avg < 200 else "Annuel"))
+                        annual_div = last_amount * freq_mult.get(_freq, 1)
+                        div_yield = round((annual_div / price) * 100, 2)
                 # Fréquence estimée
                 if len(div_hist) >= 4:
                     gaps = div_hist.index.to_series().diff().dt.days.dropna()
