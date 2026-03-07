@@ -406,7 +406,6 @@ body.is-fullscreen{{
   </div>
   <div class="hdr-right">
     <span class="live-badge {status_cls}" id="apiBadge">{status_txt}</span>
-    <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Plein écran">⛶</button>
   </div>
 </div>
 
@@ -428,6 +427,9 @@ body.is-fullscreen{{
   <button class="{cls_gc}" id="btnGC" onclick="toggleGC()" title="Gaussian Channel">GC</button>
   <button class="{cls_ob}" id="btnOB" onclick="toggleOB()" title="Order Blocks">OB</button>
 
+  <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+    <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="Plein écran (F11)" style="height:26px;width:26px;font-size:14px;">⛶</button>
+  </div>
   <!-- QUANT TOOLS TOGGLE (visible only in quant mode) -->
   <button class="qp-toggle-btn" id="qpToggleBtn" onclick="toggleQuantPanel()">⚙ QUANT TOOLS ▶</button>
 
