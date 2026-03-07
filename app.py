@@ -2956,150 +2956,201 @@ elif outil == "VALORISATION FONDAMENTALE":
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        symbol = st.text_input("TICKER DE L'ACTIF", value="AAPL",
-                                help="Ex: AAPL, MSFT, GOOGL, BTC-USD, ETH-USD, MC.PA")
+        # FIX #5 : accepte nom ou ticker, résolution intelligente
+        vf_input = st.text_input("NOM OU TICKER DE L'ACTIF", value="AAPL",
+                                  help="Ex: Apple, AAPL, Tesla, TSLA, LVMH, MC.PA, BTC-USD")
     with col2:
         st.write("")
         st.write("")
         if st.button("🔍 ANALYSER LA VALORISATION", use_container_width=True):
-            st.session_state['valuation_symbol'] = symbol
+            # FIX #7 : forcer recalcul à chaque clic même si même symbole
+            resolved = trouver_ticker(vf_input)
+            st.session_state["valuation_symbol"] = resolved
+            st.session_state["valuation_input"]  = vf_input
 
-    if 'valuation_symbol' in st.session_state:
-        symbol = st.session_state['valuation_symbol']
-        with st.spinner(f"Analyse fondamentale de {symbol} en cours..."):
+    if "valuation_symbol" in st.session_state:
+        symbol   = st.session_state["valuation_symbol"]
+        vf_label = st.session_state.get("valuation_input", symbol)
+        with st.spinner(f"Analyse fondamentale de {vf_label} ({symbol}) en cours..."):
             calculator = ValuationCalculator(symbol)
-            results = calculator.get_comprehensive_valuation()
+            results    = calculator.get_comprehensive_valuation()
+
+            # FIX #6 : détecter la devise réelle
+            _info_vf = calculator.info or {}
+            _devise  = _info_vf.get("currency", "USD")
+            _sym_dev = "€" if _devise in ("EUR","GBP","GBp") else ("£" if _devise == "GBP" else "$")
 
             if not results:
-                st.error("❌ Impossible de valoriser cet actif (données insuffisantes)")
+                st.error("❌ Impossible de valoriser cet actif. Vérifiez le ticker ou essayez une période différente.")
             else:
                 if "consensus" in results:
+                    cons    = results["consensus"]
+                    upside  = cons["upside_pct"]
+                    methods = cons["methods_used"]
+
                     st.markdown("---")
                     st.markdown("### 📊 CONSENSUS DE VALORISATION")
-                    cons = results["consensus"]
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1: st.metric("PRIX ACTUEL", f"${cons['current_price']:.2f}")
-                    with col2: st.metric("VALEUR JUSTE", f"${cons['fair_value']:.2f}")
-                    with col3:
-                        delta_color = "normal" if abs(cons['upside_pct']) < 10 else ("inverse" if cons['upside_pct'] > 0 else "off")
-                        st.metric("POTENTIEL", f"{cons['upside_pct']:+.1f}%", delta_color=delta_color)
-                    with col4:
-                        rec = cons['recommendation']
-                        if "ACHAT" in rec:   st.success(f"**{rec}** 🚀")
-                        elif "VENTE" in rec: st.error(f"**{rec}** ⚠️")
-                        else:                st.info(f"**{rec}** ⚖️")
-                    st.caption(f"Basé sur {cons['methods_used']} méthode(s) de valorisation")
 
-                    upside = cons['upside_pct']
-                    if upside > 0:
-                        gauge_color = "#00ff00" if upside > 20 else "#00ffad"
-                        sentiment = f"SOUS-ÉVALUÉ de {upside:.1f}%"
-                    else:
-                        gauge_color = "#ff4b4b" if upside < -20 else "#ff9800"
-                        sentiment = f"SURÉVALUÉ de {abs(upside):.1f}%"
-                    gauge_score = max(0, min(100, 50 + (upside / 2)))
+                    # FIX #8 : avertissement fiabilité si peu de méthodes
+                    if methods == 1:
+                        st.warning("⚠️ Consensus basé sur **1 seule méthode** — fiabilité limitée. Résultats indicatifs uniquement.")
+                    elif methods == 0:
+                        st.error("❌ Aucune méthode de valorisation applicable pour cet actif.")
+
+                    col1, col2, col3, col4 = st.columns(4)
+                    # FIX #6 : devise dynamique
+                    with col1: st.metric("PRIX ACTUEL",  f"{_sym_dev}{cons['current_price']:.2f}")
+                    with col2: st.metric("VALEUR JUSTE", f"{_sym_dev}{cons['fair_value']:.2f}")
+                    with col3:
+                        delta_color = "normal" if abs(upside) < 10 else ("inverse" if upside > 0 else "off")
+                        st.metric("POTENTIEL", f"{upside:+.1f}%", delta_color=delta_color)
+                    with col4:
+                        rec = cons["recommendation"]
+                        nb  = f" ({methods} méthode{'s' if methods > 1 else ''})"
+                        if "ACHAT" in rec:   st.success(f"**{rec}** 🚀{nb}")
+                        elif "VENTE" in rec: st.error(f"**{rec}** ⚠️{nb}")
+                        else:                st.info(f"**{rec}** ⚖️{nb}")
+
+                    # FIX #4 : jauge avec échelle sigmoidale normalisée [-100%,+100%] → [0,100]
+                    # Utilise arctan pour aplatir les extrêmes et centrer sur 50
+                    import math
+                    gauge_score = 50 + (math.atan(upside / 30) / math.atan(1)) * 25
+                    gauge_score = max(2, min(98, gauge_score))
+                    if upside > 20:    gauge_color = "#00ff41"; sentiment = f"SOUS-ÉVALUÉ de {upside:.1f}%"
+                    elif upside > 5:   gauge_color = "#7fff00"; sentiment = f"Légèrement sous-évalué ({upside:.1f}%)"
+                    elif upside > -5:  gauge_color = "#ffcc00"; sentiment = f"Juste valorisé ({upside:.1f}%)"
+                    elif upside > -20: gauge_color = "#ff9800"; sentiment = f"Légèrement surévalué ({upside:.1f}%)"
+                    else:              gauge_color = "#ff2222"; sentiment = f"SURÉVALUÉ de {abs(upside):.1f}%"
 
                     fig_gauge = go.Figure(go.Indicator(
-                        mode="gauge+number", value=gauge_score,
-                        number={'font': {'size': 30, 'color': "white"}},
-                        title={'text': f"<b>INDICE DE VALORISATION</b><br><span style='color:{gauge_color}; font-size:14px;'>{sentiment}</span>",
-                               'font': {'size': 16, 'color': "white"}},
-                        gauge={'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
-                               'bar': {'color': gauge_color, 'thickness': 0.3},
-                               'bgcolor': "rgba(0,0,0,0)",
-                               'steps': [
-                                   {'range': [0, 25],   'color': "rgba(255, 75, 75, 0.2)"},
-                                   {'range': [25, 45],  'color': "rgba(255, 152, 0, 0.2)"},
-                                   {'range': [45, 55],  'color': "rgba(241, 196, 15, 0.2)"},
-                                   {'range': [55, 75],  'color': "rgba(0, 255, 173, 0.2)"},
-                                   {'range': [75, 100], 'color': "rgba(0, 255, 0, 0.2)"}
+                        mode="gauge+number", value=round(gauge_score, 1),
+                        number={"font": {"size": 28, "color": "white"}, "suffix": "/100"},
+                        title={"text": f"<b>INDICE DE VALORISATION</b><br><span style='color:{gauge_color};font-size:13px;'>{sentiment}</span>",
+                               "font": {"size": 15, "color": "white"}},
+                        gauge={"axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "white",
+                                        "tickvals": [0,25,50,75,100],
+                                        "ticktext": ["Très surévalué","Surévalué","Juste","Sous-évalué","Très sous-évalué"]},
+                               "bar": {"color": gauge_color, "thickness": 0.3},
+                               "bgcolor": "rgba(0,0,0,0)",
+                               "steps": [
+                                   {"range": [0, 25],   "color": "rgba(255,34,34,0.2)"},
+                                   {"range": [25, 45],  "color": "rgba(255,152,0,0.2)"},
+                                   {"range": [45, 55],  "color": "rgba(255,204,0,0.2)"},
+                                   {"range": [55, 75],  "color": "rgba(127,255,0,0.2)"},
+                                   {"range": [75, 100], "color": "rgba(0,255,65,0.2)"}
                                ]}
                     ))
-                    fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"},
-                                            height=300, margin=dict(l=25, r=25, t=100, b=20))
+                    fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={"color": "white"},
+                                            height=300, margin=dict(l=25, r=25, t=110, b=20))
                     st.plotly_chart(fig_gauge, use_container_width=True)
 
                 st.markdown("---")
                 st.markdown("### 📈 DÉTAILS PAR MÉTHODE DE VALORISATION")
-                methods_available = [method for method in results.keys() if method not in ["consensus", "dcf"]]
+                # FIX #1 : inclure DCF dans les onglets (il était exclu !)
+                methods_available = [m for m in results.keys() if m != "consensus"]
                 if methods_available:
-                    tabs = st.tabs([method.upper() for method in methods_available])
+                    tab_labels = []
+                    for m in methods_available:
+                        d = results[m]
+                        exclu = d.get("excluded_from_consensus", False) and "error" not in d
+                        tab_labels.append(f"{m.upper()} {'⚠️' if exclu else ''}")
+                    tabs = st.tabs(tab_labels)
                     for idx, method in enumerate(methods_available):
                         with tabs[idx]:
                             data = results[method]
                             if "error" in data:
                                 st.warning(f"⚠️ {data['error']}")
                             else:
+                                # FIX #2 : badge EXCLU du consensus
+                                if data.get("excluded_from_consensus"):
+                                    st.warning(f"⚠️ **EXCLU DU CONSENSUS** — {data.get('exclusion_reason', 'Non applicable pour ce type d entreprise')}")
+
                                 col1, col2, col3 = st.columns(3)
-                                with col1: st.metric("VALEUR JUSTE", f"${data['fair_value']:.2f}")
-                                with col2: st.metric("PRIX ACTUEL", f"${data['current_price']:.2f}")
+                                with col1: st.metric("VALEUR JUSTE", f"{_sym_dev}{data['fair_value']:.2f}")
+                                with col2: st.metric("PRIX ACTUEL",  f"{_sym_dev}{data['current_price']:.2f}")
                                 with col3:
-                                    upside_val = data['upside_pct']
-                                    color = "normal" if abs(upside_val) < 10 else ("inverse" if upside_val > 0 else "off")
-                                    st.metric("POTENTIEL", f"{upside_val:+.1f}%", delta_color=color)
+                                    uv = data["upside_pct"]
+                                    if data.get("excluded_from_consensus"):
+                                        st.metric("POTENTIEL (indicatif)", f"{uv:+.1f}%", delta_color="off")
+                                    else:
+                                        color = "normal" if abs(uv) < 10 else ("inverse" if uv > 0 else "off")
+                                        st.metric("POTENTIEL", f"{uv:+.1f}%", delta_color=color)
                                 st.markdown("---")
                                 st.markdown("**PARAMÈTRES DE LA MÉTHODE:**")
                                 if method == "dcf":
                                     col_param = st.columns(3)
-                                    with col_param[0]: st.info(f"**Valeur d'Entreprise:** ${data['enterprise_value']:,.0f}")
-                                    with col_param[1]: st.info(f"**Valeur des Actions:** ${data['equity_value']:,.0f}")
-                                    with col_param[2]: st.info(f"**FCF Actuel:** ${data['fcf_current']:,.0f}")
-                                    params = data['parameters']
+                                    with col_param[0]: st.info(f"**Valeur d'Entreprise:** {_sym_dev}{data['enterprise_value']:,.0f}")
+                                    with col_param[1]: st.info(f"**Valeur des Actions:** {_sym_dev}{data['equity_value']:,.0f}")
+                                    with col_param[2]: st.info(f"**FCF Actuel:** {_sym_dev}{data['fcf_current']:,.0f}")
+                                    params = data["parameters"]
                                     st.write(f"- Taux de croissance: **{params['growth_rate']*100:.1f}%**")
                                     st.write(f"- Taux d'actualisation: **{params['discount_rate']*100:.1f}%**")
                                     st.write(f"- Projection: **{params['years']} ans**")
+                                    st.caption("📚 DCF — Actualisation des flux de trésorerie futurs")
                                 elif method == "pe":
                                     col_param = st.columns(3)
                                     with col_param[0]: st.info(f"**P/E Actuel:** {data['current_pe']}")
-                                    with col_param[1]: st.info(f"**P/E Cible:** {data['target_pe']}")
-                                    with col_param[2]: st.info(f"**EPS:** ${data['eps']:.2f}")
-                                    st.write(f"- Type EPS: **{data['eps_type']}**")
+                                    with col_param[1]: st.info(f"**P/E Cible (sectoriel):** {data['target_pe']}")
+                                    with col_param[2]: st.info(f"**EPS:** {_sym_dev}{data['eps']:.2f}")
+                                    st.write(f"- Type EPS utilisé: **{data['eps_type']}**")
+                                    st.caption("📚 P/E — Valorisation par les bénéfices (médiane sectorielle Damodaran)")
                                 elif method == "pb":
+                                    # FIX #3 : book_value peut être string "N/A (rachats)"
+                                    bv_display = data["book_value"] if isinstance(data["book_value"], str) else f"{_sym_dev}{data['book_value']:.2f}"
                                     col_param = st.columns(3)
-                                    with col_param[0]: st.info(f"**Valeur Comptable:** ${data['book_value']:.2f}")
-                                    with col_param[1]: st.info(f"**P/B Actuel:** {data['current_pb']:.2f}")
-                                    with col_param[2]: st.info(f"**P/B Cible:** {data['target_pb']:.2f}")
+                                    with col_param[0]: st.info(f"**Valeur Comptable:** {bv_display}")
+                                    with col_param[1]: st.info(f"**P/B Actuel:** {data['current_pb']:.2f}×")
+                                    with col_param[2]: st.info(f"**P/B Cible (sectoriel):** {data['target_pb']:.2f}×")
+                                    st.caption("📚 P/B — Valorisation par la valeur comptable (médiane sectorielle Damodaran)")
                                 elif method == "graham":
+                                    bv_display = data["book_value"] if isinstance(data["book_value"], str) else f"{_sym_dev}{data['book_value']:.2f}"
                                     col_param = st.columns(3)
-                                    with col_param[0]: st.info(f"**EPS:** ${data['eps']:.2f}")
-                                    with col_param[1]: st.info(f"**Book Value:** ${data['book_value']:.2f}")
-                                    with col_param[2]: st.info(f"**Formule:** √(22.5 × EPS × BV)")
-                                    st.caption("📚 Formule de Benjamin Graham - Investissement Value")
+                                    with col_param[0]: st.info(f"**EPS:** {_sym_dev}{data['eps']:.2f}")
+                                    with col_param[1]: st.info(f"**Book Value:** {bv_display}")
+                                    with col_param[2]: st.info(f"**Variante:** {data.get('method_note','classique')[:28]}")
+                                    st.caption(f"📚 {data.get('method_note', 'Formule de Benjamin Graham')}")
                                 elif method == "nvt":
                                     col_param = st.columns(3)
                                     with col_param[0]: st.info(f"**NVT Ratio:** {data['nvt_ratio']:.2f}")
                                     with col_param[1]: st.info(f"**Status:** {data['status']}")
-                                    with col_param[2]: st.info(f"**Market Cap:** ${data['market_cap']:,.0f}")
-                                    st.write(f"- Volume quotidien moyen: **${data['daily_tx_value']:,.0f}**")
+                                    with col_param[2]: st.info(f"**Market Cap:** {_sym_dev}{data['market_cap']:,.0f}")
+                                    st.write(f"- Volume quotidien moyen: **{_sym_dev}{data['daily_tx_value']:,.0f}**")
                                     st.write(f"- NVT cible: **{data['target_nvt']}**")
                                     st.caption("NVT < 10 = Sous-évalué | NVT 10-20 = Juste valorisé | NVT > 20 = Surévalué")
 
                 st.markdown("---")
                 st.markdown("### ℹ️ INFORMATIONS COMPLÉMENTAIRES")
-                info = calculator.info
-                if info:
+                info_vf = calculator.info
+                if info_vf:
                     col_info = st.columns(4)
-                    with col_info[0]: st.write(f"**Secteur:** {info.get('sector', 'N/A')}")
-                    with col_info[1]: st.write(f"**Industrie:** {info.get('industry', 'N/A')}")
+                    with col_info[0]: st.write(f"**Secteur:** {info_vf.get('sector', 'N/A')}")
+                    with col_info[1]: st.write(f"**Industrie:** {info_vf.get('industry', 'N/A')}")
                     with col_info[2]:
-                        market_cap = info.get('marketCap', 0)
-                        st.write(f"**Cap. Boursière:** ${market_cap/1e9:.2f}B" if market_cap > 0 else "**Cap. Boursière:** N/A")
+                        market_cap = info_vf.get("marketCap", 0)
+                        st.write(f"**Cap. Boursière:** {_sym_dev}{market_cap/1e9:.2f}B" if market_cap > 0 else "**Cap. Boursière:** N/A")
                     with col_info[3]:
-                        employees = info.get('fullTimeEmployees', 'N/A')
+                        employees = info_vf.get("fullTimeEmployees", "N/A")
                         st.write(f"**Employés:** {employees:,}" if isinstance(employees, int) else f"**Employés:** {employees}")
 
                 with st.expander("📖 GUIDE D'INTERPRÉTATION"):
                     st.markdown("""
-                    **COMMENT INTERPRÉTER LES RÉSULTATS:**
+                    **COMMENT INTERPRÉTER LES RÉSULTATS :**
 
-                    **Potentiel (Upside %):**
+                    **Potentiel (Upside %) :**
                     - **> +20%** : Fortement sous-évalué → ACHAT FORT 🚀
-                    - **+10% à +20%** : Sous-évalué → ACHAT 📈
-                    - **-10% à +10%** : Juste valorisé → CONSERVER ⚖️
-                    - **-20% à -10%** : Surévalué → VENTE 📉
+                    - **+5% à +20%** : Sous-évalué → ACHAT 📈
+                    - **-5% à +5%** : Juste valorisé → CONSERVER ⚖️
+                    - **-20% à -5%** : Légèrement surévalué → VENTE 📉
                     - **< -20%** : Fortement surévalué → VENTE FORTE ⚠️
 
-                    ⚠️ À combiner avec l'analyse technique. Ne constitue pas un conseil en investissement.
+                    **Méthodes utilisées :**
+                    - **DCF** : Actualisation des flux de trésorerie — fiable pour entreprises matures avec FCF stable
+                    - **P/E** : Basé sur la médiane sectorielle Damodaran — fiable pour toutes les actions
+                    - **Graham** : Adapté aux value stocks (P/E < 40). Exclu pour growth stocks.
+                    - **P/B** : Adapté aux entreprises avec actifs tangibles. Exclu si P/B > 20×.
+                    - **NVT** : Réservé aux cryptomonnaies uniquement.
+
+                    ⚠️ Ces valorisations sont indicatives. Ne constitue pas un conseil en investissement.
                     """)
 
 # ==========================================
