@@ -1751,12 +1751,76 @@ st_autorefresh(interval=600000, key="global_refresh")
 #  NAVIGATION SIDEBAR
 # ============================================================
 
+# ── Sidebar navigation — boutons pills ──
 st.sidebar.markdown("### 🗂️ NAVIGATION")
-categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "ACTIONS & BOURSE", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "MARCHÉ CRYPTO",
-    "BOITE À OUTILS", "INTERFACE PRO", "INTERFACE CRYPTO PRO",
-    "PORTFOLIO", "ALERTES", "SCREENER", "TERMINAL", "MON ESPACE ANALYSE"
-])
+
+NAV_ITEMS = [
+    ("📈", "ACTIONS & BOURSE"),
+    ("🏦", "ÉCONOMIE"),
+    ("💱", "FOREX"),
+    ("🛢️", "MATIÈRES PREMIÈRES"),
+    ("🪙", "MARCHÉ CRYPTO"),
+    ("🔧", "BOITE À OUTILS"),
+    ("🖥️", "INTERFACE PRO"),
+    ("⚡", "INTERFACE CRYPTO PRO"),
+    ("💼", "PORTFOLIO"),
+    ("🔔", "ALERTES"),
+    ("🔎", "SCREENER"),
+    ("🖥️", "TERMINAL"),
+    ("📊", "MON ESPACE ANALYSE"),
+]
+
+# CSS pour les boutons pills
+st.sidebar.markdown("""
+<style>
+div[data-testid="stSidebar"] .nav-btn button {
+    background: #1a1a1a !important;
+    color: #aaa !important;
+    border: 1px solid #333 !important;
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.5px !important;
+    width: 100% !important;
+    text-align: left !important;
+    margin-bottom: 3px !important;
+    transition: all 0.15s !important;
+}
+div[data-testid="stSidebar"] .nav-btn button:hover {
+    background: #ff980022 !important;
+    color: #ff9800 !important;
+    border-color: #ff9800 !important;
+}
+div[data-testid="stSidebar"] .nav-btn-active button {
+    background: linear-gradient(135deg, #ff980033, #ff980011) !important;
+    color: #ff9800 !important;
+    border: 1.5px solid #ff9800 !important;
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
+    width: 100% !important;
+    text-align: left !important;
+    margin-bottom: 3px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+if "nav_categorie" not in st.session_state:
+    st.session_state.nav_categorie = "ACTIONS & BOURSE"
+
+for emoji, label in NAV_ITEMS:
+    is_active = st.session_state.nav_categorie == label
+    css_class = "nav-btn-active" if is_active else "nav-btn"
+    st.sidebar.markdown(f"<div class='{css_class}'>", unsafe_allow_html=True)
+    if st.sidebar.button(f"{emoji}  {label}", key=f"nav_{label}", use_container_width=True):
+        st.session_state.nav_categorie = label
+        st.rerun()
+    st.sidebar.markdown("</div>", unsafe_allow_html=True)
+
+categorie = st.session_state.nav_categorie
 st.sidebar.markdown("---")
 
 if categorie == "TERMINAL":
