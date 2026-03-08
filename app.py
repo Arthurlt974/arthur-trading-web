@@ -20,6 +20,7 @@ import interface_economie
 import interface_forex
 import interface_matieres_premieres
 import interface_analyse_perso
+import terminal as terminal_module
 
 
 # ══════════════════════════════════════════════
@@ -1686,9 +1687,13 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "MON ESPACE ANALYSE", "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
+    "TERMINAL", "MON ESPACE ANALYSE", "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
 ])
 st.sidebar.markdown("---")
+
+if categorie == "TERMINAL":
+    terminal_module.show_terminal()
+    st.stop()
 
 if categorie == "MON ESPACE ANALYSE":
     interface_analyse_perso.show_analyse_perso()
@@ -1877,27 +1882,19 @@ elif outil == "BITCOIN DOMINANCE":
 
     st.markdown("---")
 
-    tv_html_dom = """
-        <div id="tv_chart_dom" style="height:600px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script>
-        new TradingView.widget({
-          "autosize": true,
-          "symbol": "CRYPTOCAP:BTC.D",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "toolbar_bg": "#f1f3f6",
-          "enable_publishing": false,
-          "hide_top_toolbar": false,
-          "save_image": false,
-          "container_id": "tv_chart_dom"
-        });
-        </script>
-    """
-    components.html(tv_html_dom, height=610)
+    from chart_module import render_chart
+    import time as _t
+    _btcd_html = render_chart(
+        symbol="BTCUSDT",
+        interval="1d",
+        limit=200,
+        height=620,
+        pair_label="BTC/USDT — Dominance Proxy",
+        exchange="Binance · Spot",
+        show_ma=True,
+        show_bb=False,
+    ) + f"<!-- btcd:{int(_t.time()*1000)} -->"
+    components.html(_btcd_html, height=630, scrolling=False)
 
 # ==========================================
 # OUTIL : CRYPTO WALLET TRACKER
