@@ -1341,28 +1341,29 @@ def get_valuation_cached(ticker: str) -> dict:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_ticker_history(ticker, period="2d"):
-    """Historique — yfinance d'abord, FMP en fallback."""
     try:
-        df = yf.Ticker(ticker).history(period=period)
-        if not df.empty:
-            return df
-    except Exception: pass
-    # Fallback FMP — historique journalier
+        data = yf.Ticker(ticker)
+        return data.history(period=period)
+    except:
+        return pd.DataFrame()
+
+def trouver_ticker(nom):
+    """Recherche le ticker Yahoo Finance — avec timeout et fallback robuste"""
+    nom = nom.strip()
+    if not nom:
+        return "AAPL"
     try:
-        limit_map = {"1d": 1, "2d": 2, "5d": 5, "1mo": 30, "3mo": 90,
-                     "6mo": 180, "1y": 365, "2y": 730, "5y": 1825, "max": 5000}
-        limit = limit_map.get(period, 30)
-        data = _fmp_get(f"/v3/historical-price-full/{ticker}", {"serietype": "line", "timeseries": limit})
-        hist = data.get("historical", []) if isinstance(data, dict) else []
-        if hist:
-            df = pd.DataFrame(hist[::-1])
-            df['Date'] = pd.to_datetime(df['date'])
-            df = df.set_index('Date')
-            df.rename(columns={'open':'Open','high':'High','low':'Low',
-                               'close':'Close','volume':'Volume'}, inplace=True)
-            return df[['Open','High','Low','Close','Volume']].dropna()
-    except Exception: pass
-    return pd.DataFrame()
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={nom}"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=5).json()
+        quotes = response.get('quotes', [])
+        # Préférer les actions (EQUITY) aux autres types
+        for q in quotes:
+            if q.get('quoteType') in ('EQUITY', 'ETF'):
+                return q['symbol']
+        return quotes[0]['symbol'] if quotes else nom.upper()
+    except Exception:
+        return nom.upper()
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def trouver_ticker(nom):
@@ -1385,19 +1386,7 @@ def trouver_ticker(nom):
     if is_likely_ticker:
         return nom_up
 
-    # ── FMP search ──
-    if _fmp_key():
-        try:
-            results = _fmp_get(f"/v3/search", {"query": nom, "limit": 10})
-            if isinstance(results, list):
-                for r in results:
-                    if r.get('exchangeShortName') in ('NASDAQ','NYSE','EURONEXT','LSE','XETRA'):
-                        return r['symbol']
-                if results:
-                    return results[0]['symbol']
-        except Exception: pass
-
-    # ── Yahoo Finance fallback ──
+    # ── Yahoo Finance search ──
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36'}
     for base in ["https://query2.finance.yahoo.com", "https://query1.finance.yahoo.com"]:
         try:
