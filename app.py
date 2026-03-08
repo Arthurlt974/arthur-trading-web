@@ -932,82 +932,25 @@ class ValuationCalculator:
         self.info = self._get_safe_info()
 
     def _get_safe_info(self):
-        """
-        Récupère les infos complètes avec 3 niveaux de fallback.
-        Stratégie : fast_info (prix) + info avec session custom (fondamentaux) + calculs alternatifs.
-        """
         import requests as _req
-        info = {}
-
-        # ── Étape 1 : fast_info — prix temps réel (toujours disponible) ──
+        session = _req.Session()
+        session.headers["User-Agent"] = (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        )
         try:
-            fi = self.ticker.fast_info
-            price = getattr(fi, 'last_price', None)
-            prev  = getattr(fi, 'previous_close', None)
-            mktcap = getattr(fi, 'market_cap', None)
-            shares = getattr(fi, 'shares', None)
-            if price and float(price) > 0:
-                info['currentPrice']       = float(price)
-                info['regularMarketPrice'] = float(price)
-            if prev  and float(prev)  > 0:
-                info['previousClose']      = float(prev)
-            if mktcap: info['marketCap']          = float(mktcap)
-            if shares: info['sharesOutstanding']   = float(shares)
-        except Exception:
-            pass
-
-        # ── Étape 2 : ticker.info avec session custom pour contourner blocage Yahoo ──
-        try:
-            session = _req.Session()
-            session.headers.update({
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-            })
             import yfinance as _yf
-            t2 = _yf.Ticker(self.symbol, session=session)
-            full = t2.info or {}
-            if len(full) < 5:
-                # Essai sans session custom
-                full = self.ticker.info or {}
-            for k, v in full.items():
-                if v is not None and v != '' and v != 0:
-                    if k not in info or k not in ('currentPrice', 'regularMarketPrice'):
-                        info[k] = v
-            # Prix depuis info si fast_info n'a rien donné
-            if not info.get('currentPrice') or info['currentPrice'] == 0:
-                p = full.get('currentPrice') or full.get('regularMarketPrice')
-                if p and float(p) > 0:
-                    info['currentPrice']       = float(p)
-                    info['regularMarketPrice'] = float(p)
-        except Exception:
-            pass
-
-        # ── Étape 3 : history — prix + calculs alternatifs ──
-        try:
-            hist = self.ticker.history(period="1y")
-            if not hist.empty:
-                if not info.get('currentPrice') or info['currentPrice'] == 0:
-                    info['currentPrice']       = float(hist['Close'].iloc[-1])
-                    info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
-                # EPS estimé si absent : rendement sur 1 an * prix * ratio empirique
-                if not info.get('trailingEps') and not info.get('forwardEps'):
-                    # Estimation grossière via rendement annuel moyen
-                    ret_1y = (hist['Close'].iloc[-1] / hist['Close'].iloc[0] - 1)
-                    pe_sector, _ = self._get_sector_multiples()
-                    if pe_sector > 0 and info.get('currentPrice', 0) > 0:
-                        # EPS estimé = prix / P/E sectoriel médian
-                        info['_estimated_eps'] = info['currentPrice'] / pe_sector
-                # Calcul book value alternatif si absent
-                if not info.get('bookValue') and info.get('marketCap') and info.get('sharesOutstanding'):
-                    pb_sector = self._get_sector_multiples()[1]
-                    if pb_sector > 0:
-                        price_per_share = info.get('currentPrice', 0)
-                        info['_estimated_bv'] = price_per_share / pb_sector
-        except Exception:
-            pass
-
-        return info
+            t = _yf.Ticker(self.symbol, session=session)
+            info = t.info or {}
+            # Compléter le prix si absent
+            if not info.get('currentPrice') and not info.get('regularMarketPrice'):
+                hist = self.ticker.history(period="5d")
+                if not hist.empty:
+                    info['currentPrice'] = float(hist['Close'].iloc[-1])
+            return info
+        except:
+            return {}
 
     def dcf_valuation(self, growth_rate=0.05, discount_rate=0.10, years=5):
         try:
@@ -1092,11 +1035,6 @@ class ValuationCalculator:
             trailing_pe  = self.info.get('trailingPE')  or 0
             trailing_eps = self.info.get('trailingEps') or 0
             forward_eps  = self.info.get('forwardEps')  or 0
-            # Fallback EPS estimé
-            if trailing_eps == 0 and forward_eps == 0:
-                est = self.info.get('_estimated_eps') or 0
-                if est > 0:
-                    forward_eps = est
 
             if target_pe is None:
                 sector_pe, _ = self._get_sector_multiples()
@@ -1147,9 +1085,6 @@ class ValuationCalculator:
                     pass
             book_value = self.info.get('bookValue') or 0
             pb_ratio   = self.info.get('priceToBook') or 0
-            # Fallback book value estimée
-            if book_value == 0 or book_value is None:
-                book_value = self.info.get('_estimated_bv') or 0
             if book_value == 0 or book_value is None:
                 return {"error": "Valeur comptable non disponible"}
 
@@ -1244,9 +1179,6 @@ class ValuationCalculator:
                 forward = self.info.get('forwardEps') or 0
                 if forward > 0:
                     eps = forward
-            # Fallback : EPS estimé via prix / P/E sectoriel
-            if eps <= 0:
-                eps = self.info.get('_estimated_eps') or 0
             if eps <= 0:
                 return {"error": "EPS négatif ou nul — Graham non applicable"}
 
@@ -1334,13 +1266,11 @@ class ValuationCalculator:
                     results["pb"]["exclusion_reason"] = f"Growth stock (P/B={pb_ratio:.1f}) - P/B non pertinent pour entreprises avec rachats massifs"
         if fair_values:
             consensus_value = np.median(fair_values)
-            current_price = (self.info.get('currentPrice') or 
-                             self.info.get('regularMarketPrice') or 
-                             self.info.get('previousClose') or 0)
+            current_price = self.info.get('currentPrice', 0) or self.info.get('regularMarketPrice', 0)
             # Fallback history si prix toujours à 0
             if not current_price or current_price == 0:
                 try:
-                    hist = self.ticker.history(period="5d")
+                    hist = self.ticker.history(period="1d")
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1374,61 +1304,23 @@ class ValuationCalculator:
 
 @st.cache_data(ttl=300)  # 5 minutes — évite le spam Yahoo Finance
 def get_ticker_info(ticker):
-    """Charge les infos avec fast_info + session custom + history en cascade."""
+    import requests as _req
+    session = _req.Session()
+    session.headers["User-Agent"] = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
     try:
-        t = yf.Ticker(ticker)
-        info = {}
-
-        # ── fast_info — prix temps réel fiable ──
-        try:
-            fi = t.fast_info
-            price = getattr(fi, 'last_price', None)
-            prev  = getattr(fi, 'previous_close', None)
-            if price and float(price) > 0:
-                info['currentPrice']       = float(price)
-                info['regularMarketPrice'] = float(price)
-            if prev and float(prev) > 0:
-                info['previousClose'] = float(prev)
-        except Exception:
-            pass
-
-        # ── info complet avec session custom (contourne blocage Yahoo) ──
-        try:
-            import requests as _req
-            session = _req.Session()
-            session.headers.update({
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.5',
-            })
-            t2   = yf.Ticker(ticker, session=session)
-            full = t2.info or {}
-            if len(full) < 5:
-                full = t.info or {}
-            for k, v in full.items():
-                if v is not None and v != '' and v != 0:
-                    if k not in info or k not in ('currentPrice', 'regularMarketPrice'):
-                        info[k] = v
-            if not info.get('currentPrice'):
-                p = full.get('currentPrice') or full.get('regularMarketPrice')
-                if p and float(p) > 0:
-                    info['currentPrice']       = float(p)
-                    info['regularMarketPrice'] = float(p)
-        except Exception:
-            pass
-
-        # ── history — dernier recours ──
-        if not info.get('currentPrice'):
-            try:
-                hist = t.history(period="5d")
-                if not hist.empty:
-                    p = float(hist['Close'].iloc[-1])
-                    info['currentPrice']       = p
-                    info['regularMarketPrice'] = p
-            except Exception:
-                pass
-
+        data = yf.Ticker(ticker, session=session)
+        info = data.info or {}
+        # Prix de secours si absent
+        if not info.get('currentPrice') and not info.get('regularMarketPrice'):
+            hist = data.history(period="5d")
+            if not hist.empty:
+                info['currentPrice'] = float(hist['Close'].iloc[-1])
         return info if info else None
-    except Exception:
+    except:
         return None
 
 @st.cache_data(ttl=300)
@@ -2303,9 +2195,9 @@ elif outil == "ANALYSEUR PRO":
     ticker = trouver_ticker(nom_entree)
     info = get_ticker_info(ticker)
 
-    if info and any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
+    if info and ('currentPrice' in info or 'regularMarketPrice' in info):
         nom = info.get('longName') or info.get('shortName') or ticker
-        prix = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose') or 1
+        prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
 
         if prix == 0 or prix is None:
             hist = get_ticker_history(ticker, "1d")
@@ -2314,14 +2206,7 @@ elif outil == "ANALYSEUR PRO":
             else:
                 prix = 1
 
-        # Devise : fallback USD pour tickers US (pas de suffixe .PA, .L, etc.)
-        raw_currency = info.get('currency', '')
-        if raw_currency:
-            devise = raw_currency
-        elif '.' in ticker:
-            devise = 'EUR'   # europeen probable
-        else:
-            devise = 'USD'   # US par défaut
+        devise = info.get('currency', 'EUR')
         secteur = info.get('sector', 'N/A')
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
         per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
@@ -3596,9 +3481,9 @@ elif outil == "EXPERT SYSTEM":
             ticker = trouver_ticker(nom_entree)
             info = get_ticker_info(ticker) or {}
 
-            if info and any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
+            if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                 nom = info.get('longName', ticker)
-                prix = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose') or 1
+                prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                 if prix == 0 or prix is None:
                     hist = get_ticker_history(ticker, "1d")
                     if not hist.empty: prix = float(hist['Close'].iloc[-1])
@@ -3687,7 +3572,7 @@ elif outil == "THE GRAND COUNCIL️":
                 ticker = trouver_ticker(nom_entree)
                 info = get_ticker_info(ticker) or {}
 
-                if info and any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
+                if info and ('currentPrice' in info or 'regularMarketPrice' in info):
                     p = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                     if p == 0 or p is None or p < 0.01:
                         hist = get_ticker_history(ticker, "5d")
@@ -4195,7 +4080,7 @@ elif outil == "SCREENER CAC 40":
                 info = get_ticker_info(t) or {}
                 if not info or 'currentPrice' not in info: continue
                 nom = info.get('shortName') or t
-                prix = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose') or 1
+                prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                 if prix == 0 or prix is None:
                     hist = get_ticker_history(t, "1d")
                     if not hist.empty: prix = float(hist['Close'].iloc[-1])
