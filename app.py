@@ -932,25 +932,104 @@ class ValuationCalculator:
         self.info = self._get_safe_info()
 
     def _get_safe_info(self):
-        import requests as _req
-        session = _req.Session()
-        session.headers["User-Agent"] = (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        )
+        """
+        Reconstruit un dict info complet depuis les sources yfinance fiables.
+        Ne dépend PAS de .info qui est cassé sur Yahoo Finance depuis fin 2024.
+        """
+        info = {}
+        t = self.ticker
+
+        # ── Prix & market data via fast_info (toujours fiable) ──
         try:
-            import yfinance as _yf
-            t = _yf.Ticker(self.symbol, session=session)
-            info = t.info or {}
-            # Compléter le prix si absent
-            if not info.get('currentPrice') and not info.get('regularMarketPrice'):
-                hist = self.ticker.history(period="5d")
+            fi = t.fast_info
+            if getattr(fi, 'last_price', None):
+                info['currentPrice']       = float(fi.last_price)
+                info['regularMarketPrice'] = float(fi.last_price)
+            if getattr(fi, 'previous_close', None):
+                info['previousClose']      = float(fi.previous_close)
+            if getattr(fi, 'market_cap', None):
+                info['marketCap']          = float(fi.market_cap)
+            if getattr(fi, 'shares', None):
+                info['sharesOutstanding']  = float(fi.shares)
+            if getattr(fi, 'fifty_two_week_high', None):
+                info['fiftyTwoWeekHigh']   = float(fi.fifty_two_week_high)
+            if getattr(fi, 'fifty_two_week_low', None):
+                info['fiftyTwoWeekLow']    = float(fi.fifty_two_week_low)
+            if getattr(fi, 'currency', None):
+                info['currency']           = fi.currency
+        except Exception:
+            pass
+
+        # ── Fallback prix via history ──
+        if not info.get('currentPrice'):
+            try:
+                hist = t.history(period="5d")
                 if not hist.empty:
-                    info['currentPrice'] = float(hist['Close'].iloc[-1])
-            return info
-        except:
-            return {}
+                    info['currentPrice']       = float(hist['Close'].iloc[-1])
+                    info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
+            except Exception:
+                pass
+
+        # ── Essai .info avec timeout court — si ça marche tant mieux ──
+        try:
+            import requests as _req, yfinance as _yf
+            s = _req.Session()
+            s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+            full = _yf.Ticker(self.symbol, session=s).info or {}
+            if len(full) > 10:   # dict valide
+                for k, v in full.items():
+                    if v not in (None, '', 0) and k not in info:
+                        info[k] = v
+                # Override prix avec valeur fast_info si elle existait déjà
+        except Exception:
+            pass
+
+        # ── EPS via income statement si absent ──
+        if not info.get('trailingEps') and not info.get('forwardEps'):
+            try:
+                inc = t.income_stmt
+                if inc is not None and not inc.empty:
+                    net_income_row = None
+                    for lbl in ['Net Income', 'NetIncome', 'Net Income Common Stockholders']:
+                        if lbl in inc.index:
+                            net_income_row = inc.loc[lbl]
+                            break
+                    shares = info.get('sharesOutstanding', 0)
+                    if net_income_row is not None and shares > 0:
+                        ni = float(net_income_row.iloc[0])
+                        info['trailingEps'] = round(ni / shares, 4)
+            except Exception:
+                pass
+
+        # ── Book Value via balance sheet si absent ──
+        if not info.get('bookValue'):
+            try:
+                bs = t.balance_sheet
+                if bs is not None and not bs.empty:
+                    eq = None
+                    for lbl in ['Stockholders Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest']:
+                        if lbl in bs.index:
+                            eq = float(bs.loc[lbl].iloc[0])
+                            break
+                    shares = info.get('sharesOutstanding', 0)
+                    if eq and shares > 0:
+                        info['bookValue'] = round(eq / shares, 4)
+                        if info.get('currentPrice') and info['bookValue'] > 0:
+                            info['priceToBook'] = round(info['currentPrice'] / info['bookValue'], 2)
+            except Exception:
+                pass
+
+        # ── P/E ratio si EPS dispo ──
+        if not info.get('trailingPE') and info.get('trailingEps') and info.get('currentPrice'):
+            eps = info['trailingEps']
+            if eps > 0:
+                info['trailingPE'] = round(info['currentPrice'] / eps, 2)
+
+        # ── Secteur par défaut si absent ──
+        if not info.get('sector'):
+            info['sector'] = 'Technology'   # fallback pour les tickers US
+
+        return info
 
     def dcf_valuation(self, growth_rate=0.05, discount_rate=0.10, years=5):
         try:
@@ -1304,23 +1383,92 @@ class ValuationCalculator:
 
 @st.cache_data(ttl=300)  # 5 minutes — évite le spam Yahoo Finance
 def get_ticker_info(ticker):
-    import requests as _req
-    session = _req.Session()
-    session.headers["User-Agent"] = (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
+    """
+    Reconstruit les infos ticker depuis les sources fiables (fast_info + statements).
+    Contourne le bug .info de yfinance post-2024.
+    """
+    info = {}
     try:
-        data = yf.Ticker(ticker, session=session)
-        info = data.info or {}
-        # Prix de secours si absent
-        if not info.get('currentPrice') and not info.get('regularMarketPrice'):
-            hist = data.history(period="5d")
-            if not hist.empty:
-                info['currentPrice'] = float(hist['Close'].iloc[-1])
+        t = yf.Ticker(ticker)
+
+        # fast_info — toujours disponible
+        try:
+            fi = t.fast_info
+            if getattr(fi, 'last_price', None):
+                info['currentPrice']       = float(fi.last_price)
+                info['regularMarketPrice'] = float(fi.last_price)
+            if getattr(fi, 'previous_close', None):
+                info['previousClose']      = float(fi.previous_close)
+            if getattr(fi, 'market_cap', None):
+                info['marketCap']          = float(fi.market_cap)
+            if getattr(fi, 'shares', None):
+                info['sharesOutstanding']  = float(fi.shares)
+            if getattr(fi, 'currency', None):
+                info['currency']           = fi.currency
+        except Exception:
+            pass
+
+        # .info avec session custom — si ça marche on prend tout
+        try:
+            import requests as _req
+            s = _req.Session()
+            s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+            full = yf.Ticker(ticker, session=s).info or {}
+            if len(full) > 10:
+                for k, v in full.items():
+                    if v not in (None, '', 0) and k not in info:
+                        info[k] = v
+        except Exception:
+            pass
+
+        # EPS depuis income statement si absent
+        if not info.get('trailingEps') and not info.get('forwardEps'):
+            try:
+                inc = t.income_stmt
+                shares = info.get('sharesOutstanding', 0)
+                if inc is not None and not inc.empty and shares > 0:
+                    for lbl in ['Net Income', 'NetIncome', 'Net Income Common Stockholders']:
+                        if lbl in inc.index:
+                            ni = float(inc.loc[lbl].iloc[0])
+                            info['trailingEps'] = round(ni / shares, 4)
+                            break
+            except Exception:
+                pass
+
+        # Book Value depuis balance sheet si absent
+        if not info.get('bookValue'):
+            try:
+                bs = t.balance_sheet
+                shares = info.get('sharesOutstanding', 0)
+                if bs is not None and not bs.empty and shares > 0:
+                    for lbl in ['Stockholders Equity', 'Common Stock Equity', 'Total Equity Gross Minority Interest']:
+                        if lbl in bs.index:
+                            eq = float(bs.loc[lbl].iloc[0])
+                            info['bookValue'] = round(eq / shares, 4)
+                            if info.get('currentPrice') and info['bookValue'] > 0:
+                                info['priceToBook'] = round(info['currentPrice'] / info['bookValue'], 2)
+                            break
+            except Exception:
+                pass
+
+        # P/E si absent
+        if not info.get('trailingPE') and info.get('trailingEps') and info.get('currentPrice'):
+            eps = info['trailingEps']
+            if eps > 0:
+                info['trailingPE'] = round(info['currentPrice'] / eps, 2)
+
+        # Fallback prix
+        if not info.get('currentPrice'):
+            try:
+                hist = t.history(period="5d")
+                if not hist.empty:
+                    info['currentPrice']       = float(hist['Close'].iloc[-1])
+                    info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
+            except Exception:
+                pass
+
         return info if info else None
-    except:
+    except Exception:
         return None
 
 @st.cache_data(ttl=300)
