@@ -1307,7 +1307,10 @@ class ValuationCalculator:
 
 def _fmp_key():
     """Retourne la clé FMP depuis secrets."""
-    return st.secrets.get("FMP_API_KEY", "")
+    try:
+        return st.secrets.get("FMP_API_KEY", "") or ""
+    except Exception:
+        return ""
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _fmp_get(endpoint: str, params: dict = None) -> dict | list:
@@ -1510,8 +1513,19 @@ def trouver_ticker(nom):
     nom = nom.strip()
     if not nom: return "AAPL"
     nom_up = nom.upper()
-    # Si déjà un ticker valide (court, majuscules), retourner directement
-    if len(nom_up) <= 6 and nom_up.replace('.','').replace('-','').isalpha():
+    # Tickers connus directement (max 5 lettres, PAS des noms de sociétés)
+    # On vérifie que c'est bien un ticker (pas un nom comme NVIDIA, APPLE, TESLA)
+    KNOWN_NAMES = {"NVIDIA","APPLE","TESLA","AMAZON","GOOGLE","META","MICROSOFT",
+                   "NETFLIX","ALIBABA","SAMSUNG","TOYOTA","LVMH","HERMES","AIRBUS",
+                   "TOTALENERGIES","SANOFI","LOREAL","DANONE","RENAULT","PEUGEOT",
+                   "BITCOIN","ETHEREUM","SOLANA","BINANCE","RIPPLE"}
+    is_likely_ticker = (
+        len(nom_up) <= 5 and
+        nom_up.replace('.','').replace('-','').isalpha() and
+        nom_up not in KNOWN_NAMES and
+        not any(c.islower() for c in nom)  # ticker = tout en majuscules
+    )
+    if is_likely_ticker:
         return nom_up
 
     # ── FMP search ──
@@ -2391,7 +2405,7 @@ elif outil == "STAKING & YIELD":
 # OUTIL : ANALYSEUR PRO
 # ==========================================
 elif outil == "ANALYSEUR PRO":
-    nom_entree = st.sidebar.text_input("TICKER SEARCH", value="NVIDIA")
+    nom_entree = st.sidebar.text_input("TICKER SEARCH", value="NVDA")
     ticker = trouver_ticker(nom_entree)
     info = get_ticker_info(ticker) or {}
     valuation_results = {}
