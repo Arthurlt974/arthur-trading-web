@@ -89,7 +89,7 @@ def get_coin_details(coin_id):
     return _get(f"https://api.coingecko.com/api/v3/coins/{coin_id}",
                 params={"localization":"false","tickers":"false","community_data":"true","developer_data":"false"})
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=300)
 def get_top_coins(limit=30):
     return _get("https://api.coingecko.com/api/v3/coins/markets",
                 params={"vs_currency":"usd","order":"market_cap_desc","per_page":limit,
@@ -100,12 +100,12 @@ def get_coin_market_chart(coin_id, days=30):
     return _get(f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart",
                 params={"vs_currency":"usd","days":days}) or {}
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=300)
 def get_global_data():
     data = _get("https://api.coingecko.com/api/v3/global")
     return data.get("data", {}) if data else {}
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=300)
 def get_binance_funding_rates():
     """
     Funding rates — tente Binance puis Bybit puis OKX.
@@ -1011,7 +1011,7 @@ class ValuationCalculator:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
                 try:
-                    hist = self.ticker.history(period="1d")
+                    hist = self.ticker.history(period="5d", timeout=5)
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1054,7 +1054,7 @@ class ValuationCalculator:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
                 try:
-                    hist = self.ticker.history(period="1d")
+                    hist = self.ticker.history(period="5d", timeout=5)
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1105,7 +1105,7 @@ class ValuationCalculator:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
                 try:
-                    hist = self.ticker.history(period="1d")
+                    hist = self.ticker.history(period="5d", timeout=5)
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1195,7 +1195,7 @@ class ValuationCalculator:
             current_price = self.info.get('currentPrice', 0)
             if current_price == 0 or current_price is None:
                 try:
-                    hist = self.ticker.history(period="1d")
+                    hist = self.ticker.history(period="5d", timeout=5)
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1297,7 +1297,7 @@ class ValuationCalculator:
             # Fallback history si prix toujours à 0
             if not current_price or current_price == 0:
                 try:
-                    hist = self.ticker.history(period="1d")
+                    hist = self.ticker.history(period="5d", timeout=5)
                     if not hist.empty:
                         current_price = float(hist['Close'].iloc[-1])
                 except:
@@ -1329,7 +1329,7 @@ class ValuationCalculator:
 #  FONCTIONS UTILITAIRES PARTAGÉES
 # ============================================================
 
-@st.cache_data(ttl=300)  # 5 minutes — évite le spam Yahoo Finance
+@st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
     import requests as _req
     info = {}
@@ -1359,7 +1359,7 @@ def get_ticker_info(ticker):
         return info if info else None
     except Exception: return None
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=900, show_spinner=False)
 def get_valuation_cached(ticker: str) -> dict:
     """Wrapper cached autour de ValuationCalculator — évite les appels yfinance répétés."""
     try:
@@ -1369,6 +1369,7 @@ def get_valuation_cached(ticker: str) -> dict:
         return {"error": str(e)}
 
 @st.cache_data(ttl=300)  # 5 minutes
+@st.cache_data(ttl=300, show_spinner=False)
 def get_ticker_history(ticker, period="2d"):
     try:
         data = yf.Ticker(ticker)
