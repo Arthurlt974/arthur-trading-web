@@ -932,31 +932,50 @@ class ValuationCalculator:
         self.info = self._get_safe_info()
 
     def _get_safe_info(self):
-        """Récupère les infos avec fast_info (fiable) + info (fondamentaux) + history (fallback)."""
+        """
+        Récupère les infos complètes avec 3 niveaux de fallback.
+        Stratégie : fast_info (prix) + info avec session custom (fondamentaux) + calculs alternatifs.
+        """
+        import requests as _req
         info = {}
+
+        # ── Étape 1 : fast_info — prix temps réel (toujours disponible) ──
         try:
-            # Étape 1 : fast_info — prix temps réel fiable
             fi = self.ticker.fast_info
             price = getattr(fi, 'last_price', None)
             prev  = getattr(fi, 'previous_close', None)
+            mktcap = getattr(fi, 'market_cap', None)
+            shares = getattr(fi, 'shares', None)
             if price and float(price) > 0:
                 info['currentPrice']       = float(price)
                 info['regularMarketPrice'] = float(price)
-            if prev and float(prev) > 0:
-                info['previousClose'] = float(prev)
+            if prev  and float(prev)  > 0:
+                info['previousClose']      = float(prev)
+            if mktcap: info['marketCap']          = float(mktcap)
+            if shares: info['sharesOutstanding']   = float(shares)
         except Exception:
             pass
 
+        # ── Étape 2 : ticker.info avec session custom pour contourner blocage Yahoo ──
         try:
-            # Étape 2 : info complet — fondamentaux (EPS, P/E, secteur, etc.)
-            full = self.ticker.info or {}
+            session = _req.Session()
+            session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+            })
+            import yfinance as _yf
+            t2 = _yf.Ticker(self.symbol, session=session)
+            full = t2.info or {}
+            if len(full) < 5:
+                # Essai sans session custom
+                full = self.ticker.info or {}
             for k, v in full.items():
-                if k not in info and v is not None:
-                    info[k] = v
-                elif k not in ('currentPrice', 'regularMarketPrice') and v:
-                    info[k] = v
-            # Si fast_info n'a pas donné de prix valide, utiliser celui de info
-            if 'currentPrice' not in info or info['currentPrice'] == 0:
+                if v is not None and v != '' and v != 0:
+                    if k not in info or k not in ('currentPrice', 'regularMarketPrice'):
+                        info[k] = v
+            # Prix depuis info si fast_info n'a rien donné
+            if not info.get('currentPrice') or info['currentPrice'] == 0:
                 p = full.get('currentPrice') or full.get('regularMarketPrice')
                 if p and float(p) > 0:
                     info['currentPrice']       = float(p)
@@ -964,16 +983,29 @@ class ValuationCalculator:
         except Exception:
             pass
 
-        # Étape 3 : history — dernier recours
-        if not info.get('currentPrice') or info['currentPrice'] == 0:
-            try:
-                hist = self.ticker.history(period="5d")
-                if not hist.empty:
-                    p = float(hist['Close'].iloc[-1])
-                    info['currentPrice']       = p
-                    info['regularMarketPrice'] = p
-            except Exception:
-                pass
+        # ── Étape 3 : history — prix + calculs alternatifs ──
+        try:
+            hist = self.ticker.history(period="1y")
+            if not hist.empty:
+                if not info.get('currentPrice') or info['currentPrice'] == 0:
+                    info['currentPrice']       = float(hist['Close'].iloc[-1])
+                    info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
+                # EPS estimé si absent : rendement sur 1 an * prix * ratio empirique
+                if not info.get('trailingEps') and not info.get('forwardEps'):
+                    # Estimation grossière via rendement annuel moyen
+                    ret_1y = (hist['Close'].iloc[-1] / hist['Close'].iloc[0] - 1)
+                    pe_sector, _ = self._get_sector_multiples()
+                    if pe_sector > 0 and info.get('currentPrice', 0) > 0:
+                        # EPS estimé = prix / P/E sectoriel médian
+                        info['_estimated_eps'] = info['currentPrice'] / pe_sector
+                # Calcul book value alternatif si absent
+                if not info.get('bookValue') and info.get('marketCap') and info.get('sharesOutstanding'):
+                    pb_sector = self._get_sector_multiples()[1]
+                    if pb_sector > 0:
+                        price_per_share = info.get('currentPrice', 0)
+                        info['_estimated_bv'] = price_per_share / pb_sector
+        except Exception:
+            pass
 
         return info
 
@@ -1060,6 +1092,11 @@ class ValuationCalculator:
             trailing_pe  = self.info.get('trailingPE')  or 0
             trailing_eps = self.info.get('trailingEps') or 0
             forward_eps  = self.info.get('forwardEps')  or 0
+            # Fallback EPS estimé
+            if trailing_eps == 0 and forward_eps == 0:
+                est = self.info.get('_estimated_eps') or 0
+                if est > 0:
+                    forward_eps = est
 
             if target_pe is None:
                 sector_pe, _ = self._get_sector_multiples()
@@ -1110,6 +1147,9 @@ class ValuationCalculator:
                     pass
             book_value = self.info.get('bookValue') or 0
             pb_ratio   = self.info.get('priceToBook') or 0
+            # Fallback book value estimée
+            if book_value == 0 or book_value is None:
+                book_value = self.info.get('_estimated_bv') or 0
             if book_value == 0 or book_value is None:
                 return {"error": "Valeur comptable non disponible"}
 
@@ -1204,6 +1244,9 @@ class ValuationCalculator:
                 forward = self.info.get('forwardEps') or 0
                 if forward > 0:
                     eps = forward
+            # Fallback : EPS estimé via prix / P/E sectoriel
+            if eps <= 0:
+                eps = self.info.get('_estimated_eps') or 0
             if eps <= 0:
                 return {"error": "EPS négatif ou nul — Graham non applicable"}
 
@@ -1331,12 +1374,12 @@ class ValuationCalculator:
 
 @st.cache_data(ttl=300)  # 5 minutes — évite le spam Yahoo Finance
 def get_ticker_info(ticker):
-    """Charge les infos avec fast_info + info + history en cascade."""
+    """Charge les infos avec fast_info + session custom + history en cascade."""
     try:
         t = yf.Ticker(ticker)
         info = {}
 
-        # fast_info — prix fiable
+        # ── fast_info — prix temps réel fiable ──
         try:
             fi = t.fast_info
             price = getattr(fi, 'last_price', None)
@@ -1349,14 +1392,22 @@ def get_ticker_info(ticker):
         except Exception:
             pass
 
-        # info complet — fondamentaux
+        # ── info complet avec session custom (contourne blocage Yahoo) ──
         try:
-            full = t.info or {}
+            import requests as _req
+            session = _req.Session()
+            session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.5',
+            })
+            t2   = yf.Ticker(ticker, session=session)
+            full = t2.info or {}
+            if len(full) < 5:
+                full = t.info or {}
             for k, v in full.items():
-                if k not in info and v is not None:
-                    info[k] = v
-                elif k not in ('currentPrice', 'regularMarketPrice') and v:
-                    info[k] = v
+                if v is not None and v != '' and v != 0:
+                    if k not in info or k not in ('currentPrice', 'regularMarketPrice'):
+                        info[k] = v
             if not info.get('currentPrice'):
                 p = full.get('currentPrice') or full.get('regularMarketPrice')
                 if p and float(p) > 0:
@@ -1365,7 +1416,7 @@ def get_ticker_info(ticker):
         except Exception:
             pass
 
-        # history — dernier recours
+        # ── history — dernier recours ──
         if not info.get('currentPrice'):
             try:
                 hist = t.history(period="5d")
