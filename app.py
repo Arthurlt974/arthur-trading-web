@@ -1683,7 +1683,7 @@ if "whale_logs" not in st.session_state:
 #  CONFIGURATION GLOBALE
 # ============================================================
 
-st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
+st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide", initial_sidebar_state="collapsed")
 
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
@@ -1733,6 +1733,64 @@ st.markdown("""
             background-color: #ff9800;
             color: #000;
         }
+        /* Cacher header natif + toggle */
+        [data-testid="collapsedControl"] { display: none !important; }
+        header[data-testid="stHeader"] { display: none !important; }
+        .block-container { padding-top: 70px !important; padding-left: 1rem !important; }
+        /* Sidebar minimaliste pour sous-menus */
+        [data-testid="stSidebar"] {
+            background: #0f0f0f !important;
+            border-right: 1px solid #222 !important;
+            min-width: 180px !important;
+            max-width: 200px !important;
+        }
+        [data-testid="stSidebar"] * { font-size: 11px !important; }
+        /* Topbar fixe */
+        .am-topbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 9999;
+            background: #0d0d0d;
+            border-bottom: 2px solid #ff9800;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            height: 54px;
+            gap: 4px;
+        }
+        .am-topbar .am-logo {
+            color: #ff9800;
+            font-weight: 900;
+            font-size: 15px;
+            letter-spacing: 2px;
+            margin-right: 16px;
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+        .am-topbar a {
+            color: #666;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+        .am-topbar a:hover {
+            color: #ff9800;
+            border-color: #ff980066;
+            background: #ff980011;
+        }
+        .am-topbar a.active {
+            color: #ff9800;
+            border-color: #ff9800;
+            background: linear-gradient(135deg,#ff980025,#ff980010);
+            font-weight: 900;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1751,9 +1809,7 @@ st_autorefresh(interval=600000, key="global_refresh")
 #  NAVIGATION SIDEBAR
 # ============================================================
 
-# ── Sidebar navigation — boutons pills ──
-st.sidebar.markdown("### 🗂️ NAVIGATION")
-
+# ── Topbar navigation ──
 NAV_ITEMS = [
     ("📈", "ACTIONS & BOURSE"),
     ("🏦", "ÉCONOMIE"),
@@ -1770,58 +1826,30 @@ NAV_ITEMS = [
     ("📊", "MON ESPACE ANALYSE"),
 ]
 
-# CSS pour les boutons pills
-st.sidebar.markdown("""
-<style>
-div[data-testid="stSidebar"] .nav-btn button {
-    background: #1a1a1a !important;
-    color: #aaa !important;
-    border: 1px solid #333 !important;
-    border-radius: 8px !important;
-    padding: 6px 10px !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.5px !important;
-    width: 100% !important;
-    text-align: left !important;
-    margin-bottom: 3px !important;
-    transition: all 0.15s !important;
-}
-div[data-testid="stSidebar"] .nav-btn button:hover {
-    background: #ff980022 !important;
-    color: #ff9800 !important;
-    border-color: #ff9800 !important;
-}
-div[data-testid="stSidebar"] .nav-btn-active button {
-    background: linear-gradient(135deg, #ff980033, #ff980011) !important;
-    color: #ff9800 !important;
-    border: 1.5px solid #ff9800 !important;
-    border-radius: 8px !important;
-    padding: 6px 10px !important;
-    font-size: 12px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.5px !important;
-    width: 100% !important;
-    text-align: left !important;
-    margin-bottom: 3px !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
 if "nav_categorie" not in st.session_state:
     st.session_state.nav_categorie = "ACTIONS & BOURSE"
 
-for emoji, label in NAV_ITEMS:
-    is_active = st.session_state.nav_categorie == label
-    css_class = "nav-btn-active" if is_active else "nav-btn"
-    st.sidebar.markdown(f"<div class='{css_class}'>", unsafe_allow_html=True)
-    if st.sidebar.button(f"{emoji}  {label}", key=f"nav_{label}", use_container_width=True):
-        st.session_state.nav_categorie = label
-        st.rerun()
-    st.sidebar.markdown("</div>", unsafe_allow_html=True)
+# Intercepter les clics via query params
+params = st.query_params
+if "nav" in params:
+    st.session_state.nav_categorie = params["nav"]
 
 categorie = st.session_state.nav_categorie
-st.sidebar.markdown("---")
+
+# Construire le HTML de la topbar
+links_html = ""
+for emoji, label in NAV_ITEMS:
+    active_class = "active" if label == categorie else ""
+    # Encoder le label pour l'URL
+    encoded = label.replace(" ", "+").replace("&", "%26").replace("É", "%C3%89").replace("è", "%C3%A8").replace("é", "%C3%A9").replace("Î", "%C3%8E")
+    links_html += f'<a href="?nav={encoded}" class="{active_class}" target="_self">{emoji} {label}</a>'
+
+st.markdown(f"""
+<div class="am-topbar">
+    <div class="am-logo">⚡ AM-TRADING</div>
+    {links_html}
+</div>
+""", unsafe_allow_html=True)
 
 if categorie == "TERMINAL":
     terminal_module.show_terminal()
@@ -1895,8 +1923,7 @@ elif categorie == "BOITE À OUTILS":
         "ALERTS MANAGER"
     ])
 
-st.sidebar.markdown("---")
-st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
+
 
 # Barre utilisateur (compte + déconnexion)
 render_user_sidebar()
