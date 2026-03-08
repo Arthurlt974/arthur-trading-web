@@ -28,6 +28,11 @@ from reportlab.platypus import (
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
+def _hex(c) -> str:
+    """Retourne la couleur en hex 6 chars (#RRGGBB) compatible Paragraph HTML."""
+    h = c.hexval()          # ReportLab retourne '#XRRGGBB' (9 chars)
+    return h[-6:]           # On prend les 6 derniers = RRGGBB
+
 # ══════════════════════════════════════════
 #  PALETTE AM-TRADING
 # ══════════════════════════════════════════
@@ -218,9 +223,9 @@ def _section_analyse(story, S, ticker: str, info: dict, valuation: dict):
 
         cons_data = [
             ["RECOMMANDATION", "VALEUR CONSENSUS", "POTENTIEL", "MÉTHODES"],
-            [Paragraph(f'<font color="#{rec_c.hexval()[1:]}"><b>{rec}</b></font>', ParagraphStyle("x", fontSize=11, alignment=TA_CENTER)),
+            [Paragraph(f'<font color="#{_hex(rec_c)}"><b>{rec}</b></font>', ParagraphStyle("x", fontSize=11, alignment=TA_CENTER)),
              f"{cv:,.2f} {devise}",
-             Paragraph(f'<font color="#{up_c.hexval()[1:]}"><b>{up:+.1f}%</b></font>', ParagraphStyle("x", fontSize=11, alignment=TA_CENTER)),
+             Paragraph(f'<font color="#{_hex(up_c)}"><b>{up:+.1f}%</b></font>', ParagraphStyle("x", fontSize=11, alignment=TA_CENTER)),
              str(nmeth)],
         ]
         cons_tbl = Table(cons_data, colWidths=[45*mm, 45*mm, 45*mm, 30*mm])
@@ -323,9 +328,9 @@ def _section_portfolio(story, S, positions: list):
             f"{p.get('buy_price',0):.2f}",
             f"{p.get('current_price',0):.2f}",
             f"{p.get('market_value',0):,.2f}",
-            Paragraph(f'<font color="#{p_c.hexval()[1:]}">{pnl_abs:+,.2f}</font>',
+            Paragraph(f'<font color="#{_hex(p_c)}">{pnl_abs:+,.2f}</font>',
                       ParagraphStyle("pnl", fontSize=8, alignment=TA_CENTER)),
-            Paragraph(f'<font color="#{p_c.hexval()[1:]}">{pnl_pct:+.1f}%</font>',
+            Paragraph(f'<font color="#{_hex(p_c)}">{pnl_pct:+.1f}%</font>',
                       ParagraphStyle("pnlp", fontSize=8, alignment=TA_CENTER)),
         ])
     p_tbl = Table(p_rows, colWidths=[22*mm, 20*mm, 18*mm, 22*mm, 22*mm, 22*mm, 22*mm, 18*mm])
