@@ -64,106 +64,87 @@ TERMINAL_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
-/* ── Reset Streamlit ── */
-[data-testid="stAppViewContainer"] > section:first-child { background: #000 !important; }
-[data-testid="stSidebar"] { background: #050505 !important; border-right: 1px solid #111; }
-[data-testid="stSidebar"] * { font-family: 'IBM Plex Mono', monospace !important; }
-footer, header { display: none !important; }
-.block-container { padding: 0 !important; max-width: 100% !important; }
-[data-testid="stVerticalBlock"] { gap: 0 !important; }
-
-/* ── Barre titre terminal ── */
+/* ── Topbar ── */
 .term-topbar {
-    display: flex; align-items: center; gap: 0;
+    display: flex; align-items: center;
     background: #000; border-bottom: 1px solid #1a1a1a;
-    height: 36px; padding: 0 12px; flex-shrink: 0;
+    height: 34px; padding: 0 14px;
 }
 .term-logo {
     font-family: 'IBM Plex Mono', monospace; font-size: 13px;
     font-weight: 700; color: #ff6600; letter-spacing: 1px;
-    margin-right: 16px; white-space: nowrap;
+    margin-right: 14px;
 }
 .term-logo span { color: #4d9fff; }
 
-/* ── Onglets ── */
-.term-tabs {
-    display: flex; align-items: stretch;
-    background: #000; border-bottom: 2px solid #111;
-    overflow-x: auto; flex-shrink: 0;
+/* ── Streamlit tabs → style Bloomberg ── */
+[data-testid="stTabs"] {
+    background: #000;
 }
-.term-tabs::-webkit-scrollbar { height: 3px; }
-.term-tabs::-webkit-scrollbar-thumb { background: #222; }
-
-.term-tab {
-    display: flex; align-items: center; gap: 6px;
-    padding: 0 14px; height: 34px; cursor: pointer;
-    border-right: 1px solid #111; white-space: nowrap;
-    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
-    color: #4d9fff; background: #050505;
-    border-top: 2px solid transparent;
-    transition: all .12s; user-select: none; min-width: 120px;
+[data-testid="stTabsTabList"] {
+    background: #000 !important;
+    border-bottom: 2px solid #111 !important;
+    gap: 0 !important;
+    padding: 0 !important;
 }
-.term-tab:hover { background: #0d0d0d; color: #fff; }
-.term-tab.active {
-    background: #000; color: #ff6600;
-    border-top: 2px solid #ff6600;
+[data-testid="stTabsTab"] {
+    background: #050505 !important;
+    border: none !important;
+    border-right: 1px solid #111 !important;
+    border-top: 2px solid transparent !important;
+    border-radius: 0 !important;
+    padding: 0 16px !important;
+    height: 34px !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    color: #4d9fff !important;
+    letter-spacing: 0.3px !important;
+    transition: all .12s !important;
+    white-space: nowrap !important;
 }
-.term-tab .tab-close {
-    margin-left: auto; color: #333; font-size: 11px;
-    padding: 1px 3px; border-radius: 2px;
+[data-testid="stTabsTab"]:hover {
+    background: #0d0d0d !important;
+    color: #fff !important;
+    border-top-color: #333 !important;
 }
-.term-tab:hover .tab-close { color: #666; }
-.term-tab.active .tab-close { color: #ff6600; }
-.term-tab-add {
-    display: flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; cursor: pointer;
-    color: #333; font-size: 16px; background: #000;
-    border-right: 1px solid #111; flex-shrink: 0;
+[data-testid="stTabsTab"][aria-selected="true"] {
+    background: #000 !important;
+    color: #ff6600 !important;
+    border-top: 2px solid #ff6600 !important;
+    font-weight: 600 !important;
 }
-.term-tab-add:hover { color: #ff6600; background: #0d0d0d; }
-
-/* ── Contenu onglet ── */
-.term-content {
-    flex: 1; overflow: auto; background: #000;
-    min-height: 0;
+/* Supprimer le soulignement rouge natif Streamlit */
+[data-testid="stTabsTab"][aria-selected="true"]::after,
+[data-testid="stTabsTab"]::after {
+    display: none !important;
 }
-
-/* ── Écran de bienvenue ── */
-.term-welcome {
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; height: 100%; min-height: 500px;
-    gap: 12px;
+[data-testid="stTabsTabPanel"] {
+    background: #000 !important;
+    padding: 12px 0 0 !important;
 }
-.term-welcome .logo-big {
-    font-family: 'IBM Plex Mono', monospace; font-size: 48px;
-    font-weight: 700; color: #ff6600; letter-spacing: 4px;
-}
-.term-welcome .logo-big span { color: #4d9fff; }
-.term-welcome .tagline {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px; color: #4d9fff; letter-spacing: 2px;
-}
-.term-welcome .shortcut-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 8px; margin-top: 24px; max-width: 600px; width: 100%;
-}
-.shortcut-card {
-    background: #080808; border: 1px solid #1a1a1a;
-    border-radius: 4px; padding: 12px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
-    color: #4d9fff; cursor: pointer; transition: all .15s;
-    text-align: center;
-}
-.shortcut-card:hover { border-color: #ff6600; color: #ff6600; background: #0d0800; }
-.shortcut-card .sc-icon { font-size: 20px; margin-bottom: 6px; }
-.shortcut-card .sc-label { color: #555; font-size: 9px; margin-top: 2px; }
 
 /* ── Sidebar terminal ── */
-.term-sidebar-section {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px; color: #ff6600; letter-spacing: 1.5px;
-    padding: 8px 0 4px; text-transform: uppercase;
+[data-testid="stSidebar"] {
+    background: #050505 !important;
+    border-right: 1px solid #111 !important;
 }
+[data-testid="stSidebar"] button {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 10px !important;
+    background: #0a0a0a !important;
+    border: 1px solid #1a1a1a !important;
+    color: #4d9fff !important;
+    border-radius: 3px !important;
+}
+[data-testid="stSidebar"] button:hover {
+    border-color: #ff6600 !important;
+    color: #ff6600 !important;
+}
+
+/* ── Padding général ── */
+.block-container { padding-top: 0 !important; padding-bottom: 0 !important; }
+footer, header { display: none !important; }
 </style>
 """
 
@@ -583,30 +564,21 @@ def show_terminal():
     )
 
     # ══════════════════════════════════════════
-    # BARRE D'ONGLETS (HTML)
+    # TOPBAR simple (une seule ligne)
     # ══════════════════════════════════════════
-    tabs_html = '<div class="term-tabs">'
-    for i, tab in enumerate(tabs):
-        active_cls = "active" if i == active else ""
-        tabs_html += f'<div class="term-tab {active_cls}">{tab["name"]}</div>'
-    tabs_html += '<div class="term-tab-add">＋</div>'
-    tabs_html += '</div>'
-
-    # Topbar + onglets
     st.markdown(f"""
     <div class="term-topbar">
       <div class="term-logo">AM<span>.</span>TERMINAL</div>
       <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#4d9fff;letter-spacing:1px;">
-        MULTI-ONGLETS · {len(tabs)} ACTIF{'S' if len(tabs)>1 else ''}
+        {len(tabs)} ONGLET{'S' if len(tabs)>1 else ''} OUVERT{'S' if len(tabs)>1 else ''}
       </div>
       <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;
                   font-size:9px;color:#333;">{time.strftime('%H:%M:%S')}</div>
     </div>
-    {tabs_html}
     """, unsafe_allow_html=True)
 
     # ══════════════════════════════════════════
-    # NAVIGATION ONGLETS via st.tabs
+    # ONGLETS STREAMLIT NATIFS (une seule barre)
     # ══════════════════════════════════════════
     if not tabs:
         st.markdown("""
@@ -616,7 +588,6 @@ def show_terminal():
         </div>""", unsafe_allow_html=True)
         return
 
-    # Créer des onglets Streamlit natifs
     tab_labels = [t["name"] for t in tabs]
     st_tabs = st.tabs(tab_labels)
 
