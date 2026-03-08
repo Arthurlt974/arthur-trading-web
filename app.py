@@ -2271,7 +2271,8 @@ elif outil == "STAKING & YIELD":
 elif outil == "ANALYSEUR PRO":
     nom_entree = st.sidebar.text_input("TICKER SEARCH", value="NVIDIA")
     ticker = trouver_ticker(nom_entree)
-    info = get_ticker_info(ticker)
+    info = get_ticker_info(ticker) or {}
+    valuation_results = {}
 
     if info and any(k in info for k in ('currentPrice','regularMarketPrice','previousClose')):
         nom = info.get('longName') or info.get('shortName') or ticker
@@ -2516,10 +2517,11 @@ elif outil == "ANALYSEUR PRO":
         st.error(f"⚠️ IMPOSSIBLE DE CHARGER LES DONNÉES POUR {ticker}")
 
     # ── Export PDF ──
-    st.markdown("---")
-    _c1, _c2, _c3 = st.columns([1,1,2])
-    with _c1:
-        export_pdf.download_button_analyse(ticker, info, valuation_results, key="pdf_analyseur_pro")
+    if info and valuation_results:
+        st.markdown("---")
+        _c1, _c2, _c3 = st.columns([1,1,2])
+        with _c1:
+            export_pdf.download_button_analyse(ticker, info, valuation_results, key="pdf_analyseur_pro")
 
 
 # ==========================================
