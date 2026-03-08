@@ -1331,48 +1331,74 @@ class ValuationCalculator:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
-    import requests as _req
+    """Récupère les infos d'un ticker — robuste aux blocages Yahoo Finance."""
+    import requests as _req, time as _time
     info = {}
+    t = yf.Ticker(ticker)
+
+    # ── ÉTAPE 1 : fast_info (léger, rarement bloqué) ──
     try:
-        t = yf.Ticker(ticker)
-        try:
-            fi = t.fast_info
-            if getattr(fi,'last_price',None): info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
-            if getattr(fi,'previous_close',None): info['previousClose'] = float(fi.previous_close)
-            if getattr(fi,'market_cap',None): info['marketCap'] = float(fi.market_cap)
-            if getattr(fi,'shares',None): info['sharesOutstanding'] = float(fi.shares)
-            if getattr(fi,'currency',None): info['currency'] = fi.currency
-        except Exception: pass
+        fi = t.fast_info
+        for attr, key in [
+            ('last_price',     'currentPrice'),
+            ('previous_close', 'previousClose'),
+            ('market_cap',     'marketCap'),
+            ('shares',         'sharesOutstanding'),
+            ('currency',       'currency'),
+            ('fifty_day_average',      'fiftyDayAverage'),
+            ('two_hundred_day_average','twoHundredDayAverage'),
+        ]:
+            val = getattr(fi, attr, None)
+            if val: info[key] = float(val) if attr != 'currency' else val
+        if info.get('currentPrice'):
+            info['regularMarketPrice'] = info['currentPrice']
+    except Exception: pass
+
+    # ── ÉTAPE 2 : .info avec plusieurs User-Agents ──
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+    ]
+    full = {}
+    for ua in user_agents:
         try:
             s = _req.Session()
-            s.headers.update({
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "application/json,text/html",
-                "Accept-Language": "en-US,en;q=0.9",
-            })
+            s.headers.update({"User-Agent": ua, "Accept": "application/json", "Accept-Language": "en-US,en;q=0.9"})
             full = yf.Ticker(ticker, session=s).info or {}
-            # Si trop peu de données, retry sans session custom
-            if len(full) < 10:
-                import time; time.sleep(0.5)
-                full2 = t.info or {}
-                if len(full2) > len(full): full = full2
-            for k,v in full.items():
-                if v not in (None, '', 0) and k not in info:
-                    info[k] = v
+            if len(full) > 10: break
+            _time.sleep(0.3)
+        except Exception:
+            continue
+    for k, v in full.items():
+        if v not in (None, '', 0) and k not in info:
+            info[k] = v
+
+    # ── ÉTAPE 3 : historique comme dernier recours pour le prix ──
+    if not info.get('currentPrice'):
+        try:
+            hist = t.history(period="5d")
+            if not hist.empty:
+                info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
+                if len(hist) > 1:
+                    info['previousClose'] = float(hist['Close'].iloc[-2])
+                # Calculer variation manuelle
+                if info.get('previousClose') and info['previousClose'] > 0:
+                    chg = ((info['currentPrice'] - info['previousClose']) / info['previousClose']) * 100
+                    info['regularMarketChangePercent'] = round(chg, 4)
         except Exception: pass
-        # Fallback prix via historique
-        if not info.get('currentPrice'):
-            try:
-                hist = t.history(period="5d")
-                if not hist.empty:
-                    info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
-                    info['previousClose'] = float(hist['Close'].iloc[-2]) if len(hist) > 1 else info['currentPrice']
-            except Exception: pass
-        # Fallback previousClose
-        if not info.get('previousClose') and info.get('currentPrice'):
-            info['previousClose'] = info['currentPrice']
-        return info if len(info) > 2 else None
-    except Exception: return None
+
+    # ── ÉTAPE 4 : combler les manques critiques ──
+    if not info.get('previousClose') and info.get('currentPrice'):
+        info['previousClose'] = info['currentPrice']
+    if not info.get('currency'):
+        info['currency'] = 'USD' if '.' not in ticker else 'EUR'
+    # shortName minimal pour affichage
+    if not info.get('longName') and not info.get('shortName'):
+        info['shortName'] = ticker.upper()
+
+    # Retourner si on a au minimum un prix
+    return info if info.get('currentPrice') or info.get('previousClose') else None
 
 @st.cache_data(ttl=900, show_spinner=False)
 def get_valuation_cached(ticker: str) -> dict:
@@ -2513,7 +2539,11 @@ elif outil == "ANALYSEUR PRO":
         except Exception:
             st.error("ERROR FETCHING NEWS FEED.")
     else:
-        st.error(f"⚠️ IMPOSSIBLE DE CHARGER LES DONNÉES POUR {ticker}")
+        st.warning(f"⚠️ Données indisponibles pour **{ticker}** — Yahoo Finance temporairement inaccessible.")
+        st.info("💡 Essaie dans quelques secondes, ou vérifie que le ticker est correct (ex: NVDA, AAPL, MC.PA)")
+        if st.button("🔄 Réessayer", key="retry_analyseur"):
+            st.cache_data.clear()
+            st.rerun()
 
 
 
