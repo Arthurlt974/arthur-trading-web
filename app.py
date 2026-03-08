@@ -1692,7 +1692,9 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "TERMINAL", "💼 PORTFOLIO", "MON ESPACE ANALYSE", "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
+    "ACTIONS & BOURSE", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "MARCHÉ CRYPTO",
+    "BOITE À OUTILS", "INTERFACE PRO", "INTERFACE CRYPTO PRO",
+    "PORTFOLIO", "TERMINAL", "MON ESPACE ANALYSE"
 ])
 st.sidebar.markdown("---")
 
@@ -1700,7 +1702,7 @@ if categorie == "TERMINAL":
     terminal_module.show_terminal()
     st.stop()
 
-if categorie == "💼 PORTFOLIO":
+if categorie == "PORTFOLIO":
     interface_portfolio.show_portfolio()
     st.stop()
 
