@@ -63,24 +63,33 @@ def _perf(closes: pd.Series, days: int) -> float:
 def _fetch_ticker(symbol: str) -> dict | None:
     try:
         t  = yf.Ticker(symbol)
-        fi = t.fast_info
 
-        # Prix & market data
-        price   = getattr(fi, "last_price",       None)
-        prev    = getattr(fi, "previous_close",   None)
-        mktcap  = getattr(fi, "market_cap",       None)
-        shares  = getattr(fi, "shares",           None)
-        currency= getattr(fi, "currency",         "USD")
-
-        if not price or price == 0:
-            return None
-
-        # Historique pour RSI + performance
+        # Priorité : history pour le prix (plus fiable que fast_info sur Streamlit Cloud)
         hist = t.history(period="3mo", progress=False, auto_adjust=True)
         if hist.empty or len(hist) < 5:
             return None
+        if isinstance(hist.columns, pd.MultiIndex):
+            hist.columns = hist.columns.get_level_values(0)
+
+        price = float(hist["Close"].iloc[-1])
+        if not price or price == 0:
+            return None
+
+        # fast_info pour les métadonnées
+        mktcap   = None
+        shares   = None
+        currency = "USD"
+        prev     = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else price
+        try:
+            fi       = t.fast_info
+            mktcap   = getattr(fi, "market_cap",     None)
+            shares   = getattr(fi, "shares",         None)
+            currency = getattr(fi, "currency",       "USD") or "USD"
+        except Exception:
+            pass
+
         closes = hist["Close"].squeeze()
-        volume = float(hist["Volume"].iloc[-1]) if "Volume" in hist else 0
+        volume = float(hist["Volume"].iloc[-1]) if "Volume" in hist.columns else 0
 
         # Info fondamentaux
         info = {}
@@ -311,7 +320,22 @@ def show_screener():
             status.empty()
             
             if not results:
-                st.error("Aucune donnée récupérée. Vérifiez votre connexion ou les tickers.")
+                st.error(f"Aucune donnée récupérée sur {total} tickers testés.")
+                # Test rapide sur le premier ticker pour diagnostiquer
+                if symbols_list:
+                    test_sym = symbols_list[0]
+                    st.info(f"Test de diagnostic sur {test_sym}...")
+                    try:
+                        import yfinance as _yf
+                        _t = _yf.Ticker(test_sym)
+                        _h = _t.history(period="5d", progress=False)
+                        if _h.empty:
+                            st.error(f"❌ {test_sym} : history() retourne vide — Yahoo Finance bloque les requêtes depuis Streamlit Cloud")
+                            st.info("💡 Solution : ajouter `yfinance>=0.2.36` dans requirements.txt")
+                        else:
+                            st.success(f"✅ {test_sym} : prix={float(_h['Close'].iloc[-1]):.2f} — les données arrivent, problème dans le parsing")
+                    except Exception as _e:
+                        st.error(f"❌ Erreur : {_e}")
                 return
             
             df_raw = pd.DataFrame(results)
