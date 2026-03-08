@@ -1866,7 +1866,7 @@ st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
     "ACTIONS & BOURSE", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "MARCHÉ CRYPTO",
     "BOITE À OUTILS", "INTERFACE PRO", "INTERFACE CRYPTO PRO",
-    "PORTFOLIO", "TERMINAL", "MON ESPACE ANALYSE"
+    "PORTFOLIO", "ALERTES", "TERMINAL", "MON ESPACE ANALYSE"
 ])
 st.sidebar.markdown("---")
 
@@ -1876,6 +1876,10 @@ if categorie == "TERMINAL":
 
 if categorie == "PORTFOLIO":
     interface_portfolio.show_portfolio()
+    st.stop()
+
+if categorie == "ALERTES":
+    interface_alertes.show_alertes()
     st.stop()
 
 if categorie == "MON ESPACE ANALYSE":
