@@ -1882,19 +1882,27 @@ elif outil == "BITCOIN DOMINANCE":
 
     st.markdown("---")
 
-    from chart_module import render_chart
-    import time as _t
-    _btcd_html = render_chart(
-        symbol="BTCUSDT",
-        interval="1d",
-        limit=200,
-        height=620,
-        pair_label="BTC/USDT — Dominance Proxy",
-        exchange="Binance · Spot",
-        show_ma=True,
-        show_bb=False,
-    ) + f"<!-- btcd:{int(_t.time()*1000)} -->"
-    components.html(_btcd_html, height=630, scrolling=False)
+    tv_html_dom = """
+        <div id="tv_chart_dom" style="height:600px;"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <script>
+        new TradingView.widget({
+          "autosize": true,
+          "symbol": "CRYPTOCAP:BTC.D",
+          "interval": "D",
+          "timezone": "Europe/Paris",
+          "theme": "dark",
+          "style": "1",
+          "locale": "fr",
+          "toolbar_bg": "#000000",
+          "enable_publishing": false,
+          "hide_top_toolbar": false,
+          "save_image": false,
+          "container_id": "tv_chart_dom"
+        });
+        </script>
+    """
+    components.html(tv_html_dom, height=610)
 
 # ==========================================
 # OUTIL : CRYPTO WALLET TRACKER
