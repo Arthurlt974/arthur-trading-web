@@ -6,6 +6,10 @@ Permet d'ouvrir jusqu'à 6 onglets simultanés, chacun configuré sur un outil d
 import streamlit as st
 import streamlit.components.v1 as components
 import time
+from utils import (
+    show_onchain, show_liquidations, show_staking, show_order_book_ui,
+    init_session_from_firebase,
+)
 
 # ══════════════════════════════════════════════════════════
 #  CATALOGUE DES OUTILS DISPONIBLES
@@ -163,151 +167,38 @@ def _render_tool(tool_id: str, tool_name: str):
     import numpy as np
 
     if tool_id == "CHART_CRYPTO":
-        CRYPTOS_TV = {
-            "BTC/USDT": "BINANCE:BTCUSDT", "ETH/USDT": "BINANCE:ETHUSDT",
-            "SOL/USDT": "BINANCE:SOLUSDT", "BNB/USDT": "BINANCE:BNBUSDT",
-            "XRP/USDT": "BINANCE:XRPUSDT", "ADA/USDT": "BINANCE:ADAUSDT",
-            "AVAX/USDT":"BINANCE:AVAXUSDT","DOGE/USDT":"BINANCE:DOGEUSDT",
-            "LINK/USDT":"BINANCE:LINKUSDT","DOT/USDT": "BINANCE:DOTUSDT",
-            "MATIC/USDT":"BINANCE:MATICUSDT","ATOM/USDT":"BINANCE:ATOMUSDT",
+        from chart_module import render_chart
+        CRYPTOS = {
+            "BTC/USDT": "BTCUSDT", "ETH/USDT": "ETHUSDT", "SOL/USDT": "SOLUSDT",
+            "BNB/USDT": "BNBUSDT", "XRP/USDT": "XRPUSDT", "ADA/USDT": "ADAUSDT",
+            "AVAX/USDT": "AVAXUSDT", "DOGE/USDT": "DOGEUSDT", "LINK/USDT": "LINKUSDT",
         }
-        TF_TV = {"1m":"1","5m":"5","15m":"15","30m":"30","1h":"60","4h":"240","1D":"D","1W":"W"}
         c1, c2 = st.columns([3, 1])
         with c1:
-            pair = st.selectbox("Paire", list(CRYPTOS_TV.keys()), key=f"tc_pair_{tool_id}", label_visibility="collapsed")
+            pair  = st.selectbox("Paire", list(CRYPTOS.keys()), key=f"tc_pair_{tool_id}", label_visibility="collapsed")
         with c2:
-            tf   = st.selectbox("TF", list(TF_TV.keys()), index=5, key=f"tc_tf_{tool_id}", label_visibility="collapsed")
-        tv_sym = CRYPTOS_TV[pair]
-        tv_tf  = TF_TV[tf]
-        cid = f"tv_crypto_{pair.replace('/','_').replace(' ','_')}"
-        tv_html = f"""
-        <div id="{cid}" style="height:650px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script>
-        new TradingView.widget({{
-          "autosize": true,
-          "symbol": "{tv_sym}",
-          "interval": "{tv_tf}",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "toolbar_bg": "#000000",
-          "enable_publishing": false,
-          "hide_side_toolbar": false,
-          "allow_symbol_change": true,
-          "studies": ["RSI@tv-basicstudies","MACD@tv-basicstudies","BB@tv-basicstudies"],
-          "container_id": "{cid}"
-        }});
-        </script>"""
-        components.html(tv_html, height=660, scrolling=False)
+            tf    = st.selectbox("TF", ["1h","4h","1d","1w"], index=1, key=f"tc_tf_{tool_id}", label_visibility="collapsed")
+        sym = CRYPTOS[pair]
+        html = render_chart(symbol=sym, interval=tf, limit=200, height=640,
+                            pair_label=pair, exchange="Binance · Spot", show_ma=True
+                            ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
+        components.html(html, height=650, scrolling=False)
 
     elif tool_id == "CHART_STOCK":
-        _EU_SFX = (".PA",".AS",".DE",".MI",".MA",".BR",".LS",".ST",".HE",".OL",".CO")
-        TF_TV_STOCK = {"1m":"1","5m":"5","15m":"15","1h":"60","4h":"240","1D":"D","1W":"W","1M":"M"}
-        c1, c2, c3 = st.columns([3, 1, 1])
+        from chart_module import render_chart
+        c1, c2 = st.columns([3, 1])
         with c1:
-            sym = st.text_input("Ticker (ex: AAPL, MC.PA, NVDA…)", value="AAPL",
-                                key=f"tc_stock_{tool_id}", label_visibility="collapsed").upper()
+            sym = st.text_input("Ticker", value="AAPL", key=f"tc_stock_{tool_id}", label_visibility="collapsed").upper()
         with c2:
-            tf = st.selectbox("TF", list(TF_TV_STOCK.keys()), index=5,
-                              key=f"tc_stf_{tool_id}", label_visibility="collapsed")
-        with c3:
-            exchange_hint = st.selectbox("Bourse", ["AUTO","NASDAQ","NYSE","EURONEXT","LSE"],
-                                         key=f"tc_exch_{tool_id}", label_visibility="collapsed")
-
-        is_eu = any(sym.endswith(s) for s in _EU_SFX)
-
-        if is_eu:
-            # Actions EU → Plotly candlestick (TradingView ne charge pas bien Euronext)
-            from plotly.subplots import make_subplots
-            try:
-                df = yf.download(sym, period="6mo", progress=False, auto_adjust=True)
-                if isinstance(df.columns, pd.MultiIndex):
-                    df.columns = df.columns.get_level_values(0)
-                if df.empty:
-                    st.warning(f"Aucune donnée pour {sym}")
-                else:
-                    df["SMA20"] = df["Close"].rolling(20).mean()
-                    df["SMA50"] = df["Close"].rolling(50).mean()
-                    df["BB_std"]= df["Close"].rolling(20).std()
-                    df["BB_up"] = df["SMA20"] + 2*df["BB_std"]
-                    df["BB_dn"] = df["SMA20"] - 2*df["BB_std"]
-                    df["VolMA"] = df["Volume"].rolling(20).mean()
-                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                                        vertical_spacing=0.04, row_heights=[0.75, 0.25])
-                    fig.add_trace(go.Candlestick(
-                        x=df.index, open=df["Open"], high=df["High"],
-                        low=df["Low"], close=df["Close"], name=sym,
-                        increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
-                        increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"
-                    ), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=df["SMA20"],
-                        line=dict(color="#ff9800", width=1.5), name="SMA20"), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"],
-                        line=dict(color="#2196f3", width=1.5), name="SMA50"), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=df["BB_up"],
-                        line=dict(color="rgba(255,152,0,0.4)", dash="dash", width=1),
-                        name="BB+", showlegend=False), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=df["BB_dn"],
-                        line=dict(color="rgba(255,152,0,0.4)", dash="dash", width=1),
-                        fill="tonexty", fillcolor="rgba(255,152,0,0.05)",
-                        name="BB-", showlegend=False), row=1, col=1)
-                    colors_v = ["#26a69a" if c >= o else "#ef5350"
-                                for c, o in zip(df["Close"], df["Open"])]
-                    fig.add_trace(go.Bar(x=df.index, y=df["Volume"],
-                        marker_color=colors_v, name="Volume", opacity=0.6), row=2, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=df["VolMA"],
-                        line=dict(color="rgba(255,152,0,0.7)", width=1.5),
-                        name="VolMA"), row=2, col=1)
-                    fig.update_layout(
-                        template="plotly_dark", paper_bgcolor="#000",
-                        plot_bgcolor="#0a0a0a", height=650,
-                        xaxis_rangeslider_visible=False,
-                        font=dict(color="#d1d4dc", family="IBM Plex Mono"),
-                        legend=dict(bgcolor="rgba(0,0,0,0.5)"),
-                        margin=dict(l=10, r=10, t=30, b=10),
-                    )
-                    fig.update_xaxes(gridcolor="#1e222d")
-                    fig.update_yaxes(gridcolor="#1e222d")
-                    st.plotly_chart(fig, use_container_width=True)
-                    st.caption(f"📊 Plotly — {sym} (action EU, 6 mois)")
-            except Exception as e:
-                st.error(f"Erreur graphique EU {sym}: {e}")
-        else:
-            # Actions US / ETF / Indices → TradingView Advanced Chart
-            tv_tf = TF_TV_STOCK[tf]
-            # Préfixe bourse si besoin
-            exch_prefix = {"NASDAQ": "NASDAQ:", "NYSE": "NYSE:", "EURONEXT": "EURONEXT:",
-                           "LSE": "LSE:", "AUTO": ""}
-            prefix = exch_prefix.get(exchange_hint, "")
-            tv_sym = f"{prefix}{sym}"
-            cid = f"tv_stock_{sym.replace('.','_')}"
-            tv_html = f"""
-            <div id="{cid}" style="height:650px;"></div>
-            <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-            <script>
-            new TradingView.widget({{
-              "autosize": true,
-              "symbol": "{tv_sym}",
-              "interval": "{tv_tf}",
-              "timezone": "Europe/Paris",
-              "theme": "dark",
-              "style": "1",
-              "locale": "fr",
-              "toolbar_bg": "#000000",
-              "enable_publishing": false,
-              "hide_side_toolbar": false,
-              "allow_symbol_change": true,
-              "details": true,
-              "studies": ["RSI@tv-basicstudies","MACD@tv-basicstudies","Volume@tv-basicstudies"],
-              "container_id": "{cid}"
-            }});
-            </script>"""
-            components.html(tv_html, height=660, scrolling=False)
+            tf  = st.selectbox("TF", ["1h","1d","1wk"], index=1, key=f"tc_stf_{tool_id}", label_visibility="collapsed")
+        html = render_chart(symbol=sym, interval=tf, limit=200, height=640,
+                            pair_label=sym, exchange="Yahoo Finance", show_ma=True
+                            ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
+        components.html(html, height=650, scrolling=False)
 
     elif tool_id == "BTC_DOMINANCE":
-        st.markdown("### ₿ Bitcoin Dominance (CRYPTOCAP:BTC.D)")
+        from chart_module import render_chart
+        st.markdown("### ₿ Bitcoin Dominance — BTC/USDT Proxy")
         col1, col2, col3 = st.columns(3)
         try:
             r = requests.get("https://api.coingecko.com/api/v3/global", timeout=8)
@@ -317,27 +208,10 @@ def _render_tool(tool_id: str, tool_name: str):
             col1.metric("BTC Dominance", "N/A")
         col2.info("💡 BTC.D ↑ + BTC ↑ = Altcoins souffrent")
         col3.info("💡 BTC.D ↓ + BTC stagne = Altseason")
-        tv_btcd_html = """
-        <div id="tv_btcdominance" style="height:600px;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script>
-        new TradingView.widget({
-          "autosize": true,
-          "symbol": "CRYPTOCAP:BTC.D",
-          "interval": "D",
-          "timezone": "Europe/Paris",
-          "theme": "dark",
-          "style": "1",
-          "locale": "fr",
-          "toolbar_bg": "#000000",
-          "enable_publishing": false,
-          "hide_side_toolbar": false,
-          "allow_symbol_change": false,
-          "studies": ["RSI@tv-basicstudies"],
-          "container_id": "tv_btcdominance"
-        });
-        </script>"""
-        components.html(tv_btcd_html, height=610, scrolling=False)
+        html = render_chart(symbol="BTCUSDT", interval="1d", limit=200, height=580,
+                            pair_label="BTC/USDT · Dominance proxy", exchange="Binance · Spot"
+                            ) + f"<!-- btcd:{int(time.time()*1000)} -->"
+        components.html(html, height=590, scrolling=False)
 
     elif tool_id == "HEATMAP_LIQ":
         st.markdown("### 🔥 Liquidation Heatmap")
@@ -348,42 +222,19 @@ def _render_tool(tool_id: str, tool_name: str):
         </div>""", height=840)
 
     elif tool_id == "ORDER_BOOK":
-        # Appel à la fonction existante dans app.py
-        try:
-            import app as _app
-            _app.show_order_book_ui()
-        except Exception as e:
-            st.error(f"Erreur chargement Order Book : {e}")
+        show_order_book_ui()
 
     elif tool_id == "WHALE":
-        try:
-            import app as _app
-            # Réplique du bloc WHALE WATCHER depuis app.py
-            st.markdown("### 🐋 Whale Watcher")
-            st.info("Chargement du module Whale Watcher depuis app.py…")
-        except Exception as e:
-            st.error(f"Erreur : {e}")
+        show_onchain()
 
     elif tool_id == "ONCHAIN":
-        try:
-            import app as _app
-            _app.show_onchain()
-        except Exception as e:
-            st.error(f"Erreur chargement On-Chain : {e}")
+        show_onchain()
 
     elif tool_id == "LIQ_FUNDING":
-        try:
-            import app as _app
-            _app.show_liquidations()
-        except Exception as e:
-            st.error(f"Erreur Liquidations : {e}")
+        show_liquidations()
 
     elif tool_id == "STAKING":
-        try:
-            import app as _app
-            _app.show_staking()
-        except Exception as e:
-            st.error(f"Erreur Staking : {e}")
+        show_staking()
 
     elif tool_id == "MULTI_CHARTS":
         from chart_module import render_chart
@@ -605,6 +456,9 @@ def _render_tool(tool_id: str, tool_name: str):
 
 def show_terminal():
     """Point d'entrée principal du Terminal Bloomberg."""
+
+    # Charger watchlist/alertes/prefs depuis Firebase si user connecté
+    init_session_from_firebase()
 
     # ── Inject CSS ──
     st.markdown(TERMINAL_CSS, unsafe_allow_html=True)
