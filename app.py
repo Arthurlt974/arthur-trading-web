@@ -21,6 +21,11 @@ import interface_forex
 import interface_matieres_premieres
 import interface_analyse_perso
 import Terminal as terminal_module
+from utils import (
+    save_watchlist_firebase, load_watchlist_firebase,
+    save_alerts_firebase, load_alerts_firebase,
+    init_session_from_firebase,
+)
 
 
 # ══════════════════════════════════════════════
@@ -97,7 +102,6 @@ def get_global_data():
     data = _get("https://api.coingecko.com/api/v3/global")
     return data.get("data", {}) if data else {}
 
-@st.cache_data(ttl=60)
 @st.cache_data(ttl=60)
 def get_binance_funding_rates():
     """
@@ -1762,10 +1766,18 @@ render_user_sidebar()
 #  BANDEAU DÉFILANT (MARQUEE)
 # ============================================================
 
-# La watchlist est chargée depuis Firebase si user connecté, sinon valeur par défaut
+# Watchlist — charger depuis Firebase si connecté, sinon défaut
+_DEFAULT_WATCHLIST = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "NVDA", "INTC", "AMD",
+                      "GOOGL", "MSFT", "PEP", "KO", "MC.PA", "TTE", "BNP.PA"]
 if "watchlist" not in st.session_state:
-    st.session_state.watchlist = ["BTC-USD", "ETH-USD", "AAPL", "TSLA", "NVDA", "INTC", "AMD",
-                                   "GOOGL", "MSFT", "PEP", "KO", "MC.PA", "TTE", "BNP.PA"]
+    # Tenter Firebase d'abord
+    _wl_firebase = load_watchlist_firebase()
+    st.session_state.watchlist = _wl_firebase if _wl_firebase else _DEFAULT_WATCHLIST
+if "alerts" not in st.session_state:
+    _al_firebase = load_alerts_firebase()
+    st.session_state.alerts = _al_firebase if _al_firebase else []
+if "triggered_alerts" not in st.session_state:
+    st.session_state.triggered_alerts = []
 
 ticker_data_string = ""
 for tkr in st.session_state.watchlist:
@@ -4697,6 +4709,7 @@ elif outil == "ALERTS MANAGER":
             # Sauvegarder dans Firebase si user connecté
             try:
                 _save_current_session_config()
+                save_alerts_firebase(st.session_state.alerts)
             except Exception:
                 pass
             st.success(f"✅ Alerte créée : {new_alert['name']}")
@@ -4742,6 +4755,7 @@ elif outil == "ALERTS MANAGER":
                         st.markdown("<br>", unsafe_allow_html=True)
                         if st.button("🗑️", key=f"del_alert_{alert['id']}", help="Supprimer l'alerte"):
                             st.session_state.alerts.remove(alert)
+                            save_alerts_firebase(st.session_state.alerts)
                             st.rerun()
             else:
                 st.info("Aucune alerte active.")
