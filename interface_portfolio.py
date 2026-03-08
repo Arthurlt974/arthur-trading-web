@@ -363,10 +363,12 @@ def _render_positions_table(enriched: list) -> int | None:
                         f"font-weight:600;color:#e8e8e8;'>{pos['display_sym']}</div>"
                         f"<div style='font-size:9px;color:#333;'>{pos.get('note','')}</div>",
                         unsafe_allow_html=True)
+        _ac = cfg["color"]
+        _at = pos['asset_type'].split('/')[0].strip()[:6]
         row[2].markdown(f"<div style='font-size:9px;padding:2px 6px;border-radius:3px;"
-                        f"background:{cfg[\"color\"]}22;color:{cfg[\"color\"]};display:inline-block;"
+                        f"background:{_ac}22;color:{_ac};display:inline-block;"
                         f"font-family:IBM Plex Mono,monospace;font-weight:600;'>"
-                        f"{pos['asset_type'].split('/')[0].strip()[:6]}</div>", unsafe_allow_html=True)
+                        f"{_at}</div>", unsafe_allow_html=True)
         row[3].markdown(f"<div style='font-family:IBM Plex Mono,monospace;font-size:12px;'>{pos['qty']}</div>",
                         unsafe_allow_html=True)
         row[4].markdown(f"<div style='font-family:IBM Plex Mono,monospace;font-size:12px;'>${pos['buy_price']:,.4g}</div>",
