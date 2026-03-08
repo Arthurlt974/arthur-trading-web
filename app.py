@@ -1292,33 +1292,62 @@ class ValuationCalculator:
 #  FONCTIONS UTILITAIRES PARTAGÉES
 # ============================================================
 
-@st.cache_data(ttl=300)  # 5 minutes — évite le spam Yahoo Finance
+@st.cache_data(ttl=120)  # 2 minutes
 def get_ticker_info(ticker):
+    """
+    Charge les infos d'un ticker avec 3 niveaux de fallback :
+    1. fast_info  (rapide, fiable pour le prix)
+    2. info       (complet mais instable sur Yahoo)
+    3. history    (dernier recours)
+    """
     try:
         t = yf.Ticker(ticker)
-        info = t.info or {}
-        # Compléter via fast_info si le prix est absent (API Yahoo instable)
-        if not any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
-            try:
-                fi = t.fast_info
-                price = getattr(fi, 'last_price', None) or getattr(fi, 'previous_close', None)
-                prev  = getattr(fi, 'previous_close', None)
-                if price:
-                    info['currentPrice']      = float(price)
-                    info['regularMarketPrice']= float(price)
-                if prev:
-                    info['previousClose']     = float(prev)
-            except Exception:
-                pass
-        # Dernier recours : history
-        if not any(k in info for k in ('currentPrice', 'regularMarketPrice')):
+        info = {}
+
+        # — Étape 1 : fast_info (toujours disponible, prix fiable) —
+        try:
+            fi = t.fast_info
+            price = getattr(fi, 'last_price', None)
+            prev  = getattr(fi, 'previous_close', None)
+            mktcap= getattr(fi, 'market_cap', None)
+            if price and float(price) > 0:
+                info['currentPrice']       = float(price)
+                info['regularMarketPrice'] = float(price)
+            if prev and float(prev) > 0:
+                info['previousClose']      = float(prev)
+                info['regularMarketPreviousClose'] = float(prev)
+            if mktcap:
+                info['marketCap'] = mktcap
+        except Exception:
+            pass
+
+        # — Étape 2 : info complet (fondamentaux, nom, secteur…) —
+        try:
+            full = t.info or {}
+            # Fusionner : fast_info prime pour le prix, info pour tout le reste
+            for k, v in full.items():
+                if k not in info or (k not in ('currentPrice','regularMarketPrice') and v):
+                    info[k] = v
+            # Si fast_info n'a pas donné de prix, prendre celui de info
+            if 'currentPrice' not in info:
+                p = full.get('currentPrice') or full.get('regularMarketPrice')
+                if p and float(p) > 0:
+                    info['currentPrice']       = float(p)
+                    info['regularMarketPrice'] = float(p)
+        except Exception:
+            pass
+
+        # — Étape 3 : history comme dernier recours prix —
+        if not any(k in info for k in ('currentPrice','regularMarketPrice')):
             try:
                 hist = t.history(period="5d")
                 if not hist.empty:
-                    info['currentPrice']      = float(hist['Close'].iloc[-1])
-                    info['regularMarketPrice']= float(hist['Close'].iloc[-1])
+                    p = float(hist['Close'].iloc[-1])
+                    info['currentPrice']       = p
+                    info['regularMarketPrice'] = p
             except Exception:
                 pass
+
         return info if info else None
     except Exception:
         return None
@@ -2197,7 +2226,7 @@ elif outil == "ANALYSEUR PRO":
 
     if info and any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
         nom = info.get('longName') or info.get('shortName') or ticker
-        prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+        prix = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose') or info.get('regularMarketPreviousClose') or 1
 
         if prix == 0 or prix is None:
             hist = get_ticker_history(ticker, "1d")
@@ -3483,7 +3512,7 @@ elif outil == "EXPERT SYSTEM":
 
             if info and any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
                 nom = info.get('longName', ticker)
-                prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                prix = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose') or info.get('regularMarketPreviousClose') or 1
                 if prix == 0 or prix is None:
                     hist = get_ticker_history(ticker, "1d")
                     if not hist.empty: prix = float(hist['Close'].iloc[-1])
@@ -4080,7 +4109,7 @@ elif outil == "SCREENER CAC 40":
                 info = get_ticker_info(t) or {}
                 if not info or 'currentPrice' not in info: continue
                 nom = info.get('shortName') or t
-                prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
+                prix = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose') or info.get('regularMarketPreviousClose') or 1
                 if prix == 0 or prix is None:
                     hist = get_ticker_history(t, "1d")
                     if not hist.empty: prix = float(hist['Close'].iloc[-1])
