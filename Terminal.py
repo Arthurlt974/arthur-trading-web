@@ -186,14 +186,19 @@ def _render_tool(tool_id: str, tool_name: str, tab_idx: int = 0):
 
     elif tool_id == "CHART_STOCK":
         from chart_module import render_chart
+        import chart_module.config as _cm_cfg
         c1, c2 = st.columns([3, 1])
         with c1:
             sym = st.text_input("Ticker", value="AAPL", key=f"tc_stock_{tool_id}_{tab_idx}", label_visibility="collapsed").upper()
         with c2:
             tf  = st.selectbox("TF", ["1h","1d","1wk"], index=1, key=f"tc_stf_{tool_id}_{tab_idx}", label_visibility="collapsed")
+        # Forcer yfinance pour les actions (Binance ne connaît pas AAPL, TSLA, etc.)
+        _prev_src = _cm_cfg.DATA_SOURCE
+        _cm_cfg.DATA_SOURCE = "yfinance"
         html = render_chart(symbol=sym, interval=tf, limit=200, height=640,
                             pair_label=sym, exchange="Yahoo Finance", show_ma=True
                             ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
+        _cm_cfg.DATA_SOURCE = _prev_src  # Restaurer pour les autres outils
         components.html(html, height=650, scrolling=False)
 
     elif tool_id == "BTC_DOMINANCE":
