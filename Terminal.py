@@ -185,25 +185,48 @@ def _render_tool(tool_id: str, tool_name: str, tab_idx: int = 0):
         components.html(html, height=650, scrolling=False)
 
     elif tool_id == "CHART_STOCK":
-        from chart_module import render_chart
-        import chart_module.config as _cm_cfg
-        c1, c2 = st.columns([3, 1])
+        c1, c2, c3 = st.columns([3, 1, 1])
         with c1:
             sym = st.text_input("Ticker", value="AAPL", key=f"tc_stock_{tool_id}_{tab_idx}", label_visibility="collapsed").upper()
         with c2:
-            tf  = st.selectbox("TF", ["1h","1d","1wk"], index=1, key=f"tc_stf_{tool_id}_{tab_idx}", label_visibility="collapsed")
-        # Forcer yfinance pour les actions (Binance ne connaît pas AAPL, TSLA, etc.)
-        _prev_src = _cm_cfg.DATA_SOURCE
-        _cm_cfg.DATA_SOURCE = "yfinance"
-        html = render_chart(symbol=sym, interval=tf, limit=200, height=640,
-                            pair_label=sym, exchange="Yahoo Finance", show_ma=True
-                            ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
-        _cm_cfg.DATA_SOURCE = _prev_src  # Restaurer pour les autres outils
-        components.html(html, height=650, scrolling=False)
+            tf_map = {"1m":"1","5m":"5","15m":"15","1h":"60","4h":"240","1J":"D","1S":"W","1M":"M"}
+            tf_label = st.selectbox("TF", list(tf_map.keys()), index=5, key=f"tc_stf_{tool_id}_{tab_idx}", label_visibility="collapsed")
+            tf = tf_map[tf_label]
+        with c3:
+            style_map = {"Chandeliers":"1","Barres":"0","Ligne":"2","Heikin Ashi":"8","Zone":"3"}
+            style_label = st.selectbox("Style", list(style_map.keys()), index=0, key=f"tc_sst_{tool_id}_{tab_idx}", label_visibility="collapsed")
+            chart_style = style_map[style_label]
+        tv_html = f"""
+        <div style="height:640px;border:1px solid #1a1a1a;border-radius:4px;overflow:hidden;">
+          <div class="tradingview-widget-container" style="height:100%;width:100%;">
+            <div class="tradingview-widget-container__widget" style="height:100%;width:100%;"></div>
+            <script type="text/javascript"
+              src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+            {{
+              "autosize": true,
+              "symbol": "{sym}",
+              "interval": "{tf}",
+              "timezone": "Europe/Paris",
+              "theme": "dark",
+              "style": "{chart_style}",
+              "locale": "fr",
+              "backgroundColor": "rgba(0,0,0,1)",
+              "gridColor": "rgba(26,26,26,1)",
+              "hide_top_toolbar": false,
+              "allow_symbol_change": true,
+              "save_image": false,
+              "studies": ["STD;RSI","STD;MACD","STD;Volume"],
+              "height": "640",
+              "width": "100%"
+            }}
+            </script>
+          </div>
+        </div>
+        """
+        components.html(tv_html, height=650, scrolling=False)
 
     elif tool_id == "BTC_DOMINANCE":
-        from chart_module import render_chart
-        st.markdown("### ₿ Bitcoin Dominance — BTC/USDT Proxy")
+        st.markdown("### ₿ Bitcoin Dominance")
         col1, col2, col3 = st.columns(3)
         try:
             r = requests.get("https://api.coingecko.com/api/v3/global", timeout=8)
@@ -213,10 +236,33 @@ def _render_tool(tool_id: str, tool_name: str, tab_idx: int = 0):
             col1.metric("BTC Dominance", "N/A")
         col2.info("💡 BTC.D ↑ + BTC ↑ = Altcoins souffrent")
         col3.info("💡 BTC.D ↓ + BTC stagne = Altseason")
-        html = render_chart(symbol="BTCUSDT", interval="1d", limit=200, height=580,
-                            pair_label="BTC/USDT · Dominance proxy", exchange="Binance · Spot"
-                            ) + f"<!-- btcd:{int(time.time()*1000)} -->"
-        components.html(html, height=590, scrolling=False)
+        # TradingView — BTC.D natif
+        btcd_html = """
+        <div style="height:580px;border:1px solid #1a1a1a;border-radius:4px;overflow:hidden;">
+          <div class="tradingview-widget-container" style="height:100%;width:100%;">
+            <div class="tradingview-widget-container__widget" style="height:100%;width:100%;"></div>
+            <script type="text/javascript"
+              src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+            {
+              "autosize": true,
+              "symbol": "CRYPTOCAP:BTC.D",
+              "interval": "D",
+              "timezone": "Europe/Paris",
+              "theme": "dark",
+              "style": "1",
+              "locale": "fr",
+              "backgroundColor": "rgba(0,0,0,1)",
+              "hide_top_toolbar": false,
+              "allow_symbol_change": false,
+              "save_image": false,
+              "height": "580",
+              "width": "100%"
+            }
+            </script>
+          </div>
+        </div>
+        """
+        components.html(btcd_html, height=590, scrolling=False)
 
     elif tool_id == "HEATMAP_LIQ":
         st.markdown("### 🔥 Liquidation Heatmap")
@@ -242,20 +288,45 @@ def _render_tool(tool_id: str, tool_name: str, tab_idx: int = 0):
         show_staking(tab_idx)
 
     elif tool_id == "MULTI_CHARTS":
-        from chart_module import render_chart
-        PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT"]
-        tf = st.selectbox("Timeframe global", ["1h","4h","1d"], index=2,
-                          key=f"mc_tf_terminal_{tab_idx}", label_visibility="collapsed")
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            mode_multi = st.selectbox("Mode", ["📈 Actions US", "💱 Forex Majeurs", "🏦 Indices Mondiaux", "🥇 Matières Premières"],
+                                      key=f"mc_mode_{tab_idx}", label_visibility="collapsed")
+        with c2:
+            tf_map_m = {"1h":"60","4h":"240","1J":"D","1S":"W"}
+            tf_label_m = st.selectbox("TF", list(tf_map_m.keys()), index=2,
+                                      key=f"mc_tf_terminal_{tab_idx}", label_visibility="collapsed")
+            tf_m = tf_map_m[tf_label_m]
+
+        MULTI_PRESETS = {
+            "📈 Actions US":          [("AAPL","Apple"),("NVDA","Nvidia"),("TSLA","Tesla"),("MSFT","Microsoft"),("AMZN","Amazon"),("META","Meta")],
+            "💱 Forex Majeurs":       [("FX:EURUSD","EUR/USD"),("FX:GBPUSD","GBP/USD"),("FX:USDJPY","USD/JPY"),("FX:USDCHF","USD/CHF"),("FX:AUDUSD","AUD/USD"),("FX:USDCAD","USD/CAD")],
+            "🏦 Indices Mondiaux":    [("SPY","S&P 500"),("QQQ","Nasdaq"),("TVC:DJI","Dow Jones"),("EURONEXT:CAC40","CAC 40"),("INDEX:DAX","DAX"),("TVC:NI225","Nikkei")],
+            "🥇 Matières Premières":  [("COMEX:GC1!","Or"),("NYMEX:CL1!","WTI"),("COMEX:SI1!","Argent"),("NYMEX:NG1!","Gaz Nat."),("CBOT:ZW1!","Blé"),("COMEX:HG1!","Cuivre")],
+        }
+        pairs_m = MULTI_PRESETS[mode_multi]
         cols_mc = st.columns(2)
-        for i, sym in enumerate(PAIRS):
+        for i, (sym_m, label_m) in enumerate(pairs_m):
             with cols_mc[i % 2]:
-                html = render_chart(symbol=sym, interval=tf, limit=100, height=320,
-                                    pair_label=sym.replace("USDT","/USDT"),
-                                    exchange="Binance", show_header=True,
-                                    show_volume=False, show_bottom=False,
-                                    show_ma=False
-                                    ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
-                components.html(html, height=330, scrolling=False)
+                mini_html = f"""
+                <div style="height:320px;border:1px solid #1a1a1a;border-radius:4px;overflow:hidden;margin-bottom:8px;">
+                  <div class="tradingview-widget-container" style="height:100%;width:100%;">
+                    <div class="tradingview-widget-container__widget" style="height:100%;width:100%;"></div>
+                    <script type="text/javascript"
+                      src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+                    {{
+                      "autosize": true, "symbol": "{sym_m}", "interval": "{tf_m}",
+                      "timezone": "Europe/Paris", "theme": "dark", "style": "1",
+                      "locale": "fr", "backgroundColor": "rgba(0,0,0,1)",
+                      "hide_top_toolbar": true, "hide_legend": false,
+                      "allow_symbol_change": false, "save_image": false,
+                      "height": "320", "width": "100%"
+                    }}
+                    </script>
+                  </div>
+                </div>
+                """
+                components.html(mini_html, height=330, scrolling=False)
 
     elif tool_id == "FEAR_GREED":
         st.markdown("### 😨 Fear & Greed Index")
