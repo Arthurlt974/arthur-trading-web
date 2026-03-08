@@ -352,13 +352,13 @@ def init_session_from_firebase():
 #  → Utilisables dans Terminal.py sans `import app as _app`
 # ══════════════════════════════════════════════════════════════
 
-def show_order_book_ui():
+def show_order_book_ui(tab_idx: int = 0):
     """Carnet d'ordres live Coinbase Pro."""
     st.markdown("### 📖 LIVE ORDER BOOK (COINBASE PRO)")
     st.info("Utilisation des serveurs Coinbase pour éviter les restrictions géographiques de Binance.")
     symbol = st.text_input("PAIRE CRYPTO (ex: BTC, ETH, SOL)", value="BTC",
-                           key="ob_symbol_utils").upper()
-    if st.button("🔄 SYNCHRONISER LE CARNET", key="ob_sync_utils"):
+                           key=f"ob_symbol_utils_{tab_idx}").upper()
+    if st.button("🔄 SYNCHRONISER LE CARNET", key=f"ob_sync_utils_{tab_idx}"):
         with st.spinner("Extraction des ordres en cours..."):
             data_result, error_msg = get_coinbase_order_book(symbol)
         if data_result:
@@ -388,7 +388,7 @@ def show_order_book_ui():
             st.error(f"Impossible de récupérer les données : {error_msg}")
 
 
-def show_onchain():
+def show_onchain(tab_idx: int = 0):
     """Module On-Chain Analytics (extrait de app.py)."""
     st.markdown("""
         <div style='text-align:center;padding:20px;background:linear-gradient(135deg,#1a1a1a,#0d0d0d);
@@ -402,10 +402,10 @@ def show_onchain():
 
     coins_map = {"Bitcoin (BTC)":"bitcoin","Ethereum (ETH)":"ethereum",
                  "Solana (SOL)":"solana","BNB":"binancecoin","XRP":"ripple"}
-    coin_label = st.selectbox("🪙 Sélectionner la crypto", list(coins_map.keys()), key="onchain_coin_utils")
+    coin_label = st.selectbox("🪙 Sélectionner la crypto", list(coins_map.keys()), key=f"onchain_coin_utils_{tab_idx}")
     coin_id    = coins_map[coin_label]
 
-    if st.button("🔍 CHARGER LES DONNÉES ON-CHAIN", key="load_onchain_utils"):
+    if st.button("🔍 CHARGER LES DONNÉES ON-CHAIN", key=f"load_onchain_utils_{tab_idx}"):
         with st.spinner("Chargement..."):
             details = get_coin_details(coin_id)
             chart30 = get_coin_market_chart(coin_id, days=30)
@@ -536,7 +536,7 @@ def show_onchain():
         c4.metric("Telegram Members",   f"{telegram/1e3:.0f}K"   if telegram   else "N/A")
 
 
-def show_liquidations():
+def show_liquidations(tab_idx: int = 0):
     """Module Liquidations & Funding Rate (extrait de app.py)."""
     st.markdown("""
         <div style='text-align:center;padding:20px;background:linear-gradient(135deg,#1a1a1a,#0d0d0d);
@@ -552,7 +552,7 @@ def show_liquidations():
 
     with tab1:
         st.markdown("### 💥 LIQUIDATIONS RÉCENTES")
-        if st.button("🔄 CHARGER LES LIQUIDATIONS", key="liq_load_utils"):
+        if st.button("🔄 CHARGER LES LIQUIDATIONS", key=f"liq_load_utils_{tab_idx}"):
             with st.spinner("Chargement..."):
                 liq_data = get_binance_liquidations()
             if liq_data:
@@ -586,7 +586,7 @@ def show_liquidations():
     with tab2:
         st.markdown("### 💰 TAUX DE FINANCEMENT")
         st.info("💡 Funding Rate positif = Les longs paient les shorts. Se paie toutes les 8h.")
-        if st.button("🔄 CHARGER LES FUNDING RATES", key="fr_load_utils"):
+        if st.button("🔄 CHARGER LES FUNDING RATES", key=f"fr_load_utils_{tab_idx}"):
             with st.spinner("Chargement..."):
                 fr_data, fr_source = get_binance_funding_rates()
             rows = []
@@ -617,7 +617,7 @@ def show_liquidations():
 
     with tab3:
         st.markdown("### 📊 OPEN INTEREST")
-        if st.button("📊 CHARGER L'OPEN INTEREST", key="oi_load_utils"):
+        if st.button("📊 CHARGER L'OPEN INTEREST", key=f"oi_load_utils_{tab_idx}"):
             with st.spinner("Chargement..."):
                 oi_list, oi_source = get_open_interest_data()
             if oi_list:
@@ -642,7 +642,7 @@ def show_liquidations():
                 st.plotly_chart(fig, use_container_width=True)
 
 
-def show_staking():
+def show_staking(tab_idx: int = 0):
     """Module Staking & Yield Tracker (extrait de app.py)."""
     st.markdown("""
         <div style='text-align:center;padding:20px;background:linear-gradient(135deg,#1a1a1a,#0d0d0d);
@@ -705,12 +705,12 @@ def show_staking():
         st.markdown("### 🧮 SIMULATEUR DE REVENUS PASSIFS")
         col_s1, col_s2 = st.columns(2)
         with col_s1:
-            capital    = st.number_input("💰 Capital initial ($)", value=10000, step=500, key="sim_cap_utils")
-            apy_input  = st.slider("📈 APY estimé (%)", 1.0, 50.0, 8.0, 0.5, key="sim_apy_utils")
-            duree_ans  = st.slider("⏱️ Durée (années)", 1, 10, 3, key="sim_dur_utils")
+            capital    = st.number_input("💰 Capital initial ($)", value=10000, step=500, key=f"sim_cap_utils_{tab_idx}")
+            apy_input  = st.slider("📈 APY estimé (%)", 1.0, 50.0, 8.0, 0.5, key=f"sim_apy_utils_{tab_idx}")
+            duree_ans  = st.slider("⏱️ Durée (années)", 1, 10, 3, key=f"sim_dur_utils_{tab_idx}")
         with col_s2:
-            compound   = st.checkbox("♻️ Réinvestissement des gains", value=True, key="sim_comp_utils")
-            apport_mois= st.number_input("➕ Apport mensuel ($)", value=0, step=100, key="sim_ap_utils")
+            compound   = st.checkbox("♻️ Réinvestissement des gains", value=True, key=f"sim_comp_utils_{tab_idx}")
+            apport_mois= st.number_input("➕ Apport mensuel ($)", value=0, step=100, key=f"sim_ap_utils_{tab_idx}")
 
         apy_f    = float(apy_input) / 100
         mois_tot = duree_ans * 12
