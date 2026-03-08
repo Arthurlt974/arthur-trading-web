@@ -1445,45 +1445,48 @@ def _fmp_to_info(ticker: str) -> dict:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
-    """Récupère les infos — FMP en priorité, yfinance en fallback."""
-    # ── PRIORITÉ 1 : FMP (fiable sur Streamlit Cloud) ──
-    if _fmp_key():
-        info = _fmp_to_info(ticker)
-        if info.get('currentPrice'):
-            return info
-
-    # ── PRIORITÉ 2 : yfinance fast_info (léger) ──
-    import requests as _req
+    """Récupère les infos — yfinance avec curl_cffi pour contourner le blocage Yahoo."""
     info = {}
+
+    # ── curl_cffi : contourne le blocage Yahoo sur Streamlit Cloud ──
     try:
-        t = yf.Ticker(ticker)
-        fi = t.fast_info
-        for attr, key in [
-            ('last_price',      'currentPrice'),
-            ('previous_close',  'previousClose'),
-            ('market_cap',      'marketCap'),
-            ('shares',          'sharesOutstanding'),
-            ('currency',        'currency'),
-            ('fifty_day_average',       'fiftyDayAverage'),
-            ('two_hundred_day_average', 'twoHundredDayAverage'),
-        ]:
-            val = getattr(fi, attr, None)
-            if val: info[key] = float(val) if attr != 'currency' else val
-        if info.get('currentPrice'):
-            info['regularMarketPrice'] = info['currentPrice']
+        from curl_cffi.requests import Session as CurlSession
+        with CurlSession(impersonate="chrome") as s:
+            t = yf.Ticker(ticker, session=s)
+            full = t.info or {}
+            if len(full) > 10:
+                for k, v in full.items():
+                    if v not in (None, '', 0):
+                        info[k] = v
     except Exception: pass
 
-    # ── PRIORITÉ 3 : yfinance .info ──
-    try:
-        s = _req.Session()
-        s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"})
-        full = yf.Ticker(ticker, session=s).info or {}
-        for k, v in full.items():
-            if v not in (None, '', 0) and k not in info:
-                info[k] = v
-    except Exception: pass
+    # ── Fallback : yfinance standard ──
+    if not info.get('currentPrice'):
+        try:
+            t = yf.Ticker(ticker)
+            fi = t.fast_info
+            for attr, key in [
+                ('last_price',      'currentPrice'),
+                ('previous_close',  'previousClose'),
+                ('market_cap',      'marketCap'),
+                ('shares',          'sharesOutstanding'),
+                ('currency',        'currency'),
+                ('fifty_day_average',        'fiftyDayAverage'),
+                ('two_hundred_day_average',  'twoHundredDayAverage'),
+            ]:
+                val = getattr(fi, attr, None)
+                if val: info[key] = float(val) if attr != 'currency' else val
+            if info.get('currentPrice'):
+                info['regularMarketPrice'] = info['currentPrice']
+            # Tenter .info si fast_info insuffisant
+            if len(info) < 5:
+                full2 = t.info or {}
+                for k, v in full2.items():
+                    if v not in (None, '', 0) and k not in info:
+                        info[k] = v
+        except Exception: pass
 
-    # ── PRIORITÉ 4 : historique pour le prix minimum ──
+    # ── Dernier recours : historique pour le prix ──
     if not info.get('currentPrice'):
         try:
             hist = yf.Ticker(ticker).history(period="5d")
@@ -1496,6 +1499,8 @@ def get_ticker_info(ticker):
     # Defaults
     if not info.get('previousClose') and info.get('currentPrice'):
         info['previousClose'] = info['currentPrice']
+    if not info.get('regularMarketPrice') and info.get('currentPrice'):
+        info['regularMarketPrice'] = info['currentPrice']
     if not info.get('currency'):
         info['currency'] = 'USD' if '.' not in ticker else 'EUR'
     if not info.get('longName') and not info.get('shortName'):
