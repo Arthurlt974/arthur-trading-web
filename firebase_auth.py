@@ -314,17 +314,6 @@ def render_auth_page() -> bool:
         </div>
     """, unsafe_allow_html=True)
 
-    # ── Code d'accès global ──
-    with st.expander("🔐 CODE D'ACCÈS TERMINAL", expanded=True):
-        access_code = st.text_input("CODE D'ACCÈS GLOBAL", type="password", key="access_code_input",
-                                    placeholder="Code fourni par l'administrateur")
-        if access_code and access_code != "AM2026":
-            st.error("!! CODE INVALIDE")
-            return False
-        if not access_code:
-            st.info("Entrez le code d'accès global pour accéder à l'authentification.")
-            return False
-
     st.markdown("---")
 
     # ══════════════════════════════════════════
@@ -529,6 +518,29 @@ def render_user_sidebar():
             _save_current_session_config()
             _clear_session()
             st.rerun()
+
+    # ── Disclaimer légal ──
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("""
+<div style='
+    background: rgba(255,152,0,0.05);
+    border: 1px solid rgba(255,152,0,0.2);
+    border-radius: 6px;
+    padding: 10px;
+    font-family: monospace;
+'>
+<p style='color:#888; font-size:10px; margin:0 0 4px 0; text-transform:uppercase; letter-spacing:1px;'>
+⚠️ Avertissement légal
+</p>
+<p style='color:#666; font-size:10px; margin:0; line-height:1.5;'>
+AM-Trading est un outil <b style='color:#888;'>éducatif et informatif</b> uniquement.<br>
+Les données affichées ne constituent pas un conseil en investissement.<br>
+Tout investissement comporte un <b style='color:#888;'>risque de perte en capital</b>.<br><br>
+Les données proviennent de sources publiques (Yahoo Finance, CoinGecko, Binance).<br><br>
+<span style='color:#555;'>© 2026 AM-Trading · Usage non commercial</span>
+</p>
+</div>
+""", unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════
