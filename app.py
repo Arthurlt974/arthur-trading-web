@@ -22,7 +22,6 @@ import interface_matieres_premieres
 import interface_analyse_perso
 import interface_portfolio
 import interface_alertes
-import export_pdf
 import interface_screener
 import Terminal as terminal_module
 from utils import (
@@ -2516,12 +2515,7 @@ elif outil == "ANALYSEUR PRO":
     else:
         st.error(f"⚠️ IMPOSSIBLE DE CHARGER LES DONNÉES POUR {ticker}")
 
-    # ── Export PDF ──
-    if info and valuation_results:
-        st.markdown("---")
-        _c1, _c2, _c3 = st.columns([1,1,2])
-        with _c1:
-            export_pdf.download_button_analyse(ticker, info, valuation_results, key="pdf_analyseur_pro")
+
 
 
 # ==========================================
