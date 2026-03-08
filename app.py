@@ -2050,11 +2050,18 @@ if "triggered_alerts" not in st.session_state:
     st.session_state.triggered_alerts = []
 
 @st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def _get_marquee_prices(watchlist_tuple):
     result = []
     for tkr in watchlist_tuple:
         try:
-            fi = yf.Ticker(tkr).fast_info
+            # curl_cffi pour contourner le blocage Yahoo
+            try:
+                from curl_cffi.requests import Session as CurlSession
+                with CurlSession(impersonate="chrome") as s:
+                    fi = yf.Ticker(tkr, session=s).fast_info
+            except Exception:
+                fi = yf.Ticker(tkr).fast_info
             price = float(getattr(fi, 'last_price', None) or 0)
             prev  = float(getattr(fi, 'previous_close', None) or 0)
             if price > 0 and prev > 0:
