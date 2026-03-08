@@ -1312,9 +1312,8 @@ def _fmp_key():
     except Exception:
         return ""
 
-@st.cache_data(ttl=300, show_spinner=False)
 def _fmp_get(endpoint: str, params: dict = None) -> dict | list:
-    """Appel générique FMP avec cache."""
+    """Appel FMP — pas de cache ici, le cache est sur _fmp_to_info."""
     key = _fmp_key()
     if not key:
         return {}
@@ -1324,10 +1323,15 @@ def _fmp_get(endpoint: str, params: dict = None) -> dict | list:
     try:
         r = requests.get(f"{base}{endpoint}", params=p, timeout=10)
         r.raise_for_status()
-        return r.json()
+        data = r.json()
+        # FMP retourne parfois {"Error Message": "..."} 
+        if isinstance(data, dict) and data.get("Error Message"):
+            return {}
+        return data
     except Exception:
         return {}
 
+@st.cache_data(ttl=300, show_spinner=False)
 def _fmp_to_info(ticker: str) -> dict:
     """Convertit les données FMP au format dict compatible yfinance.
     Utilise uniquement des endpoints GRATUITS FMP."""
