@@ -16,6 +16,9 @@ from utils import (
 # ══════════════════════════════════════════════════════════
 
 TOOLS_CATALOG = {
+    # ── PORTFOLIO ──
+    "💼 Portfolio Tracker":        {"cat": "PORTFOLIO",    "id": "PORTFOLIO"},
+
     # ── GRAPHIQUES ──
     "📈 Graphique Crypto":         {"cat": "GRAPHIQUES",   "id": "CHART_CRYPTO"},
     "📊 Graphique Actions":        {"cat": "GRAPHIQUES",   "id": "CHART_STOCK"},
@@ -166,7 +169,11 @@ def _render_tool(tool_id: str, tool_name: str, tab_idx: int = 0):
     import requests
     import numpy as np
 
-    if tool_id == "CHART_CRYPTO":
+    if tool_id == "PORTFOLIO":
+        from interface_portfolio import show_portfolio
+        show_portfolio()
+
+    elif tool_id == "CHART_CRYPTO":
         from chart_module import render_chart
         CRYPTOS = {
             "BTC/USDT": "BTCUSDT", "ETH/USDT": "ETHUSDT", "SOL/USDT": "SOLUSDT",
@@ -542,7 +549,8 @@ def show_terminal():
     # ── Session state ──
     if "term_tabs" not in st.session_state:
         st.session_state.term_tabs = [
-            {"id": "CHART_CRYPTO", "name": "📈 Graphique Crypto", "key": "tab_0"},
+            {"id": "PORTFOLIO",    "name": "💼 Portfolio Tracker", "key": "tab_0"},
+            {"id": "CHART_CRYPTO", "name": "📈 Graphique Crypto",  "key": "tab_1"},
         ]
     if "term_active" not in st.session_state:
         st.session_state.term_active = 0
@@ -612,7 +620,7 @@ def show_terminal():
             tabs.pop(i)
             st.session_state.term_active = max(0, active - 1)
             if not tabs:
-                tabs.append({"id": "CHART_CRYPTO", "name": "📈 Graphique Crypto", "key": "tab_home"})
+                tabs.append({"id": "PORTFOLIO", "name": "💼 Portfolio Tracker", "key": "tab_home"})
             st.session_state.term_tabs = tabs
             st.rerun()
 
