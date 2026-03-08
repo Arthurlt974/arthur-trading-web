@@ -65,7 +65,7 @@ def _fetch_ticker(symbol: str) -> dict | None:
         t  = yf.Ticker(symbol)
 
         # Priorité : history pour le prix (plus fiable que fast_info sur Streamlit Cloud)
-        hist = t.history(period="3mo", progress=False, auto_adjust=True)
+        hist = t.history(period="3mo", auto_adjust=True)
         if hist.empty or len(hist) < 5:
             return None
         if isinstance(hist.columns, pd.MultiIndex):
@@ -328,7 +328,7 @@ def show_screener():
                     try:
                         import yfinance as _yf
                         _t = _yf.Ticker(test_sym)
-                        _h = _t.history(period="5d", progress=False)
+                        _h = _t.history(period="5d")
                         if _h.empty:
                             st.error(f"❌ {test_sym} : history() retourne vide — Yahoo Finance bloque les requêtes depuis Streamlit Cloud")
                             st.info("💡 Solution : ajouter `yfinance>=0.2.36` dans requirements.txt")
