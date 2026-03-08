@@ -776,6 +776,13 @@ def show_portfolio():
     # ── Chargement ──
     positions = _load_portfolio()
 
+    # ── Bouton export PDF ──
+    col_exp1, col_exp2, col_exp3 = st.columns([1,1,2])
+    with col_exp1:
+        import export_pdf as _epdf
+        positions_for_pdf = st.session_state.get("positions_computed", [])
+        _epdf.download_button_portfolio(positions_for_pdf, key="pdf_portfolio_main")
+
     # ── Onglets ──
     tab_vue, tab_analyse, tab_historique, tab_ajouter = st.tabs([
         "📊 VUE D'ENSEMBLE",
