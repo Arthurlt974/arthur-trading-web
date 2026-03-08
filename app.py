@@ -20,6 +20,7 @@ import interface_economie
 import interface_forex
 import interface_matieres_premieres
 import interface_analyse_perso
+import interface_portfolio
 import Terminal as terminal_module
 from utils import (
     save_watchlist_firebase, load_watchlist_firebase,
@@ -1691,12 +1692,16 @@ st_autorefresh(interval=600000, key="global_refresh")
 
 st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "TERMINAL", "MON ESPACE ANALYSE", "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
+    "TERMINAL", "💼 PORTFOLIO", "MON ESPACE ANALYSE", "MARCHÉ CRYPTO", "ACTIONS & BOURSE", "BOITE À OUTILS", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "INTERFACE PRO", "INTERFACE CRYPTO PRO"
 ])
 st.sidebar.markdown("---")
 
 if categorie == "TERMINAL":
     terminal_module.show_terminal()
+    st.stop()
+
+if categorie == "💼 PORTFOLIO":
+    interface_portfolio.show_portfolio()
     st.stop()
 
 if categorie == "MON ESPACE ANALYSE":
