@@ -45,13 +45,61 @@ CURRENCY_FLAGS = {
     "BRL": "🇧🇷", "SGD": "🇸🇬", "HKD": "🇭🇰",
 }
 
-# Taux d'intérêt pour carry trade
-INTEREST_RATES = {
-    "USD": 5.50, "EUR": 4.50, "GBP": 5.25, "JPY": 0.10,
-    "CHF": 1.75, "AUD": 4.35, "CAD": 5.00, "NZD": 5.50,
-    "CNY": 3.45, "TRY": 42.50, "MXN": 11.25, "ZAR": 8.25,
-    "BRL": 11.75, "SGD": 3.68, "HKD": 5.75,
+# Taux directeurs — fallback mars 2026 (sources officielles banques centrales)
+_INTEREST_RATES_FALLBACK = {
+    "USD": 4.50,  # FED — mars 2026
+    "EUR": 2.65,  # BCE — mars 2026
+    "GBP": 4.50,  # BOE — mars 2026
+    "JPY": 0.50,  # BOJ — mars 2026
+    "CHF": 0.50,  # BNS — mars 2026
+    "AUD": 4.10,  # RBA — mars 2026
+    "CAD": 3.00,  # BOC — mars 2026
+    "NZD": 3.75,  # RBNZ — mars 2026
+    "CNY": 3.10,  # PBOC — mars 2026
+    "TRY": 42.50, "MXN": 9.50, "ZAR": 7.50,
+    "BRL": 14.75, "SGD": 3.50, "HKD": 4.75,
 }
+
+@st.cache_data(ttl=3600)
+def get_interest_rates() -> dict:
+    """
+    Taux directeurs en temps réel via FRED (FED, BCE) + fallback officiel.
+    Refresh toutes les heures.
+    """
+    rates = dict(_INTEREST_RATES_FALLBACK)
+    try:
+        # FED — FRED FEDFUNDS (CSV sans clé)
+        r = requests.get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=FEDFUNDS",
+                         timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            lines = [l for l in r.text.strip().split("\n") if l and not l.startswith("DATE")]
+            for line in reversed(lines):
+                parts = line.split(",")
+                if len(parts) == 2 and parts[1].strip() not in ("", "."):
+                    rates["USD"] = round(float(parts[1].strip()), 2)
+                    break
+    except Exception:
+        pass
+    try:
+        # BCE — MRR
+        r = requests.get(
+            "https://data-api.ecb.europa.eu/service/data/FM/B.U2.EUR.4F.KR.MRR_FR.LEV"
+            "?format=csvdata&lastNObservations=1",
+            timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            for line in reversed(r.text.strip().split("\n")):
+                if line and not line.startswith("KEY") and "," in line:
+                    parts = line.split(",")
+                    val = float(parts[-1].strip())
+                    if val > 0.1:  # guard zéro
+                        rates["EUR"] = round(val, 2)
+                    break
+    except Exception:
+        pass
+    return rates
+
+# Variable globale mise en cache (chargée une seule fois par session)
+INTEREST_RATES = _INTEREST_RATES_FALLBACK  # sera rafraîchi via get_interest_rates()
 
 CURRENCY_NAMES = {
     "USD": "Dollar Américain", "EUR": "Euro", "GBP": "Livre Sterling",
