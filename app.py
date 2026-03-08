@@ -1295,9 +1295,32 @@ class ValuationCalculator:
 @st.cache_data(ttl=300)  # 5 minutes — évite le spam Yahoo Finance
 def get_ticker_info(ticker):
     try:
-        data = yf.Ticker(ticker)
-        return data.info
-    except:
+        t = yf.Ticker(ticker)
+        info = t.info or {}
+        # Compléter via fast_info si le prix est absent (API Yahoo instable)
+        if not any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
+            try:
+                fi = t.fast_info
+                price = getattr(fi, 'last_price', None) or getattr(fi, 'previous_close', None)
+                prev  = getattr(fi, 'previous_close', None)
+                if price:
+                    info['currentPrice']      = float(price)
+                    info['regularMarketPrice']= float(price)
+                if prev:
+                    info['previousClose']     = float(prev)
+            except Exception:
+                pass
+        # Dernier recours : history
+        if not any(k in info for k in ('currentPrice', 'regularMarketPrice')):
+            try:
+                hist = t.history(period="5d")
+                if not hist.empty:
+                    info['currentPrice']      = float(hist['Close'].iloc[-1])
+                    info['regularMarketPrice']= float(hist['Close'].iloc[-1])
+            except Exception:
+                pass
+        return info if info else None
+    except Exception:
         return None
 
 @st.cache_data(ttl=300)
@@ -2172,7 +2195,7 @@ elif outil == "ANALYSEUR PRO":
     ticker = trouver_ticker(nom_entree)
     info = get_ticker_info(ticker)
 
-    if info and ('currentPrice' in info or 'regularMarketPrice' in info):
+    if info and any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
         nom = info.get('longName') or info.get('shortName') or ticker
         prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
 
@@ -3458,7 +3481,7 @@ elif outil == "EXPERT SYSTEM":
             ticker = trouver_ticker(nom_entree)
             info = get_ticker_info(ticker) or {}
 
-            if info and ('currentPrice' in info or 'regularMarketPrice' in info):
+            if info and any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
                 nom = info.get('longName', ticker)
                 prix = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                 if prix == 0 or prix is None:
@@ -3549,7 +3572,7 @@ elif outil == "THE GRAND COUNCIL️":
                 ticker = trouver_ticker(nom_entree)
                 info = get_ticker_info(ticker) or {}
 
-                if info and ('currentPrice' in info or 'regularMarketPrice' in info):
+                if info and any(k in info for k in ('currentPrice', 'regularMarketPrice', 'previousClose')):
                     p = info.get('currentPrice') or info.get('regularMarketPrice') or 1
                     if p == 0 or p is None or p < 0.01:
                         hist = get_ticker_history(ticker, "5d")
