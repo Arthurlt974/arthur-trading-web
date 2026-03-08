@@ -1445,32 +1445,32 @@ def _fmp_to_info(ticker: str) -> dict:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
-    """Récupère les infos — 4 méthodes en cascade."""
+    """Récupère les infos — yfinance avec curl_cffi pour contourner le blocage Yahoo."""
     info = {}
 
-    # ── MÉTHODE 1 : curl_cffi (meilleur sur Streamlit Cloud) ──
+    # ── curl_cffi : contourne le blocage Yahoo sur Streamlit Cloud ──
     try:
         from curl_cffi.requests import Session as CurlSession
         with CurlSession(impersonate="chrome") as s:
-            full = yf.Ticker(ticker, session=s).info or {}
+            t = yf.Ticker(ticker, session=s)
+            full = t.info or {}
             if len(full) > 10:
                 for k, v in full.items():
                     if v not in (None, '', 0):
                         info[k] = v
-    except Exception:
-        pass
+    except Exception: pass
 
-    # ── MÉTHODE 2 : yfinance fast_info (léger, souvent non bloqué) ──
+    # ── Fallback : yfinance standard ──
     if not info.get('currentPrice'):
         try:
             t = yf.Ticker(ticker)
             fi = t.fast_info
             for attr, key in [
-                ('last_price',               'currentPrice'),
-                ('previous_close',           'previousClose'),
-                ('market_cap',               'marketCap'),
-                ('shares',                   'sharesOutstanding'),
-                ('currency',                 'currency'),
+                ('last_price',      'currentPrice'),
+                ('previous_close',  'previousClose'),
+                ('market_cap',      'marketCap'),
+                ('shares',          'sharesOutstanding'),
+                ('currency',        'currency'),
                 ('fifty_day_average',        'fiftyDayAverage'),
                 ('two_hundred_day_average',  'twoHundredDayAverage'),
             ]:
@@ -1478,43 +1478,15 @@ def get_ticker_info(ticker):
                 if val: info[key] = float(val) if attr != 'currency' else val
             if info.get('currentPrice'):
                 info['regularMarketPrice'] = info['currentPrice']
-        except Exception:
-            pass
-
-    # ── MÉTHODE 3 : yfinance .info standard ──
-    if not info.get('trailingPE') and not info.get('trailingEps'):
-        try:
-            full2 = yf.Ticker(ticker).info or {}
-            if len(full2) > 10:
+            # Tenter .info si fast_info insuffisant
+            if len(info) < 5:
+                full2 = t.info or {}
                 for k, v in full2.items():
                     if v not in (None, '', 0) and k not in info:
                         info[k] = v
-        except Exception:
-            pass
+        except Exception: pass
 
-    # ── MÉTHODE 4 : Yahoo v8 pour le prix minimum ──
-    if not info.get('currentPrice'):
-        try:
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"}
-            r = requests.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
-                params={"interval": "1d", "range": "2d"},
-                headers=headers, timeout=8
-            )
-            if r.status_code == 200:
-                meta = r.json()["chart"]["result"][0]["meta"]
-                info['currentPrice']    = info['regularMarketPrice'] = float(meta.get("regularMarketPrice", 0))
-                info['previousClose']   = float(meta.get("previousClose", 0) or meta.get("chartPreviousClose", 0))
-                info['currency']        = meta.get("currency", "USD")
-                info['shortName']       = meta.get("shortName", ticker)
-                if not info.get('fiftyDayAverage'):
-                    info['fiftyDayAverage']        = float(meta.get("fiftyDayAverage", 0) or 0)
-                if not info.get('twoHundredDayAverage'):
-                    info['twoHundredDayAverage']   = float(meta.get("twoHundredDayAverage", 0) or 0)
-        except Exception:
-            pass
-
-    # ── MÉTHODE 5 : historique yfinance ──
+    # ── Dernier recours : historique pour le prix ──
     if not info.get('currentPrice'):
         try:
             hist = yf.Ticker(ticker).history(period="5d")
@@ -1522,10 +1494,9 @@ def get_ticker_info(ticker):
                 info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
                 if len(hist) > 1:
                     info['previousClose'] = float(hist['Close'].iloc[-2])
-        except Exception:
-            pass
+        except Exception: pass
 
-    # ── Defaults ──
+    # Defaults
     if not info.get('previousClose') and info.get('currentPrice'):
         info['previousClose'] = info['currentPrice']
     if not info.get('regularMarketPrice') and info.get('currentPrice'):
@@ -2079,45 +2050,16 @@ if "triggered_alerts" not in st.session_state:
     st.session_state.triggered_alerts = []
 
 @st.cache_data(ttl=60, show_spinner=False)
-@st.cache_data(ttl=60, show_spinner=False)
 def _get_marquee_prices(watchlist_tuple):
-    """Récupère les prix pour le marquee — multi-sources robuste."""
     result = []
     for tkr in watchlist_tuple:
-        price, prev = 0.0, 0.0
         try:
-            # ── Crypto : Binance direct (jamais bloqué) ──
-            if tkr.endswith("-USD") or tkr.endswith("USDT"):
-                sym = tkr.replace("-USD", "USDT").replace("-", "")
-                r1 = requests.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}", timeout=5)
-                if r1.status_code == 200:
-                    d = r1.json()
-                    price = float(d.get("lastPrice", 0))
-                    prev  = float(d.get("prevClosePrice", 0))
-
-            # ── Actions : Yahoo Finance v8 (endpoint léger) ──
-            if price == 0:
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"}
-                r2 = requests.get(
-                    f"https://query1.finance.yahoo.com/v8/finance/chart/{tkr}",
-                    params={"interval": "1d", "range": "2d"},
-                    headers=headers, timeout=8
-                )
-                if r2.status_code == 200:
-                    data = r2.json()
-                    meta = data["chart"]["result"][0]["meta"]
-                    price = float(meta.get("regularMarketPrice", 0))
-                    prev  = float(meta.get("previousClose", 0) or meta.get("chartPreviousClose", 0))
-
-            # ── Fallback : yfinance fast_info ──
-            if price == 0:
-                fi = yf.Ticker(tkr).fast_info
-                price = float(getattr(fi, "last_price", 0) or 0)
-                prev  = float(getattr(fi, "previous_close", 0) or 0)
-
+            fi = yf.Ticker(tkr).fast_info
+            price = float(getattr(fi, 'last_price', None) or 0)
+            prev  = float(getattr(fi, 'previous_close', None) or 0)
             if price > 0 and prev > 0:
                 result.append((tkr, price, prev))
-        except Exception:
+        except:
             continue
     return result
 
