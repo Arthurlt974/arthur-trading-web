@@ -1329,16 +1329,41 @@ def _fmp_get(endpoint: str, params: dict = None) -> dict | list:
         return {}
 
 def _fmp_to_info(ticker: str) -> dict:
-    """Convertit les données FMP au format dict compatible yfinance."""
+    """Convertit les données FMP au format dict compatible yfinance.
+    Utilise uniquement des endpoints GRATUITS FMP."""
     info = {}
 
-    # ── Profil + prix ──
+    # ── 1. Quote (gratuit) — prix + variation + stats marché ──
+    quote = _fmp_get(f"/v3/quote/{ticker}")
+    if isinstance(quote, list) and quote:
+        q = quote[0]
+        price = q.get('price', 0)
+        if not price: return {}
+        info['currentPrice']               = info['regularMarketPrice'] = float(price)
+        info['previousClose']              = float(q.get('previousClose', price))
+        info['regularMarketChangePercent'] = q.get('changesPercentage', 0)
+        info['dayHigh']                    = q.get('dayHigh', 0)
+        info['dayLow']                     = q.get('dayLow', 0)
+        info['volume']                     = q.get('volume', 0)
+        info['averageVolume']              = q.get('avgVolume', 0)
+        info['fiftyTwoWeekHigh']           = q.get('yearHigh', 0)
+        info['fiftyTwoWeekLow']            = q.get('yearLow', 0)
+        info['fiftyDayAverage']            = q.get('priceAvg50', 0)
+        info['twoHundredDayAverage']       = q.get('priceAvg200', 0)
+        info['marketCap']                  = q.get('marketCap', 0)
+        info['sharesOutstanding']          = q.get('sharesOutstanding', 0)
+        info['dividendRate']               = q.get('lastDiv', 0) or 0
+        info['trailingAnnualDividendRate'] = q.get('lastDiv', 0) or 0
+        info['trailingPE']                 = q.get('pe', 0) or 0
+        info['eps']                        = q.get('eps', 0) or 0
+        info['trailingEps']                = q.get('eps', 0) or 0
+    else:
+        return {}
+
+    # ── 2. Profil (gratuit) — nom, secteur, description ──
     profile = _fmp_get(f"/v3/profile/{ticker}")
     if isinstance(profile, list) and profile:
         p = profile[0]
-        info['currentPrice']        = info['regularMarketPrice'] = p.get('price', 0)
-        info['previousClose']       = p.get('lastDiv', 0) or p.get('price', 0)
-        info['marketCap']           = p.get('mktCap', 0)
         info['longName']            = p.get('companyName', ticker)
         info['shortName']           = p.get('companyName', ticker)
         info['sector']              = p.get('sector', 'N/A')
@@ -1348,68 +1373,69 @@ def _fmp_to_info(ticker: str) -> dict:
         info['website']             = p.get('website', '')
         info['longBusinessSummary'] = p.get('description', '')
         info['country']             = p.get('country', '')
-        info['employees']           = p.get('fullTimeEmployees', 0)
-        info['beta']                = p.get('beta', 0)
+        info['beta']                = p.get('beta', 0) or 0
         info['ipoDate']             = p.get('ipoDate', '')
+        if p.get('lastDiv'): info['dividendRate'] = float(p['lastDiv'])
+        if info['currentPrice'] and p.get('lastDiv'):
+            info['dividendYield'] = float(p['lastDiv']) / info['currentPrice']
 
-    # ── Ratios clés ──
-    ratios = _fmp_get(f"/v3/ratios-ttm/{ticker}")
+    # ── 3. Ratios annuels (gratuit — /v3/ratios, pas TTM) ──
+    ratios = _fmp_get(f"/v3/ratios/{ticker}", {"limit": 1})
     if isinstance(ratios, list) and ratios:
         r = ratios[0]
-        info['trailingPE']          = r.get('peRatioTTM', 0) or 0
-        info['forwardPE']           = r.get('priceEarningsRatioTTM', 0) or 0
-        info['priceToBook']         = r.get('priceToBookRatioTTM', 0) or 0
-        info['priceToSalesTrailing12Months'] = r.get('priceToSalesRatioTTM', 0) or 0
-        info['returnOnEquity']      = r.get('returnOnEquityTTM', 0) or 0
-        info['returnOnAssets']      = r.get('returnOnAssetsTTM', 0) or 0
-        info['profitMargins']       = r.get('netProfitMarginTTM', 0) or 0
-        info['operatingMargins']    = r.get('operatingProfitMarginTTM', 0) or 0
-        info['debtToEquity']        = r.get('debtEquityRatioTTM', 0) or 0
-        info['currentRatio']        = r.get('currentRatioTTM', 0) or 0
-        info['quickRatio']          = r.get('quickRatioTTM', 0) or 0
-        info['dividendYield']       = r.get('dividendYieldTTM', 0) or 0
-        info['payoutRatio']         = r.get('payoutRatioTTM', 0) or 0
-        info['revenueGrowth']       = r.get('revenueGrowthTTM', 0) or 0
-        info['earningsGrowth']      = r.get('epsgrowthTTM', 0) or 0
+        if not info.get('trailingPE') or info['trailingPE'] == 0:
+            info['trailingPE']      = r.get('priceEarningsRatio', 0) or 0
+        info['priceToBook']         = r.get('priceToBookRatio', 0) or 0
+        info['priceToSalesTrailing12Months'] = r.get('priceToSalesRatio', 0) or 0
+        info['returnOnEquity']      = r.get('returnOnEquity', 0) or 0
+        info['returnOnAssets']      = r.get('returnOnAssets', 0) or 0
+        info['profitMargins']       = r.get('netProfitMargin', 0) or 0
+        info['operatingMargins']    = r.get('operatingProfitMargin', 0) or 0
+        info['debtToEquity']        = r.get('debtEquityRatio', 0) or 0
+        info['currentRatio']        = r.get('currentRatio', 0) or 0
+        info['quickRatio']          = r.get('quickRatio', 0) or 0
+        if not info.get('dividendYield'):
+            info['dividendYield']   = r.get('dividendYield', 0) or 0
+        info['payoutRatio']         = r.get('dividendPayoutRatio', 0) or 0
 
-    # ── Données financières clés ──
-    key_metrics = _fmp_get(f"/v3/key-metrics-ttm/{ticker}")
+    # ── 4. Key metrics annuels (gratuit — /v3/key-metrics, pas TTM) ──
+    key_metrics = _fmp_get(f"/v3/key-metrics/{ticker}", {"limit": 1})
     if isinstance(key_metrics, list) and key_metrics:
         km = key_metrics[0]
-        info['bookValue']           = km.get('bookValuePerShareTTM', 0) or 0
-        info['trailingEps']         = km.get('netIncomePerShareTTM', 0) or 0
-        info['forwardEps']          = km.get('netIncomePerShareTTM', 0) or 0
-        info['freeCashflow']        = km.get('freeCashFlowPerShareTTM', 0) or 0
-        info['totalCashPerShare']   = km.get('cashPerShareTTM', 0) or 0
-        info['enterpriseValue']     = km.get('enterpriseValueTTM', 0) or 0
-        info['sharesOutstanding']   = km.get('weightedAverageSharesOutTTM', 0) or 0
+        info['bookValue']           = km.get('bookValuePerShare', 0) or 0
+        if not info.get('trailingEps') or info['trailingEps'] == 0:
+            info['trailingEps']     = km.get('netIncomePerShare', 0) or 0
+        info['forwardEps']          = km.get('netIncomePerShare', 0) or 0
+        info['totalCashPerShare']   = km.get('cashPerShare', 0) or 0
+        info['enterpriseValue']     = km.get('enterpriseValue', 0) or 0
+        if km.get('revenueGrowth'):
+            info['revenueGrowth']   = km['revenueGrowth']
 
-    # ── Bilan pour dette/cash ──
+    # ── 5. Bilan (gratuit) — dette/cash totaux ──
     balance = _fmp_get(f"/v3/balance-sheet-statement/{ticker}", {"limit": 1})
     if isinstance(balance, list) and balance:
         b = balance[0]
         info['totalCash']           = b.get('cashAndCashEquivalents', 0) or 0
         info['totalDebt']           = b.get('totalDebt', 0) or 0
+        shares = b.get('commonStock', 0) or info.get('sharesOutstanding', 0)
+        if shares and not info.get('bookValue'):
+            equity = b.get('totalStockholdersEquity', 0) or 0
+            if equity and shares:
+                info['bookValue']   = round(equity / shares, 4)
 
-    # ── Quote pour prix précis + variation ──
-    quote = _fmp_get(f"/v3/quote/{ticker}")
-    if isinstance(quote, list) and quote:
-        q = quote[0]
-        if q.get('price'):
-            info['currentPrice']    = info['regularMarketPrice'] = float(q['price'])
-        info['previousClose']       = q.get('previousClose', info.get('previousClose', 0))
-        info['regularMarketChangePercent'] = q.get('changesPercentage', 0)
-        info['dayHigh']             = q.get('dayHigh', 0)
-        info['dayLow']              = q.get('dayLow', 0)
-        info['volume']              = q.get('volume', 0)
-        info['averageVolume']       = q.get('avgVolume', 0)
-        info['fiftyTwoWeekHigh']    = q.get('yearHigh', 0)
-        info['fiftyTwoWeekLow']     = q.get('yearLow', 0)
-        info['fiftyDayAverage']     = q.get('priceAvg50', 0)
-        info['twoHundredDayAverage']= q.get('priceAvg200', 0)
-        info['dividendRate']        = q.get('lastDiv', 0) or 0
-        info['trailingAnnualDividendRate'] = q.get('lastDiv', 0) or 0
-        info['sharesOutstanding']   = q.get('sharesOutstanding', info.get('sharesOutstanding', 0))
+    # ── 6. Compte de résultat (gratuit) — croissance, EPS ──
+    income = _fmp_get(f"/v3/income-statement/{ticker}", {"limit": 2})
+    if isinstance(income, list) and len(income) >= 1:
+        i0 = income[0]
+        shares = info.get('sharesOutstanding', 1) or 1
+        net_income = i0.get('netIncome', 0) or 0
+        if net_income and shares and (not info.get('trailingEps') or info['trailingEps'] == 0):
+            info['trailingEps']     = round(net_income / shares, 4)
+        info['totalRevenue']        = i0.get('revenue', 0) or 0
+        if len(income) >= 2:
+            rev0 = i0.get('revenue', 0) or 0
+            rev1 = income[1].get('revenue', 1) or 1
+            if rev1: info['revenueGrowth'] = round((rev0 - rev1) / abs(rev1), 4)
 
     return info if info.get('currentPrice') else {}
 
