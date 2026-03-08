@@ -1346,18 +1346,33 @@ def get_ticker_info(ticker):
         except Exception: pass
         try:
             s = _req.Session()
-            s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+            s.headers.update({
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json,text/html",
+                "Accept-Language": "en-US,en;q=0.9",
+            })
             full = yf.Ticker(ticker, session=s).info or {}
-            if len(full) < 5: full = t.info or {}
+            # Si trop peu de données, retry sans session custom
+            if len(full) < 10:
+                import time; time.sleep(0.5)
+                full2 = t.info or {}
+                if len(full2) > len(full): full = full2
             for k,v in full.items():
-                if v not in (None,'',0) and k not in info: info[k] = v
+                if v not in (None, '', 0) and k not in info:
+                    info[k] = v
         except Exception: pass
+        # Fallback prix via historique
         if not info.get('currentPrice'):
             try:
                 hist = t.history(period="5d")
-                if not hist.empty: info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
+                if not hist.empty:
+                    info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
+                    info['previousClose'] = float(hist['Close'].iloc[-2]) if len(hist) > 1 else info['currentPrice']
             except Exception: pass
-        return info if info else None
+        # Fallback previousClose
+        if not info.get('previousClose') and info.get('currentPrice'):
+            info['previousClose'] = info['currentPrice']
+        return info if len(info) > 2 else None
     except Exception: return None
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -1369,7 +1384,6 @@ def get_valuation_cached(ticker: str) -> dict:
     except Exception as e:
         return {"error": str(e)}
 
-@st.cache_data(ttl=300)  # 5 minutes
 @st.cache_data(ttl=300, show_spinner=False)
 def get_ticker_history(ticker, period="2d"):
     try:
@@ -1378,23 +1392,32 @@ def get_ticker_history(ticker, period="2d"):
     except:
         return pd.DataFrame()
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def trouver_ticker(nom):
-    """Recherche le ticker Yahoo Finance — avec timeout et fallback robuste"""
+    """Recherche le ticker Yahoo Finance — fallback query1 si query2 échoue"""
     nom = nom.strip()
     if not nom:
         return "AAPL"
-    try:
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={nom}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=5).json()
-        quotes = response.get('quotes', [])
-        # Préférer les actions (EQUITY) aux autres types
-        for q in quotes:
-            if q.get('quoteType') in ('EQUITY', 'ETF'):
-                return q['symbol']
-        return quotes[0]['symbol'] if quotes else nom.upper()
-    except Exception:
-        return nom.upper()
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+    }
+    for base in ["https://query2.finance.yahoo.com", "https://query1.finance.yahoo.com"]:
+        try:
+            url = f"{base}/v1/finance/search?q={nom}&quotesCount=10&newsCount=0"
+            response = requests.get(url, headers=headers, timeout=6)
+            response.raise_for_status()
+            quotes = response.json().get('quotes', [])
+            # Préférer EQUITY puis ETF
+            for qtype in ('EQUITY', 'ETF'):
+                for q in quotes:
+                    if q.get('quoteType') == qtype:
+                        return q['symbol']
+            if quotes:
+                return quotes[0]['symbol']
+        except Exception:
+            continue
+    return nom.upper()
 
 @st.cache_data(ttl=600)
 def calculer_score_sentiment(ticker):
@@ -1855,18 +1878,27 @@ if "alerts" not in st.session_state:
 if "triggered_alerts" not in st.session_state:
     st.session_state.triggered_alerts = []
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _get_marquee_prices(watchlist_tuple):
+    result = []
+    for tkr in watchlist_tuple:
+        try:
+            fi = yf.Ticker(tkr).fast_info
+            price = float(getattr(fi, 'last_price', None) or 0)
+            prev  = float(getattr(fi, 'previous_close', None) or 0)
+            if price > 0 and prev > 0:
+                result.append((tkr, price, prev))
+        except:
+            continue
+    return result
+
 ticker_data_string = ""
-for tkr in st.session_state.watchlist:
-    try:
-        t_info = yf.Ticker(tkr).fast_info
-        price = t_info['last_price']
-        change = ((price - t_info['previous_close']) / t_info['previous_close']) * 100
-        color = "#00ffad" if change >= 0 else "#ff4b4b"
-        sign = "+" if change >= 0 else ""
-        ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 40px; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
-        ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px; font-family: monospace;">{price:,.2f} ({sign}{change:.2f}%)</span>'
-    except:
-        continue
+for tkr, price, prev_close in _get_marquee_prices(tuple(st.session_state.watchlist)):
+    change = ((price - prev_close) / prev_close) * 100
+    color = "#00ffad" if change >= 0 else "#ff4b4b"
+    sign = "+" if change >= 0 else ""
+    ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 40px; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
+    ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px; font-family: monospace;">{price:,.2f} ({sign}{change:.2f}%)</span>'
 
 marquee_html = f"""
 <div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
@@ -2255,7 +2287,7 @@ elif outil == "ANALYSEUR PRO":
         devise = info.get('currency', 'USD' if '.' not in ticker else 'EUR')
         secteur = info.get('sector', 'N/A')
         bpa = info.get('trailingEps') or info.get('forwardEps') or 0
-        per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
+        per = info.get('trailingPE') or info.get('forwardPE') or (round(prix/bpa, 2) if bpa and bpa > 0 else None)
         dette_equity = info.get('debtToEquity')
         div_rate = info.get('dividendRate') or info.get('trailingAnnualDividendRate') or 0
         payout = (info.get('payoutRatio') or 0) * 100
@@ -2302,7 +2334,7 @@ elif outil == "ANALYSEUR PRO":
         f1, f2, f3 = st.columns(3)
         with f1:
             st.write(f"**EPS (BPA) :** {bpa:.2f} {devise}")
-            st.write(f"**P/E RATIO :** {per:.2f}")
+            st.write(f"**P/E RATIO :** {per:.2f}" if per else "**P/E RATIO :** N/A")
             book_value = info.get('bookValue', 0)
             st.write(f"**BOOK VALUE :** {book_value:.2f} {devise}")
         with f2:
@@ -3646,7 +3678,8 @@ elif outil == "THE GRAND COUNCIL️":
                     per = info.get('trailingPE', info.get('forwardPE', 20))
                     roe = (info.get('returnOnEquity', 0) or 0) * 100
                     marge = (info.get('operatingMargins', 0) or 0) * 100
-                    yield_div = (info.get('dividendYield', 0) or 0) * 100
+                    _dy_raw = info.get('dividendYield', 0) or 0
+                    yield_div = _dy_raw * 100 if _dy_raw <= 1 else (_dy_raw if _dy_raw <= 30 else 0)
                     croissance = (info.get('earningsGrowth', 0.05) or 0.05) * 100
                     dette_equity = info.get('debtToEquity', 100) or 100
                     pb_ratio = info.get('priceToBook', 2) or 2
@@ -3888,10 +3921,10 @@ elif outil == "MODE DUEL":
             v = p * 1.2
 
         div_yield_raw = i.get('dividendYield', 0) or 0
-        if div_yield_raw > 10:   div_yield = div_yield_raw
-        elif div_yield_raw > 1:  div_yield = div_yield_raw
-        else:                    div_yield = div_yield_raw * 100
-        if div_yield > 20:       div_yield = div_yield / 100
+        # yfinance retourne dividendYield en décimal (ex: 0.015 = 1.5%)
+        # Valeurs > 1 sont déjà en % (ancienne version yfinance)
+        div_yield = div_yield_raw * 100 if div_yield_raw <= 1 else div_yield_raw
+        if div_yield > 30: div_yield = 0  # valeur aberrante → 0
 
         per = i.get('trailingPE') or i.get('forwardPE', 0)
         marge = (i.get('profitMargins', 0) or 0) * 100
@@ -4138,7 +4171,7 @@ elif outil == "SCREENER CAC 40":
                     hist = get_ticker_history(t, "1d")
                     if not hist.empty: prix = float(hist['Close'].iloc[-1])
                 bpa = info.get('trailingEps') or info.get('forwardEps') or 0
-                per = info.get('trailingPE') or (prix/bpa if bpa > 0 else 0)
+                per = info.get('trailingPE') or info.get('forwardPE') or (round(prix/bpa, 2) if bpa and bpa > 0 else None)
                 dette_equity = info.get('debtToEquity')
                 payout = (info.get('payoutRatio') or 0) * 100
                 try:
