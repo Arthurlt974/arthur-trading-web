@@ -23,6 +23,7 @@ import interface_analyse_perso
 import interface_portfolio
 import interface_alertes
 import export_pdf
+import interface_screener
 import Terminal as terminal_module
 from utils import (
     save_watchlist_firebase, load_watchlist_firebase,
@@ -1754,7 +1755,7 @@ st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
     "ACTIONS & BOURSE", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "MARCHÉ CRYPTO",
     "BOITE À OUTILS", "INTERFACE PRO", "INTERFACE CRYPTO PRO",
-    "PORTFOLIO", "ALERTES", "TERMINAL", "MON ESPACE ANALYSE"
+    "PORTFOLIO", "ALERTES", "SCREENER", "TERMINAL", "MON ESPACE ANALYSE"
 ])
 st.sidebar.markdown("---")
 
@@ -1768,6 +1769,10 @@ if categorie == "PORTFOLIO":
 
 if categorie == "ALERTES":
     interface_alertes.show_alertes()
+    st.stop()
+
+if categorie == "SCREENER":
+    interface_screener.show_screener()
     st.stop()
 
 if categorie == "MON ESPACE ANALYSE":
