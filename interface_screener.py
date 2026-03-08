@@ -119,6 +119,9 @@ def _fetch_ticker(symbol: str) -> dict | None:
             except Exception:
                 pass
 
+        # Stocker l'historique comme liste JSON-sérialisable
+        hist_prices = closes.tolist()[-63:]  # 3 mois max
+
         return {
             "symbol":    symbol,
             "name":      name[:28],
@@ -135,7 +138,7 @@ def _fetch_ticker(symbol: str) -> dict | None:
             "eps":       round(float(eps), 3) if eps else None,
             "div_yield": round(div_y * 100, 2) if div_y else 0.0,
             "sector":    sector,
-            "_hist":     closes,   # gardé pour mini chart
+            "hist":      hist_prices,
         }
     except Exception:
         return None
@@ -165,16 +168,18 @@ def _mini_chart(closes: pd.Series, symbol: str, chg: float) -> go.Figure:
 #  SCREENER PRINCIPAL
 # ══════════════════════════════════════════
 
-@st.cache_data(ttl=600, show_spinner=False)
 def _run_screener(symbols: tuple) -> pd.DataFrame:
     """Fetch tous les tickers en parallèle et retourne le DataFrame brut."""
     results = []
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=6) as ex:
         futures = {ex.submit(_fetch_ticker, s): s for s in symbols}
         for fut in as_completed(futures):
-            data = fut.result()
-            if data:
-                results.append(data)
+            try:
+                data = fut.result(timeout=15)
+                if data:
+                    results.append(data)
+            except Exception:
+                continue
     if not results:
         return pd.DataFrame()
     df = pd.DataFrame(results)
@@ -281,13 +286,39 @@ def show_screener():
             if not symbols_list:
                 st.warning("Ajoutez au moins un ticker.")
                 return
-            with st.spinner(f"Analyse de {len(symbols_list)} actions en cours..."):
-                df_raw = _run_screener(tuple(symbols_list))
-                if df_raw.empty:
-                    st.error("Aucune donnée récupérée.")
-                    return
-                st.session_state.sc_df = df_raw
-                st.session_state.sc_symbols = tuple(symbols_list)
+            # Vider le cache précédent
+            st.session_state.pop("sc_df", None)
+            prog = st.progress(0, text="Initialisation...")
+            status = st.empty()
+            
+            results = []
+            total = len(symbols_list)
+            with ThreadPoolExecutor(max_workers=6) as ex:
+                futures = {ex.submit(_fetch_ticker, s): s for s in symbols_list}
+                done = 0
+                for fut in as_completed(futures):
+                    sym = futures[fut]
+                    try:
+                        data = fut.result(timeout=15)
+                        if data:
+                            results.append(data)
+                    except Exception:
+                        pass
+                    done += 1
+                    prog.progress(done / total, text=f"Analyse {sym}... ({done}/{total})")
+            
+            prog.empty()
+            status.empty()
+            
+            if not results:
+                st.error("Aucune donnée récupérée. Vérifiez votre connexion ou les tickers.")
+                return
+            
+            df_raw = pd.DataFrame(results)
+            df_raw = df_raw.sort_values("mktcap", ascending=False, na_position="last")
+            st.session_state.sc_df = df_raw
+            st.session_state.sc_symbols = tuple(symbols_list)
+            st.success(f"✅ {len(results)}/{total} actions chargées")
 
         df = st.session_state.get("sc_df", pd.DataFrame())
         if df.empty:
@@ -413,9 +444,9 @@ def show_screener():
                 """, unsafe_allow_html=True)
 
             with col_chart:
-                if pd.notna(row.get("_hist")) and row["_hist"] is not None:
+                if row.get("hist") and len(row["hist"]) > 5:
                     try:
-                        fig = _mini_chart(row["_hist"], row["symbol"], chg1d)
+                        fig = _mini_chart(pd.Series(row["hist"]), row["symbol"], chg1d)
                         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False},
                                        key=f"mc_{row['symbol']}_{i}")
                     except Exception:
