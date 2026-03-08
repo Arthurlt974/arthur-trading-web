@@ -156,7 +156,7 @@ footer, header { display: none !important; }
 #  RENDU D'UN OUTIL
 # ══════════════════════════════════════════════════════════
 
-def _render_tool(tool_id: str, tool_name: str):
+def _render_tool(tool_id: str, tool_name: str, tab_idx: int = 0):
     """Rend le contenu d'un outil dans un onglet."""
 
     # ── Imports paresseux ──
@@ -175,9 +175,9 @@ def _render_tool(tool_id: str, tool_name: str):
         }
         c1, c2 = st.columns([3, 1])
         with c1:
-            pair  = st.selectbox("Paire", list(CRYPTOS.keys()), key=f"tc_pair_{tool_id}", label_visibility="collapsed")
+            pair  = st.selectbox("Paire", list(CRYPTOS.keys()), key=f"tc_pair_{tool_id}_{tab_idx}", label_visibility="collapsed")
         with c2:
-            tf    = st.selectbox("TF", ["1h","4h","1d","1w"], index=1, key=f"tc_tf_{tool_id}", label_visibility="collapsed")
+            tf    = st.selectbox("TF", ["1h","4h","1d","1w"], index=1, key=f"tc_tf_{tool_id}_{tab_idx}", label_visibility="collapsed")
         sym = CRYPTOS[pair]
         html = render_chart(symbol=sym, interval=tf, limit=200, height=640,
                             pair_label=pair, exchange="Binance · Spot", show_ma=True
@@ -188,9 +188,9 @@ def _render_tool(tool_id: str, tool_name: str):
         from chart_module import render_chart
         c1, c2 = st.columns([3, 1])
         with c1:
-            sym = st.text_input("Ticker", value="AAPL", key=f"tc_stock_{tool_id}", label_visibility="collapsed").upper()
+            sym = st.text_input("Ticker", value="AAPL", key=f"tc_stock_{tool_id}_{tab_idx}", label_visibility="collapsed").upper()
         with c2:
-            tf  = st.selectbox("TF", ["1h","1d","1wk"], index=1, key=f"tc_stf_{tool_id}", label_visibility="collapsed")
+            tf  = st.selectbox("TF", ["1h","1d","1wk"], index=1, key=f"tc_stf_{tool_id}_{tab_idx}", label_visibility="collapsed")
         html = render_chart(symbol=sym, interval=tf, limit=200, height=640,
                             pair_label=sym, exchange="Yahoo Finance", show_ma=True
                             ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
@@ -222,25 +222,25 @@ def _render_tool(tool_id: str, tool_name: str):
         </div>""", height=840)
 
     elif tool_id == "ORDER_BOOK":
-        show_order_book_ui()
+        show_order_book_ui(tab_idx)
 
     elif tool_id == "WHALE":
-        show_onchain()
+        show_onchain(tab_idx)
 
     elif tool_id == "ONCHAIN":
-        show_onchain()
+        show_onchain(tab_idx)
 
     elif tool_id == "LIQ_FUNDING":
-        show_liquidations()
+        show_liquidations(tab_idx)
 
     elif tool_id == "STAKING":
-        show_staking()
+        show_staking(tab_idx)
 
     elif tool_id == "MULTI_CHARTS":
         from chart_module import render_chart
         PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT"]
         tf = st.selectbox("Timeframe global", ["1h","4h","1d"], index=2,
-                          key="mc_tf_terminal", label_visibility="collapsed")
+                          key=f"mc_tf_terminal_{tab_idx}", label_visibility="collapsed")
         cols_mc = st.columns(2)
         for i, sym in enumerate(PAIRS):
             with cols_mc[i % 2]:
@@ -577,4 +577,4 @@ def show_terminal():
 
     for i, (st_tab, tab) in enumerate(zip(st_tabs, tabs)):
         with st_tab:
-            _render_tool(tab["id"], tab["name"])
+            _render_tool(tab["id"], tab["name"], i)
