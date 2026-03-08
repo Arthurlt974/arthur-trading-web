@@ -20,7 +20,7 @@ import interface_economie
 import interface_forex
 import interface_matieres_premieres
 import interface_analyse_perso
-import terminal as terminal_module
+import Terminal as terminal_module
 
 
 # ══════════════════════════════════════════════
