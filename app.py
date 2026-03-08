@@ -934,49 +934,20 @@ class ValuationCalculator:
         self.info = self._get_safe_info()
 
     def _get_safe_info(self):
-        import requests as _req, yfinance as _yf
+        """Utilise FMP en priorité, yfinance en fallback."""
+        # Réutilise get_ticker_info qui gère déjà FMP + fallbacks
+        cached = get_ticker_info(self.symbol)
+        if cached:
+            return cached
+        # Fallback minimal yfinance
         info = {}
         try:
-            fi = self.ticker.fast_info
-            if getattr(fi,'last_price',None): info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
-            if getattr(fi,'previous_close',None): info['previousClose'] = float(fi.previous_close)
-            if getattr(fi,'market_cap',None): info['marketCap'] = float(fi.market_cap)
-            if getattr(fi,'shares',None): info['sharesOutstanding'] = float(fi.shares)
-            if getattr(fi,'currency',None): info['currency'] = fi.currency
+            hist = self.ticker.history(period="5d")
+            if not hist.empty:
+                info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
+                if len(hist) > 1: info['previousClose'] = float(hist['Close'].iloc[-2])
         except Exception: pass
-        try:
-            s = _req.Session()
-            s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
-            full = _yf.Ticker(self.symbol, session=s).info or {}
-            if len(full) < 5: full = self.ticker.info or {}
-            for k,v in full.items():
-                if v not in (None,'',0) and k not in info: info[k] = v
-        except Exception: pass
-        try:
-            inc = self.ticker.income_stmt
-            shares = info.get('sharesOutstanding',0)
-            if inc is not None and not inc.empty and shares > 0 and not info.get('trailingEps'):
-                for lbl in ['Net Income','NetIncome','Net Income Common Stockholders']:
-                    if lbl in inc.index:
-                        info['trailingEps'] = round(float(inc.loc[lbl].iloc[0])/shares, 4); break
-        except Exception: pass
-        try:
-            bs = self.ticker.balance_sheet
-            shares = info.get('sharesOutstanding',0)
-            if bs is not None and not bs.empty and shares > 0 and not info.get('bookValue'):
-                for lbl in ['Stockholders Equity','Common Stock Equity','Total Equity Gross Minority Interest']:
-                    if lbl in bs.index:
-                        eq = float(bs.loc[lbl].iloc[0])
-                        info['bookValue'] = round(eq/shares,4)
-                        if info.get('currentPrice') and info['bookValue']>0:
-                            info['priceToBook'] = round(info['currentPrice']/info['bookValue'],2)
-                        break
-        except Exception: pass
-        if not info.get('currentPrice'):
-            try:
-                hist = self.ticker.history(period="5d")
-                if not hist.empty: info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
-            except Exception: pass
+        return info
         return info
 
     def dcf_valuation(self, growth_rate=0.05, discount_rate=0.10, years=5):
@@ -1329,24 +1300,139 @@ class ValuationCalculator:
 #  FONCTIONS UTILITAIRES PARTAGÉES
 # ============================================================
 
+# ============================================================
+#  FMP (Financial Modeling Prep) — API principale pour actions
+#  Clé dans st.secrets["FMP_API_KEY"]
+# ============================================================
+
+def _fmp_key():
+    """Retourne la clé FMP depuis secrets."""
+    return st.secrets.get("FMP_API_KEY", "")
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fmp_get(endpoint: str, params: dict = None) -> dict | list:
+    """Appel générique FMP avec cache."""
+    key = _fmp_key()
+    if not key:
+        return {}
+    base = "https://financialmodelingprep.com/api"
+    p = {"apikey": key}
+    if params: p.update(params)
+    try:
+        r = requests.get(f"{base}{endpoint}", params=p, timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return {}
+
+def _fmp_to_info(ticker: str) -> dict:
+    """Convertit les données FMP au format dict compatible yfinance."""
+    info = {}
+
+    # ── Profil + prix ──
+    profile = _fmp_get(f"/v3/profile/{ticker}")
+    if isinstance(profile, list) and profile:
+        p = profile[0]
+        info['currentPrice']        = info['regularMarketPrice'] = p.get('price', 0)
+        info['previousClose']       = p.get('lastDiv', 0) or p.get('price', 0)
+        info['marketCap']           = p.get('mktCap', 0)
+        info['longName']            = p.get('companyName', ticker)
+        info['shortName']           = p.get('companyName', ticker)
+        info['sector']              = p.get('sector', 'N/A')
+        info['industry']            = p.get('industry', 'N/A')
+        info['currency']            = p.get('currency', 'USD')
+        info['exchange']            = p.get('exchangeShortName', '')
+        info['website']             = p.get('website', '')
+        info['longBusinessSummary'] = p.get('description', '')
+        info['country']             = p.get('country', '')
+        info['employees']           = p.get('fullTimeEmployees', 0)
+        info['beta']                = p.get('beta', 0)
+        info['ipoDate']             = p.get('ipoDate', '')
+
+    # ── Ratios clés ──
+    ratios = _fmp_get(f"/v3/ratios-ttm/{ticker}")
+    if isinstance(ratios, list) and ratios:
+        r = ratios[0]
+        info['trailingPE']          = r.get('peRatioTTM', 0) or 0
+        info['forwardPE']           = r.get('priceEarningsRatioTTM', 0) or 0
+        info['priceToBook']         = r.get('priceToBookRatioTTM', 0) or 0
+        info['priceToSalesTrailing12Months'] = r.get('priceToSalesRatioTTM', 0) or 0
+        info['returnOnEquity']      = r.get('returnOnEquityTTM', 0) or 0
+        info['returnOnAssets']      = r.get('returnOnAssetsTTM', 0) or 0
+        info['profitMargins']       = r.get('netProfitMarginTTM', 0) or 0
+        info['operatingMargins']    = r.get('operatingProfitMarginTTM', 0) or 0
+        info['debtToEquity']        = r.get('debtEquityRatioTTM', 0) or 0
+        info['currentRatio']        = r.get('currentRatioTTM', 0) or 0
+        info['quickRatio']          = r.get('quickRatioTTM', 0) or 0
+        info['dividendYield']       = r.get('dividendYieldTTM', 0) or 0
+        info['payoutRatio']         = r.get('payoutRatioTTM', 0) or 0
+        info['revenueGrowth']       = r.get('revenueGrowthTTM', 0) or 0
+        info['earningsGrowth']      = r.get('epsgrowthTTM', 0) or 0
+
+    # ── Données financières clés ──
+    key_metrics = _fmp_get(f"/v3/key-metrics-ttm/{ticker}")
+    if isinstance(key_metrics, list) and key_metrics:
+        km = key_metrics[0]
+        info['bookValue']           = km.get('bookValuePerShareTTM', 0) or 0
+        info['trailingEps']         = km.get('netIncomePerShareTTM', 0) or 0
+        info['forwardEps']          = km.get('netIncomePerShareTTM', 0) or 0
+        info['freeCashflow']        = km.get('freeCashFlowPerShareTTM', 0) or 0
+        info['totalCashPerShare']   = km.get('cashPerShareTTM', 0) or 0
+        info['enterpriseValue']     = km.get('enterpriseValueTTM', 0) or 0
+        info['sharesOutstanding']   = km.get('weightedAverageSharesOutTTM', 0) or 0
+
+    # ── Bilan pour dette/cash ──
+    balance = _fmp_get(f"/v3/balance-sheet-statement/{ticker}", {"limit": 1})
+    if isinstance(balance, list) and balance:
+        b = balance[0]
+        info['totalCash']           = b.get('cashAndCashEquivalents', 0) or 0
+        info['totalDebt']           = b.get('totalDebt', 0) or 0
+
+    # ── Quote pour prix précis + variation ──
+    quote = _fmp_get(f"/v3/quote/{ticker}")
+    if isinstance(quote, list) and quote:
+        q = quote[0]
+        if q.get('price'):
+            info['currentPrice']    = info['regularMarketPrice'] = float(q['price'])
+        info['previousClose']       = q.get('previousClose', info.get('previousClose', 0))
+        info['regularMarketChangePercent'] = q.get('changesPercentage', 0)
+        info['dayHigh']             = q.get('dayHigh', 0)
+        info['dayLow']              = q.get('dayLow', 0)
+        info['volume']              = q.get('volume', 0)
+        info['averageVolume']       = q.get('avgVolume', 0)
+        info['fiftyTwoWeekHigh']    = q.get('yearHigh', 0)
+        info['fiftyTwoWeekLow']     = q.get('yearLow', 0)
+        info['fiftyDayAverage']     = q.get('priceAvg50', 0)
+        info['twoHundredDayAverage']= q.get('priceAvg200', 0)
+        info['dividendRate']        = q.get('lastDiv', 0) or 0
+        info['trailingAnnualDividendRate'] = q.get('lastDiv', 0) or 0
+        info['sharesOutstanding']   = q.get('sharesOutstanding', info.get('sharesOutstanding', 0))
+
+    return info if info.get('currentPrice') else {}
+
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
-    """Récupère les infos d'un ticker — robuste aux blocages Yahoo Finance."""
-    import requests as _req, time as _time
-    info = {}
-    t = yf.Ticker(ticker)
+    """Récupère les infos — FMP en priorité, yfinance en fallback."""
+    # ── PRIORITÉ 1 : FMP (fiable sur Streamlit Cloud) ──
+    if _fmp_key():
+        info = _fmp_to_info(ticker)
+        if info.get('currentPrice'):
+            return info
 
-    # ── ÉTAPE 1 : fast_info (léger, rarement bloqué) ──
+    # ── PRIORITÉ 2 : yfinance fast_info (léger) ──
+    import requests as _req
+    info = {}
     try:
+        t = yf.Ticker(ticker)
         fi = t.fast_info
         for attr, key in [
-            ('last_price',     'currentPrice'),
-            ('previous_close', 'previousClose'),
-            ('market_cap',     'marketCap'),
-            ('shares',         'sharesOutstanding'),
-            ('currency',       'currency'),
-            ('fifty_day_average',      'fiftyDayAverage'),
-            ('two_hundred_day_average','twoHundredDayAverage'),
+            ('last_price',      'currentPrice'),
+            ('previous_close',  'previousClose'),
+            ('market_cap',      'marketCap'),
+            ('shares',          'sharesOutstanding'),
+            ('currency',        'currency'),
+            ('fifty_day_average',       'fiftyDayAverage'),
+            ('two_hundred_day_average', 'twoHundredDayAverage'),
         ]:
             val = getattr(fi, attr, None)
             if val: info[key] = float(val) if attr != 'currency' else val
@@ -1354,50 +1440,34 @@ def get_ticker_info(ticker):
             info['regularMarketPrice'] = info['currentPrice']
     except Exception: pass
 
-    # ── ÉTAPE 2 : .info avec plusieurs User-Agents ──
-    user_agents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-    ]
-    full = {}
-    for ua in user_agents:
-        try:
-            s = _req.Session()
-            s.headers.update({"User-Agent": ua, "Accept": "application/json", "Accept-Language": "en-US,en;q=0.9"})
-            full = yf.Ticker(ticker, session=s).info or {}
-            if len(full) > 10: break
-            _time.sleep(0.3)
-        except Exception:
-            continue
-    for k, v in full.items():
-        if v not in (None, '', 0) and k not in info:
-            info[k] = v
+    # ── PRIORITÉ 3 : yfinance .info ──
+    try:
+        s = _req.Session()
+        s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"})
+        full = yf.Ticker(ticker, session=s).info or {}
+        for k, v in full.items():
+            if v not in (None, '', 0) and k not in info:
+                info[k] = v
+    except Exception: pass
 
-    # ── ÉTAPE 3 : historique comme dernier recours pour le prix ──
+    # ── PRIORITÉ 4 : historique pour le prix minimum ──
     if not info.get('currentPrice'):
         try:
-            hist = t.history(period="5d")
+            hist = yf.Ticker(ticker).history(period="5d")
             if not hist.empty:
                 info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
                 if len(hist) > 1:
                     info['previousClose'] = float(hist['Close'].iloc[-2])
-                # Calculer variation manuelle
-                if info.get('previousClose') and info['previousClose'] > 0:
-                    chg = ((info['currentPrice'] - info['previousClose']) / info['previousClose']) * 100
-                    info['regularMarketChangePercent'] = round(chg, 4)
         except Exception: pass
 
-    # ── ÉTAPE 4 : combler les manques critiques ──
+    # Defaults
     if not info.get('previousClose') and info.get('currentPrice'):
         info['previousClose'] = info['currentPrice']
     if not info.get('currency'):
         info['currency'] = 'USD' if '.' not in ticker else 'EUR'
-    # shortName minimal pour affichage
     if not info.get('longName') and not info.get('shortName'):
         info['shortName'] = ticker.upper()
 
-    # Retourner si on a au minimum un prix
     return info if info.get('currentPrice') or info.get('previousClose') else None
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -1411,38 +1481,65 @@ def get_valuation_cached(ticker: str) -> dict:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_ticker_history(ticker, period="2d"):
+    """Historique — yfinance d'abord, FMP en fallback."""
     try:
-        data = yf.Ticker(ticker)
-        return data.history(period=period)
-    except:
-        return pd.DataFrame()
+        df = yf.Ticker(ticker).history(period=period)
+        if not df.empty:
+            return df
+    except Exception: pass
+    # Fallback FMP — historique journalier
+    try:
+        limit_map = {"1d": 1, "2d": 2, "5d": 5, "1mo": 30, "3mo": 90,
+                     "6mo": 180, "1y": 365, "2y": 730, "5y": 1825, "max": 5000}
+        limit = limit_map.get(period, 30)
+        data = _fmp_get(f"/v3/historical-price-full/{ticker}", {"serietype": "line", "timeseries": limit})
+        hist = data.get("historical", []) if isinstance(data, dict) else []
+        if hist:
+            df = pd.DataFrame(hist[::-1])
+            df['Date'] = pd.to_datetime(df['date'])
+            df = df.set_index('Date')
+            df.rename(columns={'open':'Open','high':'High','low':'Low',
+                               'close':'Close','volume':'Volume'}, inplace=True)
+            return df[['Open','High','Low','Close','Volume']].dropna()
+    except Exception: pass
+    return pd.DataFrame()
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def trouver_ticker(nom):
-    """Recherche le ticker Yahoo Finance — fallback query1 si query2 échoue"""
+    """Recherche le ticker — FMP en priorité, Yahoo en fallback."""
     nom = nom.strip()
-    if not nom:
-        return "AAPL"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-    }
+    if not nom: return "AAPL"
+    nom_up = nom.upper()
+    # Si déjà un ticker valide (court, majuscules), retourner directement
+    if len(nom_up) <= 6 and nom_up.replace('.','').replace('-','').isalpha():
+        return nom_up
+
+    # ── FMP search ──
+    if _fmp_key():
+        try:
+            results = _fmp_get(f"/v3/search", {"query": nom, "limit": 10})
+            if isinstance(results, list):
+                for r in results:
+                    if r.get('exchangeShortName') in ('NASDAQ','NYSE','EURONEXT','LSE','XETRA'):
+                        return r['symbol']
+                if results:
+                    return results[0]['symbol']
+        except Exception: pass
+
+    # ── Yahoo Finance fallback ──
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36'}
     for base in ["https://query2.finance.yahoo.com", "https://query1.finance.yahoo.com"]:
         try:
             url = f"{base}/v1/finance/search?q={nom}&quotesCount=10&newsCount=0"
-            response = requests.get(url, headers=headers, timeout=6)
-            response.raise_for_status()
-            quotes = response.json().get('quotes', [])
-            # Préférer EQUITY puis ETF
+            quotes = requests.get(url, headers=headers, timeout=6).json().get('quotes', [])
             for qtype in ('EQUITY', 'ETF'):
                 for q in quotes:
                     if q.get('quoteType') == qtype:
                         return q['symbol']
-            if quotes:
-                return quotes[0]['symbol']
-        except Exception:
-            continue
-    return nom.upper()
+            if quotes: return quotes[0]['symbol']
+        except Exception: continue
+
+    return nom_up
 
 @st.cache_data(ttl=600)
 def calculer_score_sentiment(ticker):
