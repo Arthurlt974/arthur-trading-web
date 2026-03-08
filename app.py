@@ -2052,21 +2052,43 @@ if "triggered_alerts" not in st.session_state:
 @st.cache_data(ttl=60, show_spinner=False)
 @st.cache_data(ttl=60, show_spinner=False)
 def _get_marquee_prices(watchlist_tuple):
+    """Récupère les prix pour le marquee — multi-sources robuste."""
     result = []
     for tkr in watchlist_tuple:
+        price, prev = 0.0, 0.0
         try:
-            # curl_cffi pour contourner le blocage Yahoo
-            try:
-                from curl_cffi.requests import Session as CurlSession
-                with CurlSession(impersonate="chrome") as s:
-                    fi = yf.Ticker(tkr, session=s).fast_info
-            except Exception:
+            # ── Crypto : Binance direct (jamais bloqué) ──
+            if tkr.endswith("-USD") or tkr.endswith("USDT"):
+                sym = tkr.replace("-USD", "USDT").replace("-", "")
+                r1 = requests.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}", timeout=5)
+                if r1.status_code == 200:
+                    d = r1.json()
+                    price = float(d.get("lastPrice", 0))
+                    prev  = float(d.get("prevClosePrice", 0))
+
+            # ── Actions : Yahoo Finance v8 (endpoint léger) ──
+            if price == 0:
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"}
+                r2 = requests.get(
+                    f"https://query1.finance.yahoo.com/v8/finance/chart/{tkr}",
+                    params={"interval": "1d", "range": "2d"},
+                    headers=headers, timeout=8
+                )
+                if r2.status_code == 200:
+                    data = r2.json()
+                    meta = data["chart"]["result"][0]["meta"]
+                    price = float(meta.get("regularMarketPrice", 0))
+                    prev  = float(meta.get("previousClose", 0) or meta.get("chartPreviousClose", 0))
+
+            # ── Fallback : yfinance fast_info ──
+            if price == 0:
                 fi = yf.Ticker(tkr).fast_info
-            price = float(getattr(fi, 'last_price', None) or 0)
-            prev  = float(getattr(fi, 'previous_close', None) or 0)
+                price = float(getattr(fi, "last_price", 0) or 0)
+                prev  = float(getattr(fi, "previous_close", 0) or 0)
+
             if price > 0 and prev > 0:
                 result.append((tkr, price, prev))
-        except:
+        except Exception:
             continue
     return result
 
