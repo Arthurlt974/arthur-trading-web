@@ -2481,7 +2481,7 @@ elif outil == "ANALYSEUR PRO":
     st.markdown("---")
     _c1, _c2, _c3 = st.columns([1,1,2])
     with _c1:
-        export_pdf.download_button_analyse(ticker, info, valuation, key="pdf_analyseur_pro")
+        export_pdf.download_button_analyse(ticker, info, valuation_results, key="pdf_analyseur_pro")
 
 
 # ==========================================
