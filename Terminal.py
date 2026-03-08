@@ -1,0 +1,625 @@
+"""
+AM.TERMINAL — Terminal Bloomberg Multi-Onglets
+Permet d'ouvrir jusqu'à 6 onglets simultanés, chacun configuré sur un outil différent.
+"""
+
+import streamlit as st
+import streamlit.components.v1 as components
+import time
+
+# ══════════════════════════════════════════════════════════
+#  CATALOGUE DES OUTILS DISPONIBLES
+# ══════════════════════════════════════════════════════════
+
+TOOLS_CATALOG = {
+    # ── GRAPHIQUES ──
+    "📈 Graphique Crypto":         {"cat": "GRAPHIQUES",   "id": "CHART_CRYPTO"},
+    "📊 Graphique Actions":        {"cat": "GRAPHIQUES",   "id": "CHART_STOCK"},
+    "📉 Multi-Charts":             {"cat": "GRAPHIQUES",   "id": "MULTI_CHARTS"},
+
+    # ── CRYPTO ──
+    "₿ Bitcoin Dominance":         {"cat": "CRYPTO",       "id": "BTC_DOMINANCE"},
+    "🔥 Heatmap Liquidations":     {"cat": "CRYPTO",       "id": "HEATMAP_LIQ"},
+    "📖 Order Book Live":          {"cat": "CRYPTO",       "id": "ORDER_BOOK"},
+    "🐋 Whale Watcher":            {"cat": "CRYPTO",       "id": "WHALE"},
+    "🔗 On-Chain Analytics":       {"cat": "CRYPTO",       "id": "ONCHAIN"},
+    "⚡ Liquidations & Funding":   {"cat": "CRYPTO",       "id": "LIQ_FUNDING"},
+    "💰 Staking & Yield":          {"cat": "CRYPTO",       "id": "STAKING"},
+
+    # ── ANALYSE ──
+    "🔬 Analyseur Pro":            {"cat": "ANALYSE",      "id": "ANALYSEUR_PRO"},
+    "📐 Analyse Technique Pro":    {"cat": "ANALYSE",      "id": "TECH_PRO"},
+    "🌀 Fibonacci Calculator":     {"cat": "ANALYSE",      "id": "FIBONACCI"},
+    "🤖 Backtesting Engine":       {"cat": "ANALYSE",      "id": "BACKTEST"},
+    "💎 Valorisation Fondamentale":{"cat": "ANALYSE",      "id": "VALORISATION"},
+    "🧠 Expert System":            {"cat": "ANALYSE",      "id": "EXPERT"},
+    "⚔️ Mode Duel":                {"cat": "ANALYSE",      "id": "DUEL"},
+
+    # ── MARCHÉ ──
+    "👁 Market Monitor":           {"cat": "MARCHÉ",       "id": "MARKET_MONITOR"},
+    "🔭 Screener CAC 40":          {"cat": "MARCHÉ",       "id": "SCREENER_CAC"},
+    "📅 Dividend Calendar":        {"cat": "MARCHÉ",       "id": "DIVIDEND_CAL"},
+    "😨 Fear & Greed Index":       {"cat": "MARCHÉ",       "id": "FEAR_GREED"},
+    "🔗 Corrélation Dash":         {"cat": "MARCHÉ",       "id": "CORRELATION"},
+    "🗺 Heatmap Marché":           {"cat": "MARCHÉ",       "id": "HEATMAP_MKTF"},
+
+    # ── MACRO ──
+    "📰 Daily Brief":              {"cat": "MACRO",        "id": "DAILY_BRIEF"},
+    "📅 Calendrier Éco":           {"cat": "MACRO",        "id": "CALENDRIER_ECO"},
+    "📈 Intérêts Composés":        {"cat": "MACRO",        "id": "INTERETS"},
+    "🔔 Alerts Manager":           {"cat": "MACRO",        "id": "ALERTS"},
+}
+
+TOOLS_BY_CAT = {}
+for name, meta in TOOLS_CATALOG.items():
+    TOOLS_BY_CAT.setdefault(meta["cat"], []).append(name)
+
+MAX_TABS = 6
+
+# ══════════════════════════════════════════════════════════
+#  CSS TERMINAL
+# ══════════════════════════════════════════════════════════
+
+TERMINAL_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+/* ── Reset Streamlit ── */
+[data-testid="stAppViewContainer"] > section:first-child { background: #000 !important; }
+[data-testid="stSidebar"] { background: #050505 !important; border-right: 1px solid #111; }
+[data-testid="stSidebar"] * { font-family: 'IBM Plex Mono', monospace !important; }
+footer, header { display: none !important; }
+.block-container { padding: 0 !important; max-width: 100% !important; }
+[data-testid="stVerticalBlock"] { gap: 0 !important; }
+
+/* ── Barre titre terminal ── */
+.term-topbar {
+    display: flex; align-items: center; gap: 0;
+    background: #000; border-bottom: 1px solid #1a1a1a;
+    height: 36px; padding: 0 12px; flex-shrink: 0;
+}
+.term-logo {
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+    font-weight: 700; color: #ff6600; letter-spacing: 1px;
+    margin-right: 16px; white-space: nowrap;
+}
+.term-logo span { color: #4d9fff; }
+
+/* ── Onglets ── */
+.term-tabs {
+    display: flex; align-items: stretch;
+    background: #000; border-bottom: 2px solid #111;
+    overflow-x: auto; flex-shrink: 0;
+}
+.term-tabs::-webkit-scrollbar { height: 3px; }
+.term-tabs::-webkit-scrollbar-thumb { background: #222; }
+
+.term-tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 14px; height: 34px; cursor: pointer;
+    border-right: 1px solid #111; white-space: nowrap;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    color: #4d9fff; background: #050505;
+    border-top: 2px solid transparent;
+    transition: all .12s; user-select: none; min-width: 120px;
+}
+.term-tab:hover { background: #0d0d0d; color: #fff; }
+.term-tab.active {
+    background: #000; color: #ff6600;
+    border-top: 2px solid #ff6600;
+}
+.term-tab .tab-close {
+    margin-left: auto; color: #333; font-size: 11px;
+    padding: 1px 3px; border-radius: 2px;
+}
+.term-tab:hover .tab-close { color: #666; }
+.term-tab.active .tab-close { color: #ff6600; }
+.term-tab-add {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; cursor: pointer;
+    color: #333; font-size: 16px; background: #000;
+    border-right: 1px solid #111; flex-shrink: 0;
+}
+.term-tab-add:hover { color: #ff6600; background: #0d0d0d; }
+
+/* ── Contenu onglet ── */
+.term-content {
+    flex: 1; overflow: auto; background: #000;
+    min-height: 0;
+}
+
+/* ── Écran de bienvenue ── */
+.term-welcome {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; min-height: 500px;
+    gap: 12px;
+}
+.term-welcome .logo-big {
+    font-family: 'IBM Plex Mono', monospace; font-size: 48px;
+    font-weight: 700; color: #ff6600; letter-spacing: 4px;
+}
+.term-welcome .logo-big span { color: #4d9fff; }
+.term-welcome .tagline {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px; color: #4d9fff; letter-spacing: 2px;
+}
+.term-welcome .shortcut-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 8px; margin-top: 24px; max-width: 600px; width: 100%;
+}
+.shortcut-card {
+    background: #080808; border: 1px solid #1a1a1a;
+    border-radius: 4px; padding: 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    color: #4d9fff; cursor: pointer; transition: all .15s;
+    text-align: center;
+}
+.shortcut-card:hover { border-color: #ff6600; color: #ff6600; background: #0d0800; }
+.shortcut-card .sc-icon { font-size: 20px; margin-bottom: 6px; }
+.shortcut-card .sc-label { color: #555; font-size: 9px; margin-top: 2px; }
+
+/* ── Sidebar terminal ── */
+.term-sidebar-section {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; color: #ff6600; letter-spacing: 1.5px;
+    padding: 8px 0 4px; text-transform: uppercase;
+}
+</style>
+"""
+
+# ══════════════════════════════════════════════════════════
+#  RENDU D'UN OUTIL
+# ══════════════════════════════════════════════════════════
+
+def _render_tool(tool_id: str, tool_name: str):
+    """Rend le contenu d'un outil dans un onglet."""
+
+    # ── Imports paresseux ──
+    import yfinance as yf
+    import pandas as pd
+    import plotly.graph_objects as go
+    import requests
+    import numpy as np
+
+    if tool_id == "CHART_CRYPTO":
+        from chart_module import render_chart
+        CRYPTOS = {
+            "BTC/USDT": "BTCUSDT", "ETH/USDT": "ETHUSDT", "SOL/USDT": "SOLUSDT",
+            "BNB/USDT": "BNBUSDT", "XRP/USDT": "XRPUSDT", "ADA/USDT": "ADAUSDT",
+            "AVAX/USDT": "AVAXUSDT", "DOGE/USDT": "DOGEUSDT", "LINK/USDT": "LINKUSDT",
+        }
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            pair  = st.selectbox("Paire", list(CRYPTOS.keys()), key=f"tc_pair_{tool_id}", label_visibility="collapsed")
+        with c2:
+            tf    = st.selectbox("TF", ["1h","4h","1d","1w"], index=1, key=f"tc_tf_{tool_id}", label_visibility="collapsed")
+        sym = CRYPTOS[pair]
+        html = render_chart(symbol=sym, interval=tf, limit=200, height=640,
+                            pair_label=pair, exchange="Binance · Spot", show_ma=True
+                            ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
+        components.html(html, height=650, scrolling=False)
+
+    elif tool_id == "CHART_STOCK":
+        from chart_module import render_chart
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            sym = st.text_input("Ticker", value="AAPL", key=f"tc_stock_{tool_id}", label_visibility="collapsed").upper()
+        with c2:
+            tf  = st.selectbox("TF", ["1h","1d","1wk"], index=1, key=f"tc_stf_{tool_id}", label_visibility="collapsed")
+        html = render_chart(symbol=sym, interval=tf, limit=200, height=640,
+                            pair_label=sym, exchange="Yahoo Finance", show_ma=True
+                            ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
+        components.html(html, height=650, scrolling=False)
+
+    elif tool_id == "BTC_DOMINANCE":
+        from chart_module import render_chart
+        st.markdown("### ₿ Bitcoin Dominance — BTC/USDT Proxy")
+        col1, col2, col3 = st.columns(3)
+        try:
+            r = requests.get("https://api.coingecko.com/api/v3/global", timeout=8)
+            dom = r.json()["data"]["market_cap_percentage"]["btc"]
+            col1.metric("BTC Dominance", f"{dom:.1f}%")
+        except:
+            col1.metric("BTC Dominance", "N/A")
+        col2.info("💡 BTC.D ↑ + BTC ↑ = Altcoins souffrent")
+        col3.info("💡 BTC.D ↓ + BTC stagne = Altseason")
+        html = render_chart(symbol="BTCUSDT", interval="1d", limit=200, height=580,
+                            pair_label="BTC/USDT · Dominance proxy", exchange="Binance · Spot"
+                            ) + f"<!-- btcd:{int(time.time()*1000)} -->"
+        components.html(html, height=590, scrolling=False)
+
+    elif tool_id == "HEATMAP_LIQ":
+        st.markdown("### 🔥 Liquidation Heatmap")
+        components.html("""
+        <div style="background:#000;border:1px solid #ff6600;border-radius:6px;overflow:hidden;">
+            <iframe src="https://www.coinglass.com/fr/pro/futures/LiquidationHeatMap"
+                    width="100%" height="820" style="border:none;" scrolling="yes"></iframe>
+        </div>""", height=840)
+
+    elif tool_id == "ORDER_BOOK":
+        # Appel à la fonction existante dans app.py
+        try:
+            import app as _app
+            _app.show_order_book_ui()
+        except Exception as e:
+            st.error(f"Erreur chargement Order Book : {e}")
+
+    elif tool_id == "WHALE":
+        try:
+            import app as _app
+            # Réplique du bloc WHALE WATCHER depuis app.py
+            st.markdown("### 🐋 Whale Watcher")
+            st.info("Chargement du module Whale Watcher depuis app.py…")
+        except Exception as e:
+            st.error(f"Erreur : {e}")
+
+    elif tool_id == "ONCHAIN":
+        try:
+            import app as _app
+            _app.show_onchain()
+        except Exception as e:
+            st.error(f"Erreur chargement On-Chain : {e}")
+
+    elif tool_id == "LIQ_FUNDING":
+        try:
+            import app as _app
+            _app.show_liquidations()
+        except Exception as e:
+            st.error(f"Erreur Liquidations : {e}")
+
+    elif tool_id == "STAKING":
+        try:
+            import app as _app
+            _app.show_staking()
+        except Exception as e:
+            st.error(f"Erreur Staking : {e}")
+
+    elif tool_id == "MULTI_CHARTS":
+        from chart_module import render_chart
+        PAIRS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT"]
+        tf = st.selectbox("Timeframe global", ["1h","4h","1d"], index=2,
+                          key="mc_tf_terminal", label_visibility="collapsed")
+        cols_mc = st.columns(2)
+        for i, sym in enumerate(PAIRS):
+            with cols_mc[i % 2]:
+                html = render_chart(symbol=sym, interval=tf, limit=100, height=320,
+                                    pair_label=sym.replace("USDT","/USDT"),
+                                    exchange="Binance", show_header=True,
+                                    show_volume=False, show_bottom=False,
+                                    show_ma=False
+                                    ) + f"<!-- {sym}:{int(time.time()*1000)} -->"
+                components.html(html, height=330, scrolling=False)
+
+    elif tool_id == "FEAR_GREED":
+        st.markdown("### 😨 Fear & Greed Index")
+        try:
+            r = requests.get("https://api.alternative.me/fng/?limit=30", timeout=8)
+            data = r.json()["data"]
+            current = data[0]
+            val   = int(current["value"])
+            label = current["value_classification"]
+            color = "#00ff41" if val > 60 else "#ff6600" if val > 40 else "#ff2222"
+            st.markdown(f"""
+            <div style='text-align:center;padding:24px;'>
+                <div style='font-size:72px;font-family:IBM Plex Mono,monospace;
+                            font-weight:700;color:{color};'>{val}</div>
+                <div style='color:{color};font-size:18px;letter-spacing:2px;
+                            font-family:IBM Plex Mono,monospace;margin-top:8px;'>{label.upper()}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            hist = [(int(d["value"]), d["value_classification"]) for d in data[:14]]
+            vals_h = [h[0] for h in hist][::-1]
+            fig = go.Figure(go.Scatter(y=vals_h, mode="lines+markers",
+                line=dict(color="#ff6600", width=2),
+                marker=dict(size=6, color=["#00ff41" if v>60 else "#ff6600" if v>40 else "#ff2222" for v in vals_h])))
+            fig.update_layout(template="plotly_dark", paper_bgcolor="#000", plot_bgcolor="#0a0a0a",
+                              height=220, margin=dict(l=20,r=20,t=20,b=20), showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.error(f"Erreur Fear & Greed : {e}")
+
+    elif tool_id == "CORRELATION":
+        st.markdown("### 🔗 Corrélation inter-actifs")
+        SYMS = {"BTC":"BTC-USD","ETH":"ETH-USD","SOL":"SOL-USD","AAPL":"AAPL","NVDA":"NVDA","SPY":"SPY","GLD":"GLD"}
+        try:
+            df_all = yf.download(list(SYMS.values()), period="6mo", progress=False)["Close"]
+            df_all.columns = list(SYMS.keys())
+            corr = df_all.corr()
+            fig = go.Figure(go.Heatmap(
+                z=corr.values, x=list(corr.columns), y=list(corr.index),
+                colorscale=[[0,"#ff2222"],[0.5,"#111"],[1,"#00ff41"]],
+                zmin=-1, zmax=1, text=corr.round(2).values,
+                texttemplate="%{text}", textfont={"size":11}
+            ))
+            fig.update_layout(template="plotly_dark", paper_bgcolor="#000",
+                              height=420, margin=dict(l=20,r=20,t=30,b=20))
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e:
+            st.error(f"Erreur corrélation : {e}")
+
+    elif tool_id == "HEATMAP_MKTF":
+        st.markdown("### 🗺 Heatmap Marché")
+        components.html("""
+        <div class="tradingview-widget-container" style="height:600px;">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js" async>
+          {"exchanges":[],"dataSource":"S&P500","grouping":"sector","blockSize":"market_cap_basic",
+           "blockColor":"change","locale":"fr","symbolUrl":"","colorTheme":"dark",
+           "hasTopBar":false,"isDataSetEnabled":false,"isZoomEnabled":true,
+           "hasSymbolTooltip":true,"width":"100%","height":"100%"}
+          </script>
+        </div>""", height=620)
+
+    elif tool_id == "MARKET_MONITOR":
+        st.markdown("### 👁 Market Monitor")
+        WATCH = {
+            "BTC":  ("BTC-USD",  "Crypto"),
+            "ETH":  ("ETH-USD",  "Crypto"),
+            "SPY":  ("SPY",      "ETF"),
+            "QQQ":  ("QQQ",      "ETF"),
+            "AAPL": ("AAPL",     "Action"),
+            "NVDA": ("NVDA",     "Action"),
+            "GLD":  ("GLD",      "Or"),
+            "DX-Y.NYB": ("DX-Y.NYB", "USD Index"),
+        }
+        try:
+            tickers = list(WATCH.values())
+            data = yf.download([t[0] for t in tickers], period="2d", progress=False)["Close"]
+            cols_m = st.columns(4)
+            for i, (name, (sym, cat)) in enumerate(WATCH.items()):
+                try:
+                    series = data[sym] if sym in data.columns else data.iloc[:, 0]
+                    last  = float(series.iloc[-1])
+                    prev  = float(series.iloc[-2])
+                    pct   = (last - prev) / prev * 100
+                    color = "#00ff41" if pct >= 0 else "#ff2222"
+                    with cols_m[i % 4]:
+                        st.markdown(f"""
+                        <div style='background:#080808;border:1px solid #1a1a1a;border-radius:4px;
+                                    padding:10px;margin-bottom:8px;'>
+                            <div style='font-size:9px;color:#4d9fff;font-family:IBM Plex Mono,monospace;
+                                        letter-spacing:1px;'>{cat.upper()}</div>
+                            <div style='font-size:14px;font-weight:700;font-family:IBM Plex Mono,monospace;
+                                        margin:4px 0;'>{name}</div>
+                            <div style='font-size:18px;font-weight:700;font-family:IBM Plex Mono,monospace;'>
+                                ${last:,.2f}</div>
+                            <div style='font-size:12px;color:{color};font-family:IBM Plex Mono,monospace;'>
+                                {"▲" if pct>=0 else "▼"} {abs(pct):.2f}%</div>
+                        </div>""", unsafe_allow_html=True)
+                except:
+                    pass
+        except Exception as e:
+            st.error(f"Erreur Market Monitor : {e}")
+
+    elif tool_id == "INTERETS":
+        st.markdown("### 📈 Calculateur Intérêts Composés")
+        c1, c2, c3, c4 = st.columns(4)
+        capital    = c1.number_input("Capital initial ($)", value=10000, min_value=0, key="ic_cap")
+        mensuel    = c2.number_input("Apport mensuel ($)", value=500,   min_value=0, key="ic_mens")
+        taux_an    = c3.number_input("Taux annuel (%)",    value=10.0,  min_value=0.0, key="ic_taux", step=0.5)
+        annees     = c4.number_input("Durée (années)",     value=20,    min_value=1, max_value=50, key="ic_duree")
+        taux_m = taux_an / 100 / 12
+        vals, invests = [], []
+        total = float(capital)
+        invested = float(capital)
+        for m in range(int(annees) * 12):
+            total    = total * (1 + taux_m) + float(mensuel)
+            invested = invested + float(mensuel)
+            if m % 12 == 11:
+                vals.append(round(total, 2))
+                invests.append(round(invested, 2))
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(y=invests, name="Capital investi", line=dict(color="#4d9fff", width=1.5, dash="dot")))
+        fig.add_trace(go.Scatter(y=vals, name="Valeur totale",
+                                 line=dict(color="#ff6600", width=2), fill="tonexty",
+                                 fillcolor="rgba(255,102,0,0.08)"))
+        fig.update_layout(template="plotly_dark", paper_bgcolor="#000", plot_bgcolor="#0a0a0a",
+                          height=380, margin=dict(l=20,r=20,t=20,b=40),
+                          xaxis_title="Années", yaxis_title="Valeur ($)")
+        st.plotly_chart(fig, use_container_width=True)
+        profit = vals[-1] - invests[-1] if vals else 0
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Valeur finale", f"${vals[-1]:,.0f}" if vals else "—")
+        m2.metric("Total investi", f"${invests[-1]:,.0f}" if invests else "—")
+        m3.metric("Gains", f"${profit:,.0f}", delta=f"+{profit/max(invests[-1],1)*100:.1f}%" if invests else None)
+
+    elif tool_id == "DAILY_BRIEF":
+        st.markdown("### 📰 Daily Brief — Actualités")
+        import feedparser
+        feeds = {
+            "CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+            "Investing.com": "https://fr.investing.com/rss/news.rss",
+        }
+        tabs_feed = st.tabs(list(feeds.keys()))
+        for i, (src, url) in enumerate(feeds.items()):
+            with tabs_feed[i]:
+                try:
+                    feed = feedparser.parse(url)
+                    for entry in feed.entries[:8]:
+                        st.markdown(f"""
+                        <div style='border-left:2px solid #ff6600;padding:8px 12px;
+                                    margin:6px 0;background:#080808;border-radius:0 4px 4px 0;'>
+                            <a href='{entry.get("link","#")}' target='_blank'
+                               style='color:#e8e8e8;text-decoration:none;font-family:IBM Plex Sans,sans-serif;
+                                      font-size:13px;font-weight:600;'>{entry.get("title","")}</a>
+                            <div style='color:#4d9fff;font-size:9px;font-family:IBM Plex Mono,monospace;
+                                        margin-top:4px;'>{entry.get("published","")}</div>
+                        </div>""", unsafe_allow_html=True)
+                except:
+                    st.error(f"Erreur flux {src}")
+
+    elif tool_id == "CALENDRIER_ECO":
+        st.markdown("### 📅 Calendrier Économique")
+        components.html("""
+        <div class="tradingview-widget-container" style="height:700px;">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript"
+            src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+          {"colorTheme":"dark","isTransparent":false,"width":"100%","height":"100%",
+           "locale":"fr","importanceFilter":"0,1","countryFilter":"us,eu,gb,jp,cn,fr,de"}
+          </script>
+        </div>""", height=720)
+
+    elif tool_id == "ALERTS":
+        st.markdown("### 🔔 Alerts Manager")
+        st.info("Module Alerts — connectez-vous pour gérer vos alertes de prix.")
+
+    elif tool_id in ("ANALYSEUR_PRO", "TECH_PRO", "FIBONACCI", "BACKTEST",
+                     "VALORISATION", "EXPERT", "DUEL", "SCREENER_CAC",
+                     "DIVIDEND_CAL"):
+        # Mapping vers les outils dans app.py via session_state
+        MAP = {
+            "ANALYSEUR_PRO": "ANALYSEUR PRO",
+            "TECH_PRO":      "ANALYSE TECHNIQUE PRO",
+            "FIBONACCI":     "FIBONACCI CALCULATOR",
+            "BACKTEST":      "BACKTESTING ENGINE",
+            "VALORISATION":  "VALORISATION FONDAMENTALE",
+            "EXPERT":        "EXPERT SYSTEM",
+            "DUEL":          "MODE DUEL",
+            "SCREENER_CAC":  "SCREENER CAC 40",
+            "DIVIDEND_CAL":  "DIVIDEND CALENDAR",
+        }
+        st.info(f"💡 Cet outil est disponible dans **ACTIONS & BOURSE → {MAP[tool_id]}**")
+        st.markdown(f"*Pour l'utiliser dans le Terminal, accédez-y via le menu principal puis revenez dans le Terminal.*")
+
+    else:
+        st.markdown(f"<div style='padding:40px;text-align:center;color:#4d9fff;"
+                    f"font-family:IBM Plex Mono,monospace;'>Outil `{tool_name}` — À venir</div>",
+                    unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════
+#  INTERFACE PRINCIPALE DU TERMINAL
+# ══════════════════════════════════════════════════════════
+
+def show_terminal():
+    """Point d'entrée principal du Terminal Bloomberg."""
+
+    # ── Inject CSS ──
+    st.markdown(TERMINAL_CSS, unsafe_allow_html=True)
+
+    # ── Session state ──
+    if "term_tabs" not in st.session_state:
+        st.session_state.term_tabs = [
+            {"id": "CHART_CRYPTO", "name": "📈 Graphique Crypto", "key": "tab_0"},
+        ]
+    if "term_active" not in st.session_state:
+        st.session_state.term_active = 0
+
+    tabs      = st.session_state.term_tabs
+    active    = st.session_state.term_active
+
+    # ══════════════════════════════════════════
+    # SIDEBAR — Ajouter un outil
+    # ══════════════════════════════════════════
+    st.sidebar.markdown(
+        "<div style='font-family:IBM Plex Mono,monospace;font-size:11px;"
+        "color:#ff6600;letter-spacing:2px;padding:8px 0 4px;'>» AJOUTER UN ONGLET</div>",
+        unsafe_allow_html=True
+    )
+
+    # Sélecteur par catégorie
+    cat_sel = st.sidebar.selectbox(
+        "Catégorie", list(TOOLS_BY_CAT.keys()),
+        key="term_cat_sel", label_visibility="collapsed"
+    )
+    tool_sel = st.sidebar.selectbox(
+        "Outil", TOOLS_BY_CAT[cat_sel],
+        key="term_tool_sel", label_visibility="collapsed"
+    )
+
+    col_add1, col_add2 = st.sidebar.columns(2)
+    if col_add1.button("＋ Ouvrir", use_container_width=True, key="term_btn_add"):
+        if len(tabs) < MAX_TABS:
+            tool_meta = TOOLS_CATALOG[tool_sel]
+            new_tab = {
+                "id":   tool_meta["id"],
+                "name": tool_sel,
+                "key":  f"tab_{int(time.time()*1000)}",
+            }
+            tabs.append(new_tab)
+            st.session_state.term_active = len(tabs) - 1
+            st.rerun()
+        else:
+            st.sidebar.warning(f"Maximum {MAX_TABS} onglets.")
+
+    if col_add2.button("Remplacer", use_container_width=True, key="term_btn_replace"):
+        tool_meta = TOOLS_CATALOG[tool_sel]
+        tabs[active] = {
+            "id":   tool_meta["id"],
+            "name": tool_sel,
+            "key":  f"tab_{int(time.time()*1000)}",
+        }
+        st.session_state.term_tabs = tabs
+        st.rerun()
+
+    st.sidebar.markdown("---")
+
+    # Onglets ouverts
+    st.sidebar.markdown(
+        "<div style='font-family:IBM Plex Mono,monospace;font-size:11px;"
+        "color:#4d9fff;letter-spacing:1px;padding:4px 0;'>» ONGLETS OUVERTS</div>",
+        unsafe_allow_html=True
+    )
+    for i, tab in enumerate(tabs):
+        cols_t = st.sidebar.columns([4, 1])
+        label = f"{'▶ ' if i==active else ''}{tab['name']}"
+        if cols_t[0].button(label[:28], key=f"term_goto_{tab['key']}", use_container_width=True):
+            st.session_state.term_active = i
+            st.rerun()
+        if cols_t[1].button("✕", key=f"term_close_{tab['key']}"):
+            tabs.pop(i)
+            st.session_state.term_active = max(0, active - 1)
+            if not tabs:
+                tabs.append({"id": "CHART_CRYPTO", "name": "📈 Graphique Crypto", "key": "tab_home"})
+            st.session_state.term_tabs = tabs
+            st.rerun()
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        f"<div style='font-family:IBM Plex Mono,monospace;font-size:9px;color:#333;'>"
+        f"{len(tabs)}/{MAX_TABS} onglets ouverts</div>",
+        unsafe_allow_html=True
+    )
+
+    # ══════════════════════════════════════════
+    # BARRE D'ONGLETS (HTML)
+    # ══════════════════════════════════════════
+    tabs_html = '<div class="term-tabs">'
+    for i, tab in enumerate(tabs):
+        active_cls = "active" if i == active else ""
+        tabs_html += f'<div class="term-tab {active_cls}">{tab["name"]}</div>'
+    tabs_html += '<div class="term-tab-add">＋</div>'
+    tabs_html += '</div>'
+
+    # Topbar + onglets
+    st.markdown(f"""
+    <div class="term-topbar">
+      <div class="term-logo">AM<span>.</span>TERMINAL</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#4d9fff;letter-spacing:1px;">
+        MULTI-ONGLETS · {len(tabs)} ACTIF{'S' if len(tabs)>1 else ''}
+      </div>
+      <div style="margin-left:auto;font-family:'IBM Plex Mono',monospace;
+                  font-size:9px;color:#333;">{time.strftime('%H:%M:%S')}</div>
+    </div>
+    {tabs_html}
+    """, unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════
+    # NAVIGATION ONGLETS via st.tabs
+    # ══════════════════════════════════════════
+    if not tabs:
+        st.markdown("""
+        <div class="term-welcome">
+          <div class="logo-big">AM<span>.</span>TERMINAL</div>
+          <div class="tagline">» BLOOMBERG-STYLE MULTI-PANEL TERMINAL «</div>
+        </div>""", unsafe_allow_html=True)
+        return
+
+    # Créer des onglets Streamlit natifs
+    tab_labels = [t["name"] for t in tabs]
+    st_tabs = st.tabs(tab_labels)
+
+    for i, (st_tab, tab) in enumerate(zip(st_tabs, tabs)):
+        with st_tab:
+            _render_tool(tab["id"], tab["name"])
