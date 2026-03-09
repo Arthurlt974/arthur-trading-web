@@ -14,3 +14,4 @@ scikit-learn
 websocket-client
 reportlab
 kaleido
+firebase-admin
