@@ -15,7 +15,7 @@ import interface_pro
 import interface_crypto_pro
 import json
 from websocket import create_connection
-from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config
+from firebase_auth import render_auth_page, render_user_sidebar, _save_current_session_config, _log_visit, get_analytics_stats
 import interface_economie
 import interface_forex
 import interface_matieres_premieres
@@ -1786,6 +1786,9 @@ if not render_auth_page():
 
 st_autorefresh(interval=600000, key="global_refresh")
 
+# ── Tracker la visite ──
+_log_visit()
+
 # ── Auto-clear cache toutes les 1h pour éviter le blocage yfinance ──
 import time as _time
 if "last_cache_clear" not in st.session_state:
@@ -1884,6 +1887,19 @@ st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
 
 # Barre utilisateur (compte + déconnexion)
 render_user_sidebar()
+
+# ── Stats analytics (visible uniquement pour arthur.974.a@gmail.com) ──
+if st.session_state.get("user_email") == "arthur.974.a@gmail.com":
+    stats = get_analytics_stats()
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(f"""
+<div style='background:rgba(255,152,0,0.05);border:1px solid rgba(255,152,0,0.2);border-radius:6px;padding:10px;font-family:monospace;'>
+<p style='color:#ff9800;font-size:11px;margin:0 0 6px 0;letter-spacing:1px;'>📊 ANALYTICS</p>
+<p style='color:#aaa;font-size:11px;margin:2px 0;'>👁️ Visites totales : <b style='color:#ff9800;'>{stats['total']}</b></p>
+<p style='color:#aaa;font-size:11px;margin:2px 0;'>👤 Sessions uniques : <b style='color:#ff9800;'>{stats['unique']}</b></p>
+<p style='color:#555;font-size:9px;margin:4px 0 0 0;'>Dernière : {stats['last_visit'][:16].replace('T',' ')}</p>
+</div>
+""", unsafe_allow_html=True)
 
 
 # ============================================================
