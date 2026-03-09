@@ -18,6 +18,82 @@ FIREBASE_PROJECT_ID     = st.secrets["FIREBASE_PROJECT_ID"]
 AUTH_URL      = f"https://identitytoolkit.googleapis.com/v1/accounts"
 FIRESTORE_URL = f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}/databases/(default)/documents"
 
+# ══════════════════════════════════════════════
+#  ANALYTICS — TRACKING VISITES FIREBASE
+# ══════════════════════════════════════════════
+
+def _log_visit():
+    """Log une visite dans Firestore — sans authentification (document public en écriture)."""
+    import datetime, uuid
+    try:
+        # Incrémenter le compteur global
+        url_counter = f"{FIRESTORE_URL}/analytics/global"
+        r = requests.get(url_counter, timeout=5)
+        if r.status_code == 200:
+            fields = r.json().get("fields", {})
+            total = int(fields.get("total_visits", {}).get("integerValue", 0)) + 1
+            unique = int(fields.get("unique_sessions", {}).get("integerValue", 0))
+        else:
+            total, unique = 1, 0
+
+        # Vérifier si cette session est nouvelle
+        is_new = "visit_tracked" not in st.session_state
+        if is_new:
+            unique += 1
+            st.session_state["visit_tracked"] = True
+
+        # Mettre à jour le compteur global
+        requests.patch(url_counter, json={"fields": {
+            "total_visits":     {"integerValue": str(total)},
+            "unique_sessions":  {"integerValue": str(unique)},
+            "last_visit":       {"stringValue": datetime.datetime.utcnow().isoformat()},
+        }}, timeout=5)
+
+        # Logger la visite individuelle si nouvelle session
+        if is_new:
+            visit_id = str(uuid.uuid4())[:8]
+            url_visit = f"{FIRESTORE_URL}/analytics/visits/items/{visit_id}"
+            requests.patch(url_visit, json={"fields": {
+                "timestamp": {"stringValue": datetime.datetime.utcnow().isoformat()},
+                "session_id": {"stringValue": visit_id},
+            }}, timeout=5)
+
+    except Exception:
+        pass  # Ne jamais bloquer l'app pour une erreur analytics
+
+
+def _log_module(module_name: str):
+    """Log l'utilisation d'un module."""
+    import datetime
+    try:
+        url = f"{FIRESTORE_URL}/analytics/modules"
+        r = requests.get(url, timeout=5)
+        if r.status_code == 200:
+            fields = r.json().get("fields", {})
+            count = int(fields.get(module_name, {}).get("integerValue", 0)) + 1
+        else:
+            fields, count = {}, 1
+        fields[module_name] = {"integerValue": str(count)}
+        requests.patch(url, json={"fields": fields}, timeout=5)
+    except Exception:
+        pass
+
+
+def get_analytics_stats() -> dict:
+    """Récupère les stats pour le dashboard admin."""
+    try:
+        r = requests.get(f"{FIRESTORE_URL}/analytics/global", timeout=5)
+        if r.status_code == 200:
+            fields = r.json().get("fields", {})
+            return {
+                "total": int(fields.get("total_visits", {}).get("integerValue", 0)),
+                "unique": int(fields.get("unique_sessions", {}).get("integerValue", 0)),
+                "last_visit": fields.get("last_visit", {}).get("stringValue", "N/A"),
+            }
+        return {"total": 0, "unique": 0, "last_visit": "N/A"}
+    except Exception:
+        return {"total": 0, "unique": 0, "last_visit": "N/A"}
+
 
 # ══════════════════════════════════════════════
 #  AUTHENTIFICATION EMAIL / MOT DE PASSE
