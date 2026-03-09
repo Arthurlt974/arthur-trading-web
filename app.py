@@ -1511,61 +1511,59 @@ def _is_european(symbol: str) -> bool:
     return any(symbol.upper().endswith(s) for s in _EU_SUFFIXES)
 
 def _plotly_candle_pro(symbol, height=600):
-    """Graphique Plotly avec indicateurs — pour actions européennes."""
+    """Remplacé par render_chart AM.Terminal — pour actions européennes."""
     try:
-        from plotly.subplots import make_subplots
-        df = yf.download(symbol, period="6mo", progress=False, auto_adjust=True)
-        if df.empty:
-            st.warning(f"Pas de données pour {symbol}")
-            return
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df["SMA20"] = df["Close"].rolling(20).mean()
-        df["SMA50"] = df["Close"].rolling(50).mean()
-        df["BB_std"] = df["Close"].rolling(20).std()
-        df["BB_up"]  = df["SMA20"] + 2 * df["BB_std"]
-        df["BB_dn"]  = df["SMA20"] - 2 * df["BB_std"]
-        df["VolMA"]  = df["Volume"].rolling(20).mean()
-
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                            vertical_spacing=0.04, row_heights=[0.75, 0.25])
-        fig.add_trace(go.Candlestick(
-            x=df.index, open=df["Open"], high=df["High"],
-            low=df["Low"], close=df["Close"], name=symbol,
-            increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
-            increasing_fillcolor="#26a69a", decreasing_fillcolor="#ef5350"
-        ), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df["BB_up"],
-            line=dict(color="rgba(255,152,0,0.35)", dash="dash", width=1),
-            name="BB Upper", showlegend=False), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df["BB_dn"],
-            line=dict(color="rgba(255,152,0,0.35)", dash="dash", width=1),
-            fill="tonexty", fillcolor="rgba(255,152,0,0.04)",
-            name="BB Lower", showlegend=False), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df["SMA20"],
-            line=dict(color="#ff9800", width=1.5), name="SMA 20"), row=1, col=1)
-        if df["SMA50"].notna().any():
-            fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"],
-                line=dict(color="#2196f3", width=1.5), name="SMA 50"), row=1, col=1)
-        colors_vol = ["#26a69a" if c >= o else "#ef5350"
-                      for c, o in zip(df["Close"], df["Open"])]
-        fig.add_trace(go.Bar(x=df.index, y=df["Volume"],
-            marker_color=colors_vol, name="Volume", opacity=0.6), row=2, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df["VolMA"],
-            line=dict(color="rgba(255,152,0,0.7)", width=1.5), name="Vol MA20"), row=2, col=1)
-        fig.update_layout(
-            template="plotly_dark", paper_bgcolor="#0e1117", plot_bgcolor="#0e1117",
-            height=height, xaxis_rangeslider_visible=False,
-            font=dict(color="#d1d4dc", family="IBM Plex Mono"),
-            legend=dict(bgcolor="rgba(0,0,0,0.5)", bordercolor="#2a2e39"),
-            margin=dict(l=10, r=10, t=30, b=10),
+        from chart_module import render_chart
+        from chart_module import config as _cm_cfg
+        _old_src = _cm_cfg.DATA_SOURCE
+        _cm_cfg.DATA_SOURCE = "yfinance"
+        html = render_chart(
+            symbol=symbol,
+            height=height,
+            show_header=True,
+            show_volume=True,
+            show_bottom=False,
+            pair_label=symbol.upper(),
+            exchange="Yahoo Finance",
+            live_sim=False,
+            show_ma=True,
+            show_bb=False,
+            default_tf="1D",
         )
-        fig.update_xaxes(gridcolor="#1e222d", showgrid=True)
-        fig.update_yaxes(gridcolor="#1e222d", showgrid=True)
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("📊 Graphique Plotly (action européenne — TradingView non supporté pour ce marché)")
+        _cm_cfg.DATA_SOURCE = _old_src
+        components.html(html, height=height + 50, scrolling=False)
     except Exception as e:
-        st.error(f"Erreur graphique : {e}")
+        # Fallback Plotly si render_chart échoue
+        try:
+            from plotly.subplots import make_subplots
+            df = yf.download(symbol, period="6mo", progress=False, auto_adjust=True)
+            if df.empty:
+                st.warning(f"Pas de données pour {symbol}")
+                return
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            df["SMA20"] = df["Close"].rolling(20).mean()
+            df["SMA50"] = df["Close"].rolling(50).mean()
+            fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                row_heights=[0.75, 0.25], vertical_spacing=0.03)
+            fig.add_trace(go.Candlestick(
+                x=df.index, open=df["Open"], high=df["High"],
+                low=df["Low"], close=df["Close"],
+                increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+                name=symbol), row=1, col=1)
+            fig.add_trace(go.Scatter(x=df.index, y=df["SMA20"],
+                line=dict(color="#ff9800", width=1), name="SMA20"), row=1, col=1)
+            fig.add_trace(go.Scatter(x=df.index, y=df["SMA50"],
+                line=dict(color="#4d9fff", width=1), name="SMA50"), row=1, col=1)
+            fig.add_trace(go.Bar(x=df.index, y=df["Volume"],
+                marker_color="#3a3f4b", name="Volume"), row=2, col=1)
+            fig.update_layout(**PLOTLY_BASE, height=height)
+            fig.update_xaxes(gridcolor="#1e222d")
+            fig.update_yaxes(gridcolor="#1e222d")
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception as e2:
+            st.error(f"Erreur graphique : {e2}")
+
 
 def afficher_graphique_pro(symbol, height=600):
     """TradingView pour actions US/crypto, Plotly pour actions européennes."""
@@ -1787,6 +1785,14 @@ if not render_auth_page():
     st.stop()
 
 st_autorefresh(interval=600000, key="global_refresh")
+
+# ── Auto-clear cache toutes les 1h pour éviter le blocage yfinance ──
+import time as _time
+if "last_cache_clear" not in st.session_state:
+    st.session_state["last_cache_clear"] = _time.time()
+if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
+    st.cache_data.clear()
+    st.session_state["last_cache_clear"] = _time.time()
 
 
 # ============================================================
