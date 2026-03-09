@@ -1303,33 +1303,70 @@ class ValuationCalculator:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
-    import requests as _req
+    """Récupère les infos — yfinance avec curl_cffi pour contourner le blocage Yahoo."""
     info = {}
+
+    # ── MÉTHODE 1 : curl_cffi (contourne le blocage Yahoo sur Streamlit Cloud) ──
     try:
-        t = yf.Ticker(ticker)
+        from curl_cffi.requests import Session as CurlSession
+        with CurlSession(impersonate="chrome") as s:
+            t = yf.Ticker(ticker, session=s)
+            full = t.info or {}
+            if len(full) > 10:
+                for k, v in full.items():
+                    if v not in (None, '', 0):
+                        info[k] = v
+    except Exception:
+        pass
+
+    # ── MÉTHODE 2 : yfinance fast_info (léger, souvent non bloqué) ──
+    if not info.get('currentPrice'):
         try:
+            t = yf.Ticker(ticker)
             fi = t.fast_info
-            if getattr(fi,'last_price',None): info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
-            if getattr(fi,'previous_close',None): info['previousClose'] = float(fi.previous_close)
-            if getattr(fi,'market_cap',None): info['marketCap'] = float(fi.market_cap)
-            if getattr(fi,'shares',None): info['sharesOutstanding'] = float(fi.shares)
-            if getattr(fi,'currency',None): info['currency'] = fi.currency
-        except Exception: pass
+            if getattr(fi, 'last_price', None): info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
+            if getattr(fi, 'previous_close', None): info['previousClose'] = float(fi.previous_close)
+            if getattr(fi, 'market_cap', None): info['marketCap'] = float(fi.market_cap)
+            if getattr(fi, 'shares', None): info['sharesOutstanding'] = float(fi.shares)
+            if getattr(fi, 'currency', None): info['currency'] = fi.currency
+        except Exception:
+            pass
+
+    # ── MÉTHODE 3 : yfinance .info standard avec User-Agent ──
+    if not info.get('trailingPE') and not info.get('trailingEps'):
         try:
+            import requests as _req
             s = _req.Session()
             s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
-            full = yf.Ticker(ticker, session=s).info or {}
-            if len(full) < 5: full = t.info or {}
-            for k,v in full.items():
-                if v not in (None,'',0) and k not in info: info[k] = v
-        except Exception: pass
-        if not info.get('currentPrice'):
-            try:
-                hist = t.history(period="5d")
-                if not hist.empty: info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
-            except Exception: pass
-        return info if info else None
-    except Exception: return None
+            full2 = yf.Ticker(ticker, session=s).info or {}
+            if len(full2) < 5: full2 = yf.Ticker(ticker).info or {}
+            for k, v in full2.items():
+                if v not in (None, '', 0) and k not in info: info[k] = v
+        except Exception:
+            pass
+
+    # ── MÉTHODE 4 : historique pour le prix minimum ──
+    if not info.get('currentPrice'):
+        try:
+            hist = yf.Ticker(ticker).history(period="5d")
+            if not hist.empty:
+                info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
+                if len(hist) > 1:
+                    info['previousClose'] = float(hist['Close'].iloc[-2])
+        except Exception:
+            pass
+
+    # ── Defaults ──
+    if not info.get('previousClose') and info.get('currentPrice'):
+        info['previousClose'] = info['currentPrice']
+    if not info.get('regularMarketPrice') and info.get('currentPrice'):
+        info['regularMarketPrice'] = info['currentPrice']
+    if not info.get('currency'):
+        info['currency'] = 'USD' if '.' not in ticker else 'EUR'
+    if not info.get('longName') and not info.get('shortName'):
+        info['shortName'] = ticker.upper()
+
+    return info if info.get('currentPrice') or info.get('previousClose') else None
 @st.cache_data(ttl=900, show_spinner=False)
 def get_valuation_cached(ticker: str) -> dict:
     """Wrapper cached autour de ValuationCalculator — évite les appels yfinance répétés."""
