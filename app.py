@@ -1303,23 +1303,51 @@ class ValuationCalculator:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
-    """Récupère les infos — yfinance avec curl_cffi pour contourner le blocage Yahoo."""
+    """Récupère les infos — Twelve Data en priorité, yfinance en fallback."""
     info = {}
 
-    # ── MÉTHODE 1 : curl_cffi (contourne le blocage Yahoo sur Streamlit Cloud) ──
+    # ── MÉTHODE 1 : Twelve Data (priorité — fiable sur Streamlit Cloud) ──
     try:
-        from curl_cffi.requests import Session as CurlSession
-        with CurlSession(impersonate="chrome") as s:
-            t = yf.Ticker(ticker, session=s)
-            full = t.info or {}
-            if len(full) > 10:
-                for k, v in full.items():
-                    if v not in (None, '', 0):
-                        info[k] = v
+        _td_key = st.secrets.get("TWELVE_DATA_KEY", "")
+        if _td_key:
+            import requests as _req_td
+            r = _req_td.get("https://api.twelvedata.com/quote",
+                params={"symbol": ticker, "apikey": _td_key}, timeout=10)
+            td = r.json()
+            if td.get("status") != "error" and td.get("close"):
+                info['currentPrice'] = info['regularMarketPrice'] = float(td["close"])
+                if td.get("previous_close"):
+                    info['previousClose'] = float(td["previous_close"])
+                if td.get("currency"):
+                    info['currency'] = td["currency"]
+                if td.get("name"):
+                    info['longName'] = td["name"]
+                if td.get("percent_change"):
+                    info['regularMarketChangePercent'] = float(td["percent_change"])
+                if td.get("volume"):
+                    info['volume'] = int(float(td["volume"]))
+                if td.get("fifty_two_week"):
+                    fw = td["fifty_two_week"]
+                    if fw.get("high"): info['fiftyTwoWeekHigh'] = float(fw["high"])
+                    if fw.get("low"):  info['fiftyTwoWeekLow']  = float(fw["low"])
     except Exception:
         pass
 
-    # ── MÉTHODE 2 : yfinance fast_info (léger, souvent non bloqué) ──
+    # ── MÉTHODE 2 : curl_cffi (yfinance contourne blocage Yahoo) ──
+    if not info.get('trailingPE') and not info.get('trailingEps'):
+        try:
+            from curl_cffi.requests import Session as CurlSession
+            with CurlSession(impersonate="chrome") as s:
+                t = yf.Ticker(ticker, session=s)
+                full = t.info or {}
+                if len(full) > 10:
+                    for k, v in full.items():
+                        if v not in (None, '', 0) and k not in info:
+                            info[k] = v
+        except Exception:
+            pass
+
+    # ── MÉTHODE 3 : yfinance fast_info ──
     if not info.get('currentPrice'):
         try:
             t = yf.Ticker(ticker)
@@ -1332,7 +1360,7 @@ def get_ticker_info(ticker):
         except Exception:
             pass
 
-    # ── MÉTHODE 3 : yfinance .info standard avec User-Agent ──
+    # ── MÉTHODE 4 : yfinance .info standard avec User-Agent ──
     if not info.get('trailingPE') and not info.get('trailingEps'):
         try:
             import requests as _req
@@ -1345,7 +1373,7 @@ def get_ticker_info(ticker):
         except Exception:
             pass
 
-    # ── MÉTHODE 4 : historique pour le prix minimum ──
+    # ── MÉTHODE 5 : yfinance historique pour le prix minimum ──
     if not info.get('currentPrice'):
         try:
             hist = yf.Ticker(ticker).history(period="5d")
@@ -1378,11 +1406,40 @@ def get_valuation_cached(ticker: str) -> dict:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_ticker_history(ticker, period="2d"):
+    # 1. Twelve Data en priorité
+    try:
+        _td_key = st.secrets.get("TWELVE_DATA_KEY", "")
+        if _td_key:
+            import requests as _req_td2
+            _period_days = {"1d":1,"2d":2,"5d":5,"1mo":30,"3mo":90,"6mo":180,"1y":365,"2y":730,"5y":1825}
+            days = _period_days.get(period, 30)
+            r = _req_td2.get("https://api.twelvedata.com/time_series",
+                params={"symbol": ticker, "interval": "1day", "outputsize": days,
+                        "apikey": _td_key, "format": "JSON", "order": "ASC"}, timeout=10)
+            td = r.json()
+            if td.get("status") != "error" and td.get("values"):
+                rows = []
+                for v in td["values"]:
+                    rows.append({
+                        "Open": float(v["open"]), "High": float(v["high"]),
+                        "Low": float(v["low"]),  "Close": float(v["close"]),
+                        "Volume": float(v.get("volume", 0) or 0),
+                    })
+                df = pd.DataFrame(rows)
+                df.index = pd.to_datetime([v["datetime"] for v in td["values"]])
+                if not df.empty:
+                    return df
+    except:
+        pass
+    # 2. yfinance fallback
     try:
         data = yf.Ticker(ticker)
-        return data.history(period=period)
+        hist = data.history(period=period)
+        if not hist.empty:
+            return hist
     except:
-        return pd.DataFrame()
+        pass
+    return pd.DataFrame()
 
 def trouver_ticker(nom):
     """Recherche le ticker Yahoo Finance — avec timeout et fallback robuste"""
