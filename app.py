@@ -1303,10 +1303,16 @@ class ValuationCalculator:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
-    """Récupère les infos — Twelve Data en priorité, yfinance en fallback."""
+    """
+    Récupère les infos en deux passes PARALLÈLES :
+    - Twelve Data  → prix fiable (fonctionne sur Streamlit Cloud)
+    - yfinance     → fondamentaux (P/E, EPS, secteur, book value...)
+    Les deux sont TOUJOURS tentés, leurs résultats sont fusionnés.
+    Twelve Data gagne sur le prix, yfinance gagne sur les fondamentaux.
+    """
     info = {}
 
-    # ── MÉTHODE 1 : Twelve Data (priorité — fiable sur Streamlit Cloud) ──
+    # ══ PASSE A : Twelve Data — prix + données marché ══
     try:
         _td_key = st.secrets.get("TWELVE_DATA_KEY", "")
         if _td_key:
@@ -1315,17 +1321,18 @@ def get_ticker_info(ticker):
                 params={"symbol": ticker, "apikey": _td_key}, timeout=10)
             td = r.json()
             if td.get("status") != "error" and td.get("close"):
-                info['currentPrice'] = info['regularMarketPrice'] = float(td["close"])
+                info['currentPrice']             = float(td["close"])
+                info['regularMarketPrice']       = float(td["close"])
                 if td.get("previous_close"):
-                    info['previousClose'] = float(td["previous_close"])
+                    info['previousClose']        = float(td["previous_close"])
                 if td.get("currency"):
-                    info['currency'] = td["currency"]
+                    info['currency']             = td["currency"]
                 if td.get("name"):
-                    info['longName'] = td["name"]
+                    info['longName']             = td["name"]
                 if td.get("percent_change"):
                     info['regularMarketChangePercent'] = float(td["percent_change"])
                 if td.get("volume"):
-                    info['volume'] = int(float(td["volume"]))
+                    info['volume']               = int(float(td["volume"]))
                 if td.get("fifty_two_week"):
                     fw = td["fifty_two_week"]
                     if fw.get("high"): info['fiftyTwoWeekHigh'] = float(fw["high"])
@@ -1333,47 +1340,73 @@ def get_ticker_info(ticker):
     except Exception:
         pass
 
-    # ── MÉTHODE 2 : curl_cffi (yfinance contourne blocage Yahoo) ──
-    if not info.get('trailingPE') and not info.get('trailingEps'):
-        try:
-            from curl_cffi.requests import Session as CurlSession
-            with CurlSession(impersonate="chrome") as s:
-                t = yf.Ticker(ticker, session=s)
-                full = t.info or {}
-                if len(full) > 10:
-                    for k, v in full.items():
-                        if v not in (None, '', 0) and k not in info:
-                            info[k] = v
-        except Exception:
-            pass
+    # ══ PASSE B : yfinance — fondamentaux (toujours tenté) ══
+    # B1 : curl_cffi (meilleure chance de passer le blocage Yahoo)
+    yf_info = {}
+    try:
+        from curl_cffi.requests import Session as CurlSession
+        with CurlSession(impersonate="chrome") as s:
+            full = yf.Ticker(ticker, session=s).info or {}
+            if len(full) > 10:
+                yf_info = full
+    except Exception:
+        pass
 
-    # ── MÉTHODE 3 : yfinance fast_info ──
-    if not info.get('currentPrice'):
-        try:
-            t = yf.Ticker(ticker)
-            fi = t.fast_info
-            if getattr(fi, 'last_price', None): info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
-            if getattr(fi, 'previous_close', None): info['previousClose'] = float(fi.previous_close)
-            if getattr(fi, 'market_cap', None): info['marketCap'] = float(fi.market_cap)
-            if getattr(fi, 'shares', None): info['sharesOutstanding'] = float(fi.shares)
-            if getattr(fi, 'currency', None): info['currency'] = fi.currency
-        except Exception:
-            pass
-
-    # ── MÉTHODE 4 : yfinance .info standard avec User-Agent ──
-    if not info.get('trailingPE') and not info.get('trailingEps'):
+    # B2 : yfinance standard avec User-Agent si B1 a échoué
+    if len(yf_info) < 5:
         try:
             import requests as _req
             s = _req.Session()
             s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
             full2 = yf.Ticker(ticker, session=s).info or {}
-            if len(full2) < 5: full2 = yf.Ticker(ticker).info or {}
-            for k, v in full2.items():
-                if v not in (None, '', 0) and k not in info: info[k] = v
+            if len(full2) > len(yf_info):
+                yf_info = full2
         except Exception:
             pass
 
-    # ── MÉTHODE 5 : yfinance historique pour le prix minimum ──
+    # B3 : yfinance brut si toujours vide
+    if len(yf_info) < 5:
+        try:
+            yf_info = yf.Ticker(ticker).info or {}
+        except Exception:
+            pass
+
+    # ── Fusion : yfinance remplit les fondamentaux manquants ──
+    FUNDAMENTALS = [
+        'trailingPE','forwardPE','trailingEps','forwardEps',
+        'bookValue','priceToBook','sector','industry',
+        'marketCap','sharesOutstanding','debtToEquity',
+        'dividendRate','dividendYield','payoutRatio',
+        'totalCashPerShare','returnOnEquity','returnOnAssets',
+        'revenueGrowth','earningsGrowth','grossMargins',
+        'operatingMargins','profitMargins','totalRevenue',
+        'freeCashflow','totalDebt','totalCash',
+        'shortName','longBusinessSummary','website','country',
+        'fullTimeEmployees','auditRisk','boardRisk',
+    ]
+    for k in FUNDAMENTALS:
+        if k not in info and yf_info.get(k) not in (None, '', 0):
+            info[k] = yf_info[k]
+
+    # Prix yfinance seulement si Twelve Data n'a rien donné
+    if not info.get('currentPrice'):
+        for k in ('currentPrice','regularMarketPrice','previousClose',
+                  'currency','longName','shortName'):
+            if yf_info.get(k) not in (None, '', 0):
+                info[k] = yf_info[k]
+
+    # B4 : fast_info pour le prix si tout a échoué
+    if not info.get('currentPrice'):
+        try:
+            fi = yf.Ticker(ticker).fast_info
+            if getattr(fi, 'last_price', None):
+                info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
+            if getattr(fi, 'previous_close', None):
+                info['previousClose'] = float(fi.previous_close)
+        except Exception:
+            pass
+
+    # B5 : historique en dernier recours pour le prix
     if not info.get('currentPrice'):
         try:
             hist = yf.Ticker(ticker).history(period="5d")
