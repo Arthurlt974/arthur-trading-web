@@ -43,25 +43,14 @@ def fetch_ohlcv(symbol: str, interval: str, limit: int = DEFAULT_LIMIT) -> tuple
     Retourne (candles, is_live).
     candles  : [{t, o, h, l, c, v}, ...]
     is_live  : True si données réelles
-    Auto-détecte les actions et route vers yfinance → Twelve Data → mock.
+    Auto-détecte les actions et route vers Twelve Data → yfinance → mock.
     """
     src = DATA_SOURCE.lower()
 
     # ── Auto-routing : si c'est une action ──
     if _is_stock(symbol) and src not in ("yfinance",):
-        print(f"[chart_module] {symbol} détecté comme action → yfinance")
 
-        # 1. Essai yfinance
-        try:
-            data = _from_yfinance(symbol, interval, limit)
-            if data and len(data) > 0:
-                print(f"[chart_module] yfinance OK pour {symbol}")
-                return data, True
-            raise ValueError("Données vides")
-        except Exception as e:
-            print(f"[chart_module] yfinance échoué ({symbol}): {e} → Twelve Data")
-
-        # 2. Fallback Twelve Data
+        # 1. Twelve Data en priorité (fiable sur Streamlit Cloud)
         td_key = _get_td_key()
         if td_key:
             try:
@@ -69,10 +58,20 @@ def fetch_ohlcv(symbol: str, interval: str, limit: int = DEFAULT_LIMIT) -> tuple
                 if data and len(data) > 0:
                     print(f"[chart_module] Twelve Data OK pour {symbol}")
                     return data, True
-            except Exception as e2:
-                print(f"[chart_module] Twelve Data échoué ({symbol}): {e2}")
+            except Exception as e:
+                print(f"[chart_module] Twelve Data échoué ({symbol}): {e} → yfinance")
         else:
-            print(f"[chart_module] Clé Twelve Data manquante → mock")
+            print(f"[chart_module] Clé Twelve Data manquante → yfinance")
+
+        # 2. Fallback yfinance
+        try:
+            data = _from_yfinance(symbol, interval, limit)
+            if data and len(data) > 0:
+                print(f"[chart_module] yfinance OK pour {symbol}")
+                return data, True
+            raise ValueError("Données vides")
+        except Exception as e2:
+            print(f"[chart_module] yfinance échoué ({symbol}): {e2}")
 
         # 3. Fallback mock
         if FALLBACK_TO_MOCK:
