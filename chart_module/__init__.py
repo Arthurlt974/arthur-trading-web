@@ -1,5 +1,5 @@
 # ============================================================
-#  chart_module — Arthur Trading
+#  chart_module — AM Trading
 #  Graphique uPlot modulaire (remplace TradingView)
 #
 #  UTILISATION DANS STREAMLIT :
@@ -12,8 +12,11 @@
 # ============================================================
 
 from .chart import render_chart
+# quant/__init__.py
+from .monte_carlo import estimate_params, merton_jd
 
-__all__ = ["render_chart"]
+__all__ = ["estimate_params", "merton_jd", "render_chart"]
+
 
 
 def test_coingecko():
@@ -47,3 +50,4 @@ def test_coingecko():
             print("[test] → Trop de requêtes, attendre 1 minute")
     except Exception as e:
         print(f"[test] ❌ Erreur : {e}")
+
