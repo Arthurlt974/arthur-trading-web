@@ -215,6 +215,133 @@ body.is-fullscreen{{
 .vol-sep{{height:1px;background:var(--border);flex-shrink:0;}}
 #cvVol{{display:block;background:var(--bg);flex-shrink:0;}}
 
+
+/* ════ MONTE CARLO PANEL ════ */
+.mc-panel {{
+  flex-shrink: 0;
+  display: none;
+  flex-direction: column;
+  background: #000;
+  position: relative;
+}}
+.mc-panel.open {{ display: flex; }}
+
+/* Resize handle */
+.mc-resize-bar {{
+  height: 5px;
+  background: #0D0D0D;
+  border-top: 1px solid #1A1A1A;
+  cursor: ns-resize;
+  flex-shrink: 0;
+  transition: background .15s;
+  display: flex; align-items: center; justify-content: center;
+}}
+.mc-resize-bar:hover {{ background: rgba(250,190,44,0.15); }}
+.mc-resize-bar::after {{
+  content: '⋯'; color: #333; font-size: 10px; pointer-events: none;
+}}
+
+/* Top bar */
+.mc-bar {{
+  height: 30px;
+  background: #050505;
+  border-top: 1px solid #1E1E1E;
+  border-bottom: 1px solid #161616;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0;
+}}
+.mc-bar-title {{
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 10px; letter-spacing: 2px;
+  color: #FABE2C;
+  padding: 0 12px;
+  border-right: 1px solid #1E1E1E;
+  height: 100%; display: flex; align-items: center; gap: 5px;
+}}
+.mc-tab {{
+  padding: 0 13px; height: 100%;
+  background: transparent; border: none;
+  border-right: 1px solid #161616;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  color: #555; cursor: pointer;
+  transition: all .15s; text-transform: uppercase;
+  display: flex; align-items: center; gap: 5px;
+}}
+.mc-tab:hover {{ color: #999; background: #0A0A0A; }}
+.mc-tab.active {{ color: #FABE2C; background: rgba(250,190,44,0.05); }}
+.mc-tab-dot {{
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; opacity: 0.8;
+}}
+.mc-params {{
+  display: flex; align-items: center;
+  margin-left: auto; height: 100%;
+  border-left: 1px solid #161616;
+}}
+.mc-param-group {{
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 9px; height: 100%;
+  border-right: 1px solid #161616;
+}}
+.mc-param-lbl {{
+  font-size: 8px; color: #444;
+  letter-spacing: .5px; text-transform: uppercase;
+  white-space: nowrap;
+}}
+.mc-param-inp {{
+  width: 36px; padding: 2px 4px;
+  background: #111; border: 1px solid #222;
+  color: #bbb; font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; text-align: center;
+  outline: none;
+}}
+.mc-param-inp:focus {{ border-color: rgba(250,190,44,0.4); }}
+.mc-run {{
+  padding: 0 13px; height: 100%;
+  background: rgba(250,190,44,0.07);
+  border: none; border-right: 1px solid rgba(250,190,44,0.2);
+  color: #FABE2C; font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}}
+.mc-run:hover {{ background: rgba(250,190,44,0.15); }}
+.mc-close {{
+  padding: 0 11px; height: 100%;
+  background: transparent; border: none;
+  color: #333; cursor: pointer; font-size: 13px;
+  transition: color .12s;
+}}
+.mc-close:hover {{ color: #888; }}
+
+/* Canvas wrap */
+.mc-canvas-wrap {{
+  flex: 1; overflow: hidden; position: relative;
+  background: #000;
+}}
+
+/* Stats footer */
+.mc-stats {{
+  height: 22px; flex-shrink: 0;
+  background: #030303;
+  border-top: 1px solid #141414;
+  display: flex; align-items: center;
+}}
+.mc-stat {{
+  display: flex; align-items: center; gap: 5px;
+  padding: 0 11px; height: 100%;
+  border-right: 1px solid #111;
+}}
+.mc-stat-k {{
+  font-size: 7px; letter-spacing: .5px;
+  color: #3A3A3A; text-transform: uppercase;
+}}
+.mc-stat-v {{
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; font-weight: 700;
+}}
 /* ── TOOLTIP FLOTTANT ── */
 #tooltip{{
   position:fixed;pointer-events:none;z-index:9999;
@@ -272,6 +399,8 @@ body.is-fullscreen{{
   display:flex;flex-direction:column;
   overflow:hidden;
   border-left:1px solid #2A2A2A;
+  height:100%;          /* force bound so qp-tools can scroll */
+  min-height:0;
 }}
 .qp-header{{
   display:flex;align-items:center;
@@ -298,11 +427,14 @@ body.is-fullscreen{{
 .qp-tab:hover{{color:var(--text2);}}
 .qp-tab.active{{color:#FABE2C;border-bottom-color:#FABE2C;background:rgba(250,190,44,0.04);}}
 .qp-tools{{
-  flex:1;overflow-y:auto;padding:8px;
+  flex:1;overflow-y:auto;overflow-x:hidden;padding:8px;
   display:flex;flex-direction:column;gap:6px;
+  min-height:0;          /* critical: allow flex child to shrink & scroll */
 }}
-.qp-tools::-webkit-scrollbar{{width:3px;}}
-.qp-tools::-webkit-scrollbar-thumb{{background:#2A2A2A;}}
+.qp-tools::-webkit-scrollbar{{width:4px;}}
+.qp-tools::-webkit-scrollbar-track{{background:#0A0A0A;}}
+.qp-tools::-webkit-scrollbar-thumb{{background:#2A2A2A;border-radius:2px;}}
+.qp-tools::-webkit-scrollbar-thumb:hover{{background:#3A3A3A;}}
 .tool-card{{
   background:var(--surface2);border:1px solid #1A1A1A;
   border-radius:4px;cursor:pointer;transition:all .15s;overflow:hidden;
@@ -531,6 +663,31 @@ body.is-fullscreen{{
   <canvas id="cvRSI" style="display:none"></canvas>
   <div class="vol-sep" id="macdSep" style="display:none"></div>
   <canvas id="cvMACD" style="display:none"></canvas>
+
+  <!-- ══ MONTE CARLO PANEL ══ -->
+  <div class="mc-panel" id="mcPanel">
+    <div class="mc-resize-bar" id="mcResizeBar"></div>
+    <div class="mc-bar">
+      <div class="mc-bar-title">🎲 MONTE CARLO</div>
+      <button class="mc-tab active" id="mcTabFan" onclick="mcSetVis('fan')">
+        <span class="mc-tab-dot"></span>Fan Chart
+      </button>
+      <button class="mc-tab" id="mcTabSpag" onclick="mcSetVis('spaghetti')">
+        <span class="mc-tab-dot"></span>Spaghetti
+      </button>
+      <span id="mcBarInfo" style="margin-left:auto;font-size:8px;color:#444;font-family:'Share Tech Mono',monospace;padding:0 10px;">—</span>
+    </div>
+    <div class="mc-canvas-wrap" id="mcCanvasWrap">
+      <canvas id="cvMC"></canvas>
+    </div>
+    <div class="mc-stats">
+      <div class="mc-stat"><span class="mc-stat-k">Médiane</span><span class="mc-stat-v" id="mcStatMed" style="color:#FABE2C">—</span></div>
+      <div class="mc-stat"><span class="mc-stat-k">P95 Haussier</span><span class="mc-stat-v" id="mcStatP95" style="color:#00C853">—</span></div>
+      <div class="mc-stat"><span class="mc-stat-k">P5 Baissier</span><span class="mc-stat-v" id="mcStatP5" style="color:#FF3B30">—</span></div>
+      <div class="mc-stat"><span class="mc-stat-k">Prob. profit</span><span class="mc-stat-v" id="mcStatProb" style="color:#00C853">—</span></div>
+      <div class="mc-stat"><span class="mc-stat-k">VaR 95%</span><span class="mc-stat-v" id="mcStatVar" style="color:#FF3B30">—</span></div>
+    </div>
+  </div>
 </div>
 
 <!-- QUANT PANEL (hidden by default, shown in quant mode) -->
@@ -601,13 +758,20 @@ body.is-fullscreen{{
         </div>
         <div class="field-row">
           <span class="field-lbl">SIMULATIONS</span>
-          <input class="field-inp" id="mc_nsim" value="3000" style="max-width:60px">
+          <input class="field-inp" id="mc_nsim" value="5000" style="max-width:60px">
+        </div>
+
+        <!-- Sélecteur visualisation -->
+        <div style="font-size:7px;letter-spacing:1.5px;color:#FABE2C;margin:8px 0 4px;border-bottom:1px solid #1a1a1a;padding-bottom:3px;">VISUALISATION</div>
+        <div style="display:flex;gap:4px;margin-bottom:8px;">
+          <div id="mc_vis_fan" onclick="mcSetVis('fan')" style="flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;border:1px solid rgba(250,190,44,0.5);background:rgba(250,190,44,0.10);color:#FABE2C;transition:all .15s;">📊 FAN</div>
+          <div id="mc_vis_spag" onclick="mcSetVis('spaghetti')" style="flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;border:1px solid #2a2a2a;background:transparent;color:#555;transition:all .15s;">〰 SPAGHETTI</div>
         </div>
 
         <!-- Boutons -->
-        <div style="display:flex;gap:6px;margin-top:6px;">
-          <div class="run-btn" style="flex:1;" onclick="runMonteCarlo()">▶ CALCULER</div>
-          <div class="run-btn" id="mc_graph_btn" style="flex:1;background:rgba(77,159,255,0.10);border-color:rgba(77,159,255,0.35);color:#4d9fff;" onclick="toggleMCOnChart()">📈 GRAPHIQUE</div>
+        <div style="display:flex;gap:6px;margin-top:2px;">
+          <div class="run-btn" style="flex:1;" id="mc_calc_btn" onclick="runMonteCarlo()">▶ CALCULER</div>
+          <div class="run-btn" id="mc_graph_btn" style="flex:1;background:rgba(77,159,255,0.10);border-color:rgba(77,159,255,0.35);color:#4d9fff;" onclick="toggleMCPanel()">📈 GRAPHIQUE</div>
         </div>
 
         <!-- Résultats -->
@@ -871,8 +1035,9 @@ function setupCanvas() {{
   const volH  = showVol  ? VPAH   : 0;
   const rsiH  = showRSI  ? RSI_H  : 0;
   const macdH = showMACD ? MACD_H : 0;
+  const mcH   = MC_OPEN  ? (MC_HEIGHT + 5) : 0;  // +5 = resize bar
   const extras = volH + rsiH + macdH + (showVol?1:0) + (showRSI?1:0) + (showMACD?1:0);
-  const mainH = Math.max(fullH - hdrH - tbH - bbarH - extras - sepH, 150);
+  const mainH = Math.max(fullH - hdrH - tbH - bbarH - extras - mcH - sepH, 100);
 
   cvMain.width=W; cvMain.height=mainH;
   cvVol.width=W;  cvVol.height=volH;
@@ -1995,6 +2160,8 @@ axisX.addEventListener('dblclick', () => {{
 // ════════════════════════════════════════════════════════
 // ── Variable globale mode ──
 let CHART_MODE = 'normal';  // 'normal' | 'pro' | 'quant'
+let MC_OPEN   = false;
+let MC_HEIGHT = 260;
 
 // ── Mapping TF → intervalle Binance + secondes ──
 const TF_MAP = {{
@@ -2188,6 +2355,9 @@ function pickMode(key, lbl, sub, icon) {{
       if(qpBtn) qpBtn.textContent = '⚙ QUANT TOOLS ▶';
     }}
   }}
+  // Fermer le panel MC si on quitte le mode quant
+  if(key !== 'quant' && MC_OPEN) mcClose();
+
   setupCanvas(); render();
 }}
 
@@ -2338,7 +2508,7 @@ function runMonteCarlo() {{
   const mu_j    = (parseFloat($('mc_muj'  )?.value) || -5)  / 100;
   const sigma_j = (parseFloat($('mc_sigmaj')?.value)|| 10)  / 100;
   const horizon = parseInt  ($('mc_horizon')?.value) || 90;
-  const nSim    = Math.min(10000, parseInt($('mc_nsim')?.value) || 3000);
+  const nSim    = Math.min(10000, parseInt($('mc_nsim')?.value) || 5000);
 
   // Info calcul en cours
   const infoEl = $('mc_r_info');
@@ -2377,26 +2547,50 @@ function runMonteCarlo() {{
     if(infoEl) infoEl.textContent =
       `${{nSim}} sim · ${{horizon}}j · Merton JD · ${{ms}}ms`;
 
-    // Sauvegarde pour affichage graphique
+    // Sauvegarde (ancien système canvas)
     MC_BANDS = res;
-    if(MC_SHOW) render();   // redessiner si déjà visible
+
+    // ── Alimenter le panel MC avec les mêmes résultats ──────
+    // Convertir format mertonJDSim → format panel mcDraw
+    MC_RESULT = {{
+      percs:       res.paths,        // {{p5, p10, p25, p50, p75, p90, p95}}  Float64Array
+      allPaths:    null,             // pas de trajectoires individuelles (perf)
+      S0:          res.S0,
+      horizon:     res.horizon,
+      mean:        res.mean,
+      p5:          res.p5,
+      p25:         res.p25,
+      p50:         res.p50,
+      p75:         res.p75,
+      p95:         res.p95,
+      prob_profit: res.probProfit,
+      var_95:      res.var95,
+    }};
+
+    // Si panel ouvert → redessiner immédiatement
+    if(MC_OPEN) {{
+      mcResizeCanvas();
+      mcDraw();
+    }}
+    const barInfo = $('mcBarInfo');
+    if(barInfo) barInfo.textContent = nSim + ' sim · ' + horizon + 'j · Merton JD';
   }}, 10);
 }}
 
 // ════════════════════════════════════════════════════════
-//  BOUTON 📈 GRAPHIQUE  (toggle)
+//  BOUTON 📈 GRAPHIQUE  — toggle direct du panel MC
 // ════════════════════════════════════════════════════════
-function toggleMCOnChart() {{
-  if(!MC_BANDS) {{ runMonteCarlo(); MC_SHOW = true; }}
-  else          {{ MC_SHOW = !MC_SHOW; }}
+function toggleMCPanel() {{
+  if(MC_OPEN) {{ mcClose(); }}
+  else        {{ mcOpen(); }}
+}}
+
+function _mcUpdateGraphBtn(open) {{
   const btn = $('mc_graph_btn');
-  if(btn) {{
-    btn.style.background = MC_SHOW
-      ? 'rgba(77,159,255,0.22)' : 'rgba(77,159,255,0.10)';
-    btn.style.borderColor = MC_SHOW ? '#4d9fff' : 'rgba(77,159,255,0.35)';
-    btn.textContent = MC_SHOW ? '📈 MASQUER' : '📈 GRAPHIQUE';
-  }}
-  render();
+  if(!btn) return;
+  btn.style.background  = open ? 'rgba(77,159,255,0.22)' : 'rgba(77,159,255,0.10)';
+  btn.style.borderColor = open ? '#4d9fff' : 'rgba(77,159,255,0.35)';
+  btn.textContent       = open ? '📈 MASQUER' : '📈 GRAPHIQUE';
 }}
 
 // ════════════════════════════════════════════════════════
@@ -2671,7 +2865,483 @@ function init() {{
 }}
 
 window.addEventListener('load', init);
-window.addEventListener('resize', ()=>{{ setupCanvas(); render(); }});
+
+// ════════════════════════════════════════════════════════════════
+//  MONTE CARLO  (Merton Jump-Diffusion, vectorisé JS)
+// ════════════════════════════════════════════════════════════════
+
+let MC_MODE    = 'fan';      // 'fan' | 'spaghetti'
+let MC_RESULT  = null;
+const MC_MIN_H = 140;
+const MC_MAX_H = 520;
+
+// MC panel : s'ouvre via bouton GRAPHIQUE uniquement
+
+function mcOpen() {{
+  MC_OPEN = true;
+  const p = document.getElementById('mcPanel');
+  p.classList.add('open');
+  p.style.height = MC_HEIGHT + 'px';
+  _mcUpdateGraphBtn(true);
+  setupCanvas(); render();
+  mcResizeCanvas();
+  if(MC_RESULT) mcDraw();
+}}
+
+function mcClose() {{
+  MC_OPEN = false;
+  document.getElementById('mcPanel').classList.remove('open');
+  _mcUpdateGraphBtn(false);
+  setupCanvas(); render();
+}}
+
+
+// ════════════════════════════════════════════════════════
+//  SÉLECTEUR FAN / SPAGHETTI (carte + panel synchronisés)
+// ════════════════════════════════════════════════════════
+function mcSetVis(mode) {{
+  MC_MODE = mode;
+
+  // Mise à jour boutons dans la carte outil
+  const btnFan  = $('mc_vis_fan');
+  const btnSpag = $('mc_vis_spag');
+  if(btnFan) {{
+    btnFan.style.borderColor  = mode === 'fan' ? 'rgba(250,190,44,0.5)' : '#2a2a2a';
+    btnFan.style.background   = mode === 'fan' ? 'rgba(250,190,44,0.10)' : 'transparent';
+    btnFan.style.color        = mode === 'fan' ? '#FABE2C' : '#555';
+  }}
+  if(btnSpag) {{
+    btnSpag.style.borderColor  = mode === 'spaghetti' ? 'rgba(250,190,44,0.5)' : '#2a2a2a';
+    btnSpag.style.background   = mode === 'spaghetti' ? 'rgba(250,190,44,0.10)' : 'transparent';
+    btnSpag.style.color        = mode === 'spaghetti' ? '#FABE2C' : '#555';
+  }}
+
+  // Mise à jour onglets dans la barre du panel
+  const tabFan  = $('mcTabFan');
+  const tabSpag = $('mcTabSpag');
+  if(tabFan)  tabFan.classList.toggle('active',  mode === 'fan');
+  if(tabSpag) tabSpag.classList.toggle('active', mode === 'spaghetti');
+
+  // Redessiner
+  if(MC_RESULT && MC_OPEN) mcDraw();
+}}
+
+function mcSetMode(mode) {{
+  MC_MODE = mode;
+  document.getElementById('mcTabFan').classList.toggle('active', mode === 'fan');
+  document.getElementById('mcTabSpag').classList.toggle('active', mode === 'spaghetti');
+  if(MC_RESULT) mcDraw();
+}}
+
+function mcResizeCanvas() {{
+  const wrap = document.getElementById('mcCanvasWrap');
+  const cv   = document.getElementById('cvMC');
+  if(!wrap || !cv) return;
+  const W = wrap.offsetWidth;
+  const H = wrap.offsetHeight;
+  if(W < 10 || H < 10) return;
+  cv.width  = W; cv.height = H;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+}}
+
+// ── Merton Jump-Diffusion ─────────────────────────────────────
+function mcRandNormal() {{
+  let u, v;
+  do {{ u = Math.random(); }} while(u === 0);
+  do {{ v = Math.random(); }} while(v === 0);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}}
+function mcPoisson(lam) {{
+  const L = Math.exp(-lam);
+  let k = 0, p = 1;
+  do {{ k++; p *= Math.random(); }} while(p > L);
+  return k - 1;
+}}
+
+function mcSimulate(closes, horizon, nSim, lam) {{
+  const n = closes.length;
+  if(n < 10) return null;
+
+  // Estimer µ et σ annualisés (252 jours)
+  const ANN = 252;
+  const lr  = [];
+  for(let i = 1; i < n; i++) lr.push(Math.log(closes[i] / closes[i-1]));
+  const muPer  = lr.reduce((a,b)=>a+b, 0) / lr.length;
+  const sigPer = Math.sqrt(lr.reduce((a,b)=>a+(b-muPer)**2, 0) / Math.max(lr.length-1,1));
+  const mu     = muPer  * ANN;
+  const sigma  = sigPer * Math.sqrt(ANN);
+  const dt     = 1 / ANN;
+
+  // Params sauts Merton
+  const mu_j   = -0.05;
+  const sig_j  = 0.10;
+  const k      = Math.exp(mu_j + 0.5 * sig_j * sig_j) - 1;
+  const mu_c   = mu - lam * k;
+
+  const S0     = closes[closes.length - 1];
+  const allPaths = [];   // pour spaghetti: stocker toutes les trajectoires
+
+  const PCTS   = [5, 10, 25, 50, 75, 90, 95];
+  // Matrice: steps × nSim  (stocker juste les valeurs à chaque step pour percentile)
+  const steps  = horizon + 1;
+  const matrix = Array.from({{length: steps}}, () => new Float64Array(nSim));
+  matrix[0].fill(S0);
+
+  for(let s = 0; s < nSim; s++) {{
+    let price = S0;
+    const path = [price];
+    for(let t = 0; t < horizon; t++) {{
+      const Z  = mcRandNormal();
+      const nj = mcPoisson(lam * dt);
+      let J    = 0;
+      for(let j = 0; j < nj; j++) J += mcRandNormal() * sig_j + mu_j;
+      const ret = (mu_c - 0.5 * sigma * sigma) * dt
+                + sigma * Math.sqrt(dt) * Z
+                + J;
+      price = price * Math.exp(ret);
+      path.push(price);
+      matrix[t+1][s] = price;
+    }}
+    if(nSim <= 120) allPaths.push(path);   // garder si assez peu
+  }}
+
+  // Calculer percentiles à chaque step
+  const percs = {{}};
+  PCTS.forEach(p => percs['p'+p] = new Array(steps));
+  for(let t = 0; t < steps; t++) {{
+    const sorted = Array.from(matrix[t]).sort((a,b)=>a-b);
+    PCTS.forEach(p => {{
+      const idx = Math.max(0, Math.floor(p / 100 * (sorted.length - 1)));
+      percs['p'+p][t] = sorted[idx];
+    }});
+  }}
+
+  const finals  = Array.from(matrix[steps - 1]).sort((a,b)=>a-b);
+  const mean    = finals.reduce((a,b)=>a+b,0) / finals.length;
+  const p5v     = finals[Math.floor(0.05 * finals.length)];
+  const probP   = finals.filter(v => v > S0).length / finals.length * 100;
+
+  return {{ percs, allPaths, S0, horizon, mean,
+    p5:  finals[Math.floor(0.05 * finals.length)],
+    p25: finals[Math.floor(0.25 * finals.length)],
+    p50: finals[Math.floor(0.50 * finals.length)],
+    p75: finals[Math.floor(0.75 * finals.length)],
+    p95: finals[Math.floor(0.95 * finals.length)],
+    prob_profit: probP,
+    var_95: p5v - S0,
+  }};
+}}
+
+function mcRun() {{
+  const runBtn = document.querySelector('.mc-run');
+  if(runBtn) {{ runBtn.textContent = '⏳ ...'; runBtn.disabled = true; }}
+
+  setTimeout(() => {{
+    const horizon = Math.min(Math.max(parseInt(document.getElementById('mcHorizon').value)||60, 10), 365);
+    const nSim    = Math.min(Math.max(parseInt(document.getElementById('mcNSim').value)||300, 30), 500);
+    const lam     = Math.max(parseFloat(document.getElementById('mcLambda').value)||3, 0);
+
+    MC_RESULT = mcSimulate(D.c.slice(), horizon, nSim, lam);
+
+    if(runBtn) {{ runBtn.textContent = '▶ SIMULER'; runBtn.disabled = false; }}
+
+    if(!MC_OPEN) mcOpen();
+    mcResizeCanvas();
+    mcDraw();
+    mcUpdateStats();
+  }}, 10);
+}}
+
+function mcUpdateStats() {{
+  if(!MC_RESULT) return;
+  const r  = MC_RESULT;
+  const S0 = r.S0;
+  const pct = v => (v/S0 - 1) * 100;
+  const sign = v => v >= 0 ? '+' : '';
+  const fmtStat = v => fmt(v) + ' (' + sign(pct(v)) + pct(v).toFixed(1) + '%)';
+
+  const set = (id, v) => {{ const el = document.getElementById(id); if(el) el.textContent = v; }};
+  set('mcStatMed',  fmtStat(r.p50));
+  set('mcStatP95',  fmtStat(r.p95));
+  set('mcStatP5',   fmtStat(r.p5));
+  set('mcStatProb', r.prob_profit.toFixed(1) + '%');
+  set('mcStatVar',  fmt(Math.abs(r.var_95)) + ' (' + (r.var_95/S0*100).toFixed(1) + '%)');
+}}
+
+// ── Rendu principal ───────────────────────────────────────────
+function mcDraw() {{
+  const cv  = document.getElementById('cvMC');
+  if(!cv || !MC_RESULT) return;
+  const ctx = cv.getContext('2d');
+  const W   = cv.width, H = cv.height;
+  if(W < 10 || H < 10) return;
+
+  const r = MC_RESULT;
+
+  // ── Données historiques à afficher (40 bougies visible max)
+  const nHist    = Math.min(40, VIEW_END - VIEW_START, D.c.length);
+  const histStart = D.c.length - nHist;
+  const histC = D.c.slice(histStart);
+  const histO = D.o.slice(histStart);
+  const histH = D.h.slice(histStart);
+  const histL = D.l.slice(histStart);
+
+  // ── Range de prix : historique + toutes les bandes MC ──────
+  const allPrices = [
+    ...histH, ...histL,
+    ...r.percs.p5, ...r.percs.p95,
+  ];
+  const rawMin = Math.min(...allPrices);
+  const rawMax = Math.max(...allPrices);
+  const pad    = (rawMax - rawMin) * 0.06 || rawMax * 0.02;
+  const pMin   = rawMin - pad;
+  const pMax   = rawMax + pad;
+  const pRng   = pMax - pMin || 1;
+
+  // ── Layout ─────────────────────────────────────────────────
+  const PL = 4, PR = 70, PT = 8, PB = 20;
+  const plotW = W - PL - PR;
+  const plotH = H - PT - PB;
+
+  // Nombre total de colonnes : historique + projection
+  const totalCols = nHist + r.horizon;
+  const CW        = plotW / totalCols;
+
+  const toX = i  => PL + i * CW + CW * 0.5;
+  const toY = p  => PT + (1 - (p - pMin) / pRng) * plotH;
+
+  // ── Fond + grille ───────────────────────────────────────────
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#0F0F0F';
+  ctx.lineWidth   = 1;
+  for(let g = 0; g <= 5; g++) {{
+    const y     = PT + g / 5 * plotH;
+    const price = pMax - g / 5 * pRng;
+    ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(W - PR, y); ctx.stroke();
+    ctx.fillStyle  = '#2A2A2A';
+    ctx.font       = '9px Share Tech Mono,monospace';
+    ctx.textAlign  = 'left';
+    ctx.fillText(fmt(price), W - PR + 6, y + 3);
+  }}
+
+  // ── Séparateur NOW ──────────────────────────────────────────
+  const xNow = toX(nHist - 0.5);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(250,190,44,0.25)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(xNow, PT); ctx.lineTo(xNow, H - PB); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = 'rgba(250,190,44,0.45)';
+  ctx.font      = '7px Share Tech Mono,monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('NOW', xNow, PT - 1);
+
+  // ── Bougies historiques ─────────────────────────────────────
+  for(let i = 0; i < nHist; i++) {{
+    const o = histO[i], h = histH[i], l = histL[i], cl = histC[i];
+    const bull = cl >= o;
+    const x    = toX(i);
+    const bw   = Math.max(1, CW * 0.65);
+    ctx.strokeStyle = bull ? '#1A6B38' : '#7A2020';
+    ctx.fillStyle   = bull ? '#00C853' : '#FF3B30';
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, toY(h));
+    ctx.lineTo(x, toY(l));
+    ctx.stroke();
+    const y1 = toY(Math.max(o, cl));
+    const y2 = toY(Math.min(o, cl));
+    ctx.fillRect(x - bw/2, y1, bw, Math.max(1, y2 - y1));
+  }}
+
+  // ── Ligne de prix courant ───────────────────────────────────
+  const lastPrice = histC[histC.length - 1];
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1; ctx.setLineDash([2,4]);
+  ctx.beginPath();
+  ctx.moveTo(PL, toY(lastPrice));
+  ctx.lineTo(W - PR, toY(lastPrice));
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Branches MC ─────────────────────────────────────────────
+  if(MC_MODE === 'fan') {{
+    mcDrawFan(ctx, r, toX, toY, nHist, W, PR);
+  }} else {{
+    mcDrawSpaghetti(ctx, r, toX, toY, nHist, W, PR);
+  }}
+}}
+
+function mcDrawFan(ctx, r, toX, toY, offset, W, PR) {{
+  // Bandes de couleur : de l'extérieur vers l'intérieur
+  const bands = [
+    {{ lo: 'p5',  hi: 'p95', fill: 'rgba(250,190,44,0.05)' }},
+    {{ lo: 'p10', hi: 'p90', fill: 'rgba(250,190,44,0.08)' }},
+    {{ lo: 'p25', hi: 'p75', fill: 'rgba(250,190,44,0.12)' }},
+  ];
+
+  bands.forEach(b => {{
+    ctx.beginPath();
+    // Point de départ : prix courant (convergence)
+    const xStart = toX(offset);
+    const yStart = toY(r.S0);
+    ctx.moveTo(xStart, yStart);
+    // Bord haut
+    for(let i = 0; i <= r.horizon; i++) {{
+      ctx.lineTo(toX(offset + i), toY(r.percs[b.hi][i]));
+    }}
+    // Bord bas (retour)
+    for(let i = r.horizon; i >= 0; i--) {{
+      ctx.lineTo(toX(offset + i), toY(r.percs[b.lo][i]));
+    }}
+    ctx.closePath();
+    ctx.fillStyle = b.fill;
+    ctx.fill();
+  }});
+
+  // Lignes de percentile
+  const lines = [
+    {{ key: 'p95', color: 'rgba(0,200,83,0.85)',   lw: 1.5, dash: [] }},
+    {{ key: 'p75', color: 'rgba(0,200,83,0.35)',   lw: 1,   dash: [3,3] }},
+    {{ key: 'p50', color: 'rgba(250,190,44,0.9)',  lw: 2,   dash: [] }},
+    {{ key: 'p25', color: 'rgba(255,59,48,0.35)',  lw: 1,   dash: [3,3] }},
+    {{ key: 'p5',  color: 'rgba(255,59,48,0.85)',  lw: 1.5, dash: [] }},
+  ];
+
+  lines.forEach(l => {{
+    ctx.save();
+    ctx.strokeStyle = l.color; ctx.lineWidth = l.lw;
+    ctx.setLineDash(l.dash);
+    ctx.beginPath();
+    for(let i = 0; i <= r.horizon; i++) {{
+      const x = toX(offset + i), y = toY(r.percs[l.key][i]);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }}
+    ctx.stroke();
+    ctx.restore();
+  }});
+
+  // Labels à droite
+  const labels = [
+    {{ key: 'p95', color: '#00C853',  lbl: 'P95' }},
+    {{ key: 'p50', color: '#FABE2C',  lbl: 'MED' }},
+    {{ key: 'p5',  color: '#FF3B30',  lbl: 'P5'  }},
+  ];
+  const endX = toX(offset + r.horizon) + 4;
+  ctx.font = '8px Share Tech Mono,monospace';
+  ctx.textAlign = 'left';
+  labels.forEach(l => {{
+    ctx.fillStyle = l.color;
+    ctx.fillText(l.lbl + ' ' + fmt(r.percs[l.key][r.horizon]), endX, toY(r.percs[l.key][r.horizon]) + 3);
+  }});
+}}
+
+function mcDrawSpaghetti(ctx, r, toX, toY, offset, W, PR) {{
+  // Trajectoires individuelles (si disponibles)
+  const paths = r.allPaths;
+  if(paths && paths.length > 0) {{
+    ctx.lineWidth = 0.7;
+    for(let s = 0; s < paths.length; s++) {{
+      const finals = paths[s][paths[s].length - 1];
+      const bull   = finals >= r.S0;
+      ctx.strokeStyle = bull
+        ? 'rgba(0,200,83,0.10)'
+        : 'rgba(255,59,48,0.10)';
+      ctx.beginPath();
+      for(let i = 0; i < paths[s].length; i++) {{
+        const x = toX(offset + i), y = toY(paths[s][i]);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }}
+      ctx.stroke();
+    }}
+  }} else {{
+    // Fallback : dessiner des bandes à partir des percentiles (beaucoup de sims)
+    for(let p = 0; p < 95; p += 5) {{
+      const k1 = 'p' + p, k2 = 'p' + (p + 5);
+      if(!r.percs[k1] || !r.percs[k2]) continue;
+      const ratio = 1 - Math.abs(p - 50) / 50;
+      ctx.strokeStyle = p >= 50
+        ? `rgba(0,200,83,${{(ratio * 0.25).toFixed(2)}})`
+        : `rgba(255,59,48,${{(ratio * 0.25).toFixed(2)}})`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      for(let i = 0; i <= r.horizon; i++) {{
+        const x = toX(offset + i), y = toY(r.percs[k1][i]);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }}
+      ctx.stroke();
+    }}
+  }}
+
+  // Médiane (toujours visible)
+  ctx.save();
+  ctx.strokeStyle = '#FABE2C'; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.beginPath();
+  for(let i = 0; i <= r.horizon; i++) {{
+    const x = toX(offset + i), y = toY(r.percs.p50[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }}
+  ctx.stroke();
+  ctx.restore();
+
+  // P5 / P95 en pointillé
+  [['p5','rgba(255,59,48,0.75)'],['p95','rgba(0,200,83,0.75)']].forEach(([k,c]) => {{
+    ctx.save();
+    ctx.strokeStyle = c; ctx.lineWidth = 1.2; ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    for(let i = 0; i <= r.horizon; i++) {{
+      const x = toX(offset + i), y = toY(r.percs[k][i]);
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }}
+    ctx.stroke(); ctx.restore();
+  }});
+
+  // Labels à droite
+  const endX = toX(offset + r.horizon) + 4;
+  ctx.font = '8px Share Tech Mono,monospace'; ctx.textAlign = 'left';
+  [['p95','#00C853','P95'],['p50','#FABE2C','MED'],['p5','#FF3B30','P5']].forEach(([k,c,l]) => {{
+    ctx.fillStyle = c;
+    ctx.fillText(l + ' ' + fmt(r.percs[k][r.horizon]), endX, toY(r.percs[k][r.horizon]) + 3);
+  }});
+}}
+
+// ── Resize handle ─────────────────────────────────────────────
+(function() {{
+  const bar = document.getElementById('mcResizeBar');
+  if(!bar) return;
+  let active = false, startY = 0, startH = 0;
+
+  bar.addEventListener('mousedown', e => {{
+    active = true; startY = e.clientY; startH = MC_HEIGHT;
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+  }});
+
+  window.addEventListener('mousemove', e => {{
+    if(!active) return;
+    // Tirer vers le haut = agrandir (delta négatif = on monte)
+    const delta  = startY - e.clientY;
+    MC_HEIGHT    = Math.min(MC_MAX_H, Math.max(MC_MIN_H, startH + delta));
+    const panel  = document.getElementById('mcPanel');
+    panel.style.height = MC_HEIGHT + 'px';
+    mcResizeCanvas();
+    if(MC_RESULT) mcDraw();
+  }});
+
+  window.addEventListener('mouseup', () => {{
+    if(active) {{
+      active = false;
+      document.body.style.userSelect = '';
+      setupCanvas(); render();
+    }}
+  }});
+}})();
+
+window.addEventListener('resize', ()=>{{ setupCanvas(); render(); if(MC_OPEN){{ mcResizeCanvas(); if(MC_RESULT) mcDraw(); }} }});
 </script>
 </body>
 </html>"""
