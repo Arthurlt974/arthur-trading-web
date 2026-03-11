@@ -30,6 +30,21 @@ def render_chart(
         print(f"[chart_module] Erreur fetch ({symbol} {interval}): {e}")
         candles, is_live = [], False
 
+    # ── Quant : calibration Merton depuis l'historique ──────
+    try:
+        from .quant.monte_carlo import estimate_params
+        closes_list: list = []
+        for c in (candles or []):
+            if isinstance(c, dict):
+                closes_list.append(float(c.get('close', c.get('c', 0)) or 0))
+            elif isinstance(c, (list, tuple)) and len(c) >= 5:
+                closes_list.append(float(c[4] or 0))
+        mp       = estimate_params(closes_list, freq=interval.lower())
+        mc_mu    = round(mp['mu']    * 100, 2)   # dérive annualisée en %
+        mc_sigma = round(mp['sigma'] * 100, 2)   # vol annualisée en %
+    except Exception:
+        mc_mu, mc_sigma = 50.0, 80.0
+
     # ── Affichage du nom de la paire ──
     pair_disp = pair_label or (
         symbol.upper() + "/USD"
@@ -533,41 +548,88 @@ body.is-fullscreen{{
   </div>
   <div class="qp-tools">
 
-    <!-- Monte Carlo -->
-    <div class="tool-card tc-active" id="tc-montecarlo">
+    <!-- Monte Carlo Merton Jump-Diffusion -->
+    <div class="tool-card tc-active" id="tc-montecarlo" data-tab="simul">
       <div class="tool-header-q" onclick="toggleToolCard('tc-montecarlo')">
         <span class="tool-icon">🎲</span>
-        <span class="tool-name">Monte Carlo</span>
+        <span class="tool-name">Monte Carlo · Merton JD</span>
         <span class="tool-tag tag-sim">JUMP DIFF</span>
       </div>
       <div class="tool-body-q">
+
+        <!-- Séparateur paramètres GBM -->
+        <div style="font-size:7px;letter-spacing:1.5px;color:#4d9fff;margin:4px 0 2px;border-bottom:1px solid #1a1a1a;padding-bottom:3px;">
+          GBM — AUTO-CALIBRÉ <span style="color:#333;font-size:8px;">(modifiable)</span>
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">DÉRIVE μ/AN</span>
+          <input class="field-inp" id="mc_mu" value="{mc_mu}" style="max-width:55px">
+          <span class="field-unit">%</span>
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">VOL σ/AN</span>
+          <input class="field-inp" id="mc_sigma" value="{mc_sigma}" style="max-width:55px">
+          <span class="field-unit">%</span>
+        </div>
+
+        <!-- Séparateur Merton -->
+        <div style="font-size:7px;letter-spacing:1.5px;color:#FABE2C;margin:6px 0 2px;border-bottom:1px solid #1a1a1a;padding-bottom:3px;">MERTON — SAUTS</div>
+        <div class="field-row">
+          <span class="field-lbl">λ SAUTS/AN</span>
+          <input class="field-inp" id="mc_lam" value="3" style="max-width:45px"
+            title="Intensité Poisson : nombre moyen de sauts par an">
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">μ_J MOY SAUT</span>
+          <input class="field-inp" id="mc_muj" value="-5" style="max-width:45px"
+            title="Taille log-moyenne d'un saut (négatif = crash)">
+          <span class="field-unit">%</span>
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">σ_J VOL SAUT</span>
+          <input class="field-inp" id="mc_sigmaj" value="10" style="max-width:45px"
+            title="Dispersion log des sauts">
+          <span class="field-unit">%</span>
+        </div>
+
+        <!-- Séparateur simulation -->
+        <div style="font-size:7px;letter-spacing:1.5px;color:#FF9944;margin:6px 0 2px;border-bottom:1px solid #1a1a1a;padding-bottom:3px;">SIMULATION</div>
         <div class="field-row">
           <span class="field-lbl">HORIZON</span>
-          <input class="field-inp" value="90" style="max-width:50px">
+          <input class="field-inp" id="mc_horizon" value="90" style="max-width:50px">
           <span class="field-unit">jours</span>
         </div>
         <div class="field-row">
           <span class="field-lbl">SIMULATIONS</span>
-          <input class="field-inp" value="5000" style="max-width:60px">
+          <input class="field-inp" id="mc_nsim" value="3000" style="max-width:60px">
         </div>
-        <div class="field-row">
-          <span class="field-lbl">λ JUMPS/AN</span>
-          <input class="field-inp" value="3" style="max-width:40px">
+
+        <!-- Boutons -->
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <div class="run-btn" style="flex:1;" onclick="runMonteCarlo()">▶ CALCULER</div>
+          <div class="run-btn" id="mc_graph_btn" style="flex:1;background:rgba(77,159,255,0.10);border-color:rgba(77,159,255,0.35);color:#4d9fff;" onclick="toggleMCOnChart()">📈 GRAPHIQUE</div>
         </div>
-        <div class="run-btn">▶ AFFICHER SUR GRAPHIQUE</div>
-        <div class="result-box">
-          <div class="result-row"><span class="result-lbl">PRIX MOYEN</span><span class="result-val val-orange">$0.101 (+8.2%)</span></div>
-          <div class="result-row"><span class="result-lbl">P95 HAUSSIER</span><span class="result-val val-green">$0.141 (+51%)</span></div>
-          <div class="result-row"><span class="result-lbl">P5 BAISSIER</span><span class="result-val val-red">$0.051 (-45%)</span></div>
-          <div class="result-row"><span class="result-lbl">PROB. PROFIT</span><span class="result-val val-green">51.2%</span></div>
-          <div class="result-row"><span class="result-lbl">VaR 95%</span><span class="result-val val-red">-$42,510</span></div>
-          <div class="result-bar"><div class="result-bar-fill" style="width:51%"></div></div>
+
+        <!-- Résultats -->
+        <div class="result-box" id="mc-result-box" style="margin-top:6px;">
+          <div style="font-size:7px;color:#666;letter-spacing:1px;margin-bottom:4px;">— RÉSULTATS SIMULATION —</div>
+          <div class="result-row"><span class="result-lbl">PRIX ACTUEL S₀</span><span class="result-val" id="mc_r_s0" style="color:#4d9fff;">—</span></div>
+          <div class="result-row"><span class="result-lbl">PRIX MOYEN</span><span class="result-val val-orange" id="mc_r_mean">—</span></div>
+          <div class="result-row"><span class="result-lbl">MÉDIANE P50</span><span class="result-val val-yellow" id="mc_r_p50">—</span></div>
+          <div class="result-row"><span class="result-lbl">P95 HAUSSIER</span><span class="result-val val-green" id="mc_r_p95">—</span></div>
+          <div class="result-row"><span class="result-lbl">P5 BAISSIER</span><span class="result-val val-red" id="mc_r_p5">—</span></div>
+          <div class="result-row"><span class="result-lbl">PROB. PROFIT</span><span class="result-val" id="mc_r_prob">—</span></div>
+          <div class="result-row"><span class="result-lbl">VaR 95% (1J)</span><span class="result-val val-red" id="mc_r_var">—</span></div>
+          <div class="result-row"><span class="result-lbl">CVaR 95%</span><span class="result-val val-red" id="mc_r_cvar">—</span></div>
+          <div style="font-size:7px;color:#333;margin-top:3px;text-align:right;" id="mc_r_info">cliquer ▶ CALCULER</div>
+          <div class="result-bar" style="margin-top:4px;"><div class="result-bar-fill" id="mc_r_bar" style="width:0%"></div></div>
         </div>
+
       </div>
     </div>
 
     <!-- VaR / CVaR -->
-    <div class="tool-card tc-running" id="tc-var">
+    <div class="tool-card tc-running" id="tc-var"        data-tab="risk">
       <div class="tool-header-q" onclick="toggleToolCard('tc-var')">
         <span class="tool-icon">📉</span>
         <span class="tool-name">VaR / CVaR</span>
@@ -599,7 +661,7 @@ body.is-fullscreen{{
     </div>
 
     <!-- Kelly Criterion -->
-    <div class="tool-card" id="tc-kelly">
+    <div class="tool-card" id="tc-kelly"      data-tab="risk">
       <div class="tool-header-q" onclick="toggleToolCard('tc-kelly')">
         <span class="tool-icon">⚖️</span>
         <span class="tool-name">Kelly Criterion</span>
@@ -613,7 +675,7 @@ body.is-fullscreen{{
     </div>
 
     <!-- Sharpe / Sortino -->
-    <div class="tool-card" id="tc-sharpe">
+    <div class="tool-card" id="tc-sharpe"     data-tab="stats">
       <div class="tool-header-q" onclick="toggleToolCard('tc-sharpe')">
         <span class="tool-icon">📊</span>
         <span class="tool-name">Sharpe / Sortino</span>
@@ -626,7 +688,7 @@ body.is-fullscreen{{
     </div>
 
     <!-- GARCH -->
-    <div class="tool-card" id="tc-garch">
+    <div class="tool-card" id="tc-garch"      data-tab="stats">
       <div class="tool-header-q" onclick="toggleToolCard('tc-garch')">
         <span class="tool-icon">〰️</span>
         <span class="tool-name">GARCH Volatility</span>
@@ -639,7 +701,7 @@ body.is-fullscreen{{
     </div>
 
     <!-- Correlation Matrix -->
-    <div class="tool-card" id="tc-corr">
+    <div class="tool-card" id="tc-corr"       data-tab="stats">
       <div class="tool-header-q" onclick="toggleToolCard('tc-corr')">
         <span class="tool-icon">🔗</span>
         <span class="tool-name">Correlation Matrix</span>
@@ -652,7 +714,7 @@ body.is-fullscreen{{
     </div>
 
     <!-- Portfolio Optim -->
-    <div class="tool-card" id="tc-portfolio">
+    <div class="tool-card" id="tc-portfolio"  data-tab="optim">
       <div class="tool-header-q" onclick="toggleToolCard('tc-portfolio')">
         <span class="tool-icon">🎯</span>
         <span class="tool-name">Portfolio Optim.</span>
@@ -665,7 +727,7 @@ body.is-fullscreen{{
     </div>
 
     <!-- ML Predictions -->
-    <div class="tool-card" id="tc-ml">
+    <div class="tool-card" id="tc-ml"         data-tab="simul">
       <div class="tool-header-q" onclick="toggleToolCard('tc-ml')">
         <span class="tool-icon">🤖</span>
         <span class="tool-name">ML Predictions</span>
@@ -1237,6 +1299,9 @@ function drawMain() {{
       ctx.fillText(`MA${{m.p}}`, 8+i*52, 18);
     }});
   }}
+
+  // ── MONTE CARLO MERTON — BANDES ──
+  drawMCBands(ctx, W, H, toX, toY, N, CW);
 
   // ── BOUGIES ──
   for(let i=0;i<N;i++) {{
@@ -2040,20 +2105,31 @@ async function reloadOHLCVCoinGecko(tf) {{
 // ════════════════════════════════════════════════════════
 //  QUANT PANEL
 // ════════════════════════════════════════════════════════
-let quantPanelOpen = true;
+let quantPanelOpen = false;
 
 function toggleQuantPanel() {{
   quantPanelOpen = !quantPanelOpen;
   const qPanel = $('quantPanel');
   const btn    = $('qpToggleBtn');
   if(qPanel) qPanel.style.display = quantPanelOpen ? 'flex' : 'none';
-  if(btn)    btn.textContent = quantPanelOpen ? '⚙ QUANT TOOLS ▶' : '⚙ QUANT TOOLS ◀';
+  if(btn)    btn.textContent = quantPanelOpen ? '⚙ QUANT TOOLS ◀' : '⚙ QUANT TOOLS ▶';
+  // Initialise le filtre d'onglet à la première ouverture
+  if(quantPanelOpen) {{
+    const activeTab = document.querySelector('.qp-tab.active');
+    const tabName   = activeTab ? activeTab.textContent.trim().toLowerCase() : 'risk';
+    document.querySelectorAll('.tool-card').forEach(card => {{
+      card.style.display = (!card.dataset.tab || card.dataset.tab === tabName) ? '' : 'none';
+    }});
+  }}
   setupCanvas(); render();
 }}
 
 function switchQTab(el, tab) {{
   document.querySelectorAll('.qp-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
+  document.querySelectorAll('.tool-card').forEach(card => {{
+    card.style.display = (!card.dataset.tab || card.dataset.tab === tab) ? '' : 'none';
+  }});
 }}
 
 function toggleToolCard(id) {{
@@ -2103,17 +2179,16 @@ function pickMode(key, lbl, sub, icon) {{
   if(qpBtn) qpBtn.classList.toggle('qmode', isQuant);
   if(qPanel) {{
     if(isQuant) {{
-      quantPanelOpen = true;
-      qPanel.style.display = 'flex';
-      qpBtn.textContent = '⚙ QUANT TOOLS ▶';
-      // Update sub label
-      const sub = $('qpSub');
-      if(sub) sub.textContent = (window.CURRENT_SYMBOL || '{binance_symbol}') + ' · ' + (window.CURRENT_TF || '{active_tf}').toUpperCase();
-    }} else {{
+      quantPanelOpen = false;  // reset — bouton toggle ouvre
       qPanel.style.display = 'none';
+      if(qpBtn) qpBtn.textContent = '⚙ QUANT TOOLS ▶';
+    }} else {{
+      quantPanelOpen = false;
+      qPanel.style.display = 'none';
+      if(qpBtn) qpBtn.textContent = '⚙ QUANT TOOLS ▶';
     }}
   }}
-  render();
+  setupCanvas(); render();
 }}
 
 // Fermer dropdown si clic extérieur
@@ -2124,6 +2199,290 @@ document.addEventListener('click', e => {{
     $('modeCaret').classList.remove('open');
   }}
 }});
+// ════════════════════════════════════════════════════════
+//  MERTON JUMP-DIFFUSION  — moteur JS (TypedArray)
+//  Miroir fidèle de quant/monte_carlo.py
+// ════════════════════════════════════════════════════════
+let MC_SHOW  = false;
+let MC_BANDS = null;   // trajectoires percentiles pour drawMCBands
+
+/* Box-Muller → N(0,1) */
+function _randn() {{
+  let u, v, s;
+  do {{ u = Math.random()*2-1; v = Math.random()*2-1; s = u*u+v*v; }} while(s>=1||s===0);
+  return u * Math.sqrt(-2*Math.log(s)/s);
+}}
+
+/* Poisson(λ) — Knuth pour λ<30, approx normale sinon */
+function _poisson(lam) {{
+  if(lam <= 0) return 0;
+  if(lam < 30) {{
+    const L = Math.exp(-lam); let k=0, p=1;
+    do {{ k++; p *= Math.random(); }} while(p > L);
+    return k-1;
+  }}
+  return Math.max(0, Math.round(lam + Math.sqrt(lam)*_randn()));
+}}
+
+function mertonJDSim(S0, mu, sigma, lam, mu_j, sigma_j, horizon, nSim) {{
+  const dt     = 1/252;                              // pas journalier
+  const sqDt   = Math.sqrt(dt);
+  const k      = Math.exp(mu_j + 0.5*sigma_j*sigma_j) - 1; // saut moyen
+  const mu_c   = mu - lam * k;                      // dérive corrigée Merton
+  const steps  = horizon + 1;
+
+  // ── Stockage de toutes les trajectoires (Float64Array) ──
+  const allPaths = new Float64Array(nSim * steps);
+
+  for(let s=0; s<nSim; s++) {{
+    let price = S0;
+    allPaths[s*steps] = price;
+    for(let t=1; t<steps; t++) {{
+      // Brownien
+      const Z = _randn();
+      // Sauts de Poisson
+      const nj = _poisson(lam * dt);
+      let J = 0;
+      for(let jj=0; jj<nj; jj++) J += _randn()*sigma_j + mu_j;
+      // Log-return Merton
+      price *= Math.exp((mu_c - 0.5*sigma*sigma)*dt + sigma*sqDt*Z + J);
+      if(price < 1e-12) price = 1e-12;
+      allPaths[s*steps + t] = price;
+    }}
+  }}
+
+  // ── Calcul des percentiles par pas de temps ──
+  const PCTS = [5, 10, 25, 50, 75, 90, 95];
+  const pPaths = {{}};
+  for(const p of PCTS) pPaths[`p${{p}}`] = new Float64Array(steps);
+
+  const col = new Float64Array(nSim);
+  for(let t=0; t<steps; t++) {{
+    for(let s=0; s<nSim; s++) col[s] = allPaths[s*steps + t];
+    const sorted = col.slice().sort();
+    for(const p of PCTS) {{
+      const idx = Math.min(nSim-1, Math.floor(p/100*(nSim-1)));
+      pPaths[`p${{p}}`][t] = sorted[idx];
+    }}
+  }}
+
+  // ── Stats terminales ──
+  const finals = new Float64Array(nSim);
+  for(let s=0; s<nSim; s++) finals[s] = allPaths[s*steps + horizon];
+  const sortedF   = finals.slice().sort();
+  const sumF      = finals.reduce((a,b)=>a+b,0);
+  const mean      = sumF / nSim;
+  const p5v       = sortedF[Math.floor(0.05*(nSim-1))];
+  const p25v      = sortedF[Math.floor(0.25*(nSim-1))];
+  const p50v      = sortedF[Math.floor(0.50*(nSim-1))];
+  const p75v      = sortedF[Math.floor(0.75*(nSim-1))];
+  const p95v      = sortedF[Math.floor(0.95*(nSim-1))];
+  let probProfit=0, tailSum=0, tailN=0;
+  for(let s=0;s<nSim;s++) {{
+    if(finals[s] > S0) probProfit++;
+    if(finals[s] <= p5v) {{ tailSum+=finals[s]; tailN++; }}
+  }}
+  const cvar95 = tailN>0 ? tailSum/tailN - S0 : p5v - S0;
+
+  return {{
+    paths: pPaths,                // percentile paths (Float64Array per pct)
+    mean, p5:p5v, p25:p25v, p50:p50v, p75:p75v, p95:p95v,
+    probProfit: probProfit/nSim*100,
+    var95: p5v - S0,
+    cvar95,
+    S0, horizon,
+  }};
+}}
+
+// ════════════════════════════════════════════════════════
+//  AUTO-CALIBRATION μ et σ depuis D.c
+// ════════════════════════════════════════════════════════
+function autoCalibrateMC() {{
+  if(D.c.length < 10) return;
+  const ANN = {{'1m':525600,'5m':105120,'15m':35040,'30m':17520,
+                '1h':8760,'4h':2190,'1d':252,'1w':52}};
+  const factor = ANN[window.CURRENT_TF||'4h'] || 2190;
+  let sumLR=0, n=D.c.length;
+  const lrs = [];
+  for(let i=1;i<n;i++) {{
+    if(D.c[i-1]>0) {{
+      const lr = Math.log(D.c[i]/D.c[i-1]);
+      lrs.push(lr); sumLR+=lr;
+    }}
+  }}
+  if(lrs.length < 5) return;
+  const muP  = sumLR / lrs.length;
+  let varSum  = 0;
+  for(const r of lrs) varSum += (r-muP)*(r-muP);
+  const sigP = Math.sqrt(varSum / (lrs.length-1));
+  const muAnn  = (muP  * factor * 100).toFixed(2);
+  const sigAnn = (sigP * Math.sqrt(factor) * 100).toFixed(2);
+  const muEl  = $('mc_mu');   if (muEl && !muEl.dataset.userChanged) muEl.value = muAnn.toFixed(2);
+  const sigEl = $('mc_sigma');if (sigEl && !sigEl.dataset.userChanged) sigEl.value = sigAnn.toFixed(2);
+}}
+
+// ════════════════════════════════════════════════════════
+//  BOUTON ▶ CALCULER
+// ════════════════════════════════════════════════════════
+function runMonteCarlo() {{
+  // Prix courant du graphique (live)
+  const S0 = D.c[D.c.length-1] || 100;
+
+  // Re-calibration automatique avant calcul
+  //autoCalibrateMC();
+
+  // Lecture des paramètres
+  const mu      = (parseFloat($('mc_mu'   )?.value) || 50)  / 100;
+  const sigma   = (parseFloat($('mc_sigma')?.value) || 80)  / 100;
+  const lam     = parseFloat($('mc_lam'   )?.value) || 3;
+  const mu_j    = (parseFloat($('mc_muj'  )?.value) || -5)  / 100;
+  const sigma_j = (parseFloat($('mc_sigmaj')?.value)|| 10)  / 100;
+  const horizon = parseInt  ($('mc_horizon')?.value) || 90;
+  const nSim    = Math.min(10000, parseInt($('mc_nsim')?.value) || 3000);
+
+  // Info calcul en cours
+  const infoEl = $('mc_r_info');
+  if(infoEl) infoEl.textContent = `⏳ Calcul ${{nSim}} trajectoires…`;
+
+  // Calcul asynchrone (évite de bloquer l'UI)
+  setTimeout(() => {{
+    const t0  = performance.now();
+    const res = mertonJDSim(S0, mu, sigma, lam, mu_j, sigma_j, horizon, nSim);
+    const ms  = (performance.now() - t0).toFixed(0);
+
+    // Formatage résultats
+    const fmtR = (v, ref) => {{
+      const pct = ((v-ref)/ref*100);
+      return fmt(v) + ' (' + (pct>=0?'+':'') + pct.toFixed(1) + '%)';
+    }};
+    const setR = (id, txt, cls) => {{
+      const el=$(id);
+      if(!el) return;
+      el.textContent = txt;
+      if(cls) el.className = 'result-val ' + cls;
+    }};
+
+    setR('mc_r_s0',   fmt(S0),                     '');
+    setR('mc_r_mean', fmtR(res.mean, S0),           'val-orange');
+    setR('mc_r_p50',  fmtR(res.p50,  S0),           'val-yellow');
+    setR('mc_r_p95',  fmtR(res.p95,  S0),           'val-green');
+    setR('mc_r_p5',   fmtR(res.p5,   S0),           'val-red');
+    const pp = res.probProfit;
+    setR('mc_r_prob', pp.toFixed(1)+'%',             pp>=50?'val-green':'val-red');
+    setR('mc_r_var',  (res.var95>=0?'+':'')+fmt(res.var95)+ ' ('+((res.var95/S0)*100).toFixed(1)+'%)', 'val-red');
+    setR('mc_r_cvar', (res.cvar95>=0?'+':'')+fmt(res.cvar95)+'  CVaR','val-red');
+
+    const bar = $('mc_r_bar');
+    if(bar) bar.style.width = pp.toFixed(0)+'%';
+    if(infoEl) infoEl.textContent =
+      `${{nSim}} sim · ${{horizon}}j · Merton JD · ${{ms}}ms`;
+
+    // Sauvegarde pour affichage graphique
+    MC_BANDS = res;
+    if(MC_SHOW) render();   // redessiner si déjà visible
+  }}, 10);
+}}
+
+// ════════════════════════════════════════════════════════
+//  BOUTON 📈 GRAPHIQUE  (toggle)
+// ════════════════════════════════════════════════════════
+function toggleMCOnChart() {{
+  if(!MC_BANDS) {{ runMonteCarlo(); MC_SHOW = true; }}
+  else          {{ MC_SHOW = !MC_SHOW; }}
+  const btn = $('mc_graph_btn');
+  if(btn) {{
+    btn.style.background = MC_SHOW
+      ? 'rgba(77,159,255,0.22)' : 'rgba(77,159,255,0.10)';
+    btn.style.borderColor = MC_SHOW ? '#4d9fff' : 'rgba(77,159,255,0.35)';
+    btn.textContent = MC_SHOW ? '📈 MASQUER' : '📈 GRAPHIQUE';
+  }}
+  render();
+}}
+
+// ════════════════════════════════════════════════════════
+//  DESSIN DES BANDES MC SUR LE CANVAS
+// ════════════════════════════════════════════════════════
+function drawMCBands(ctx, W, H, toX, toY, N, CW) {{
+  if(!MC_SHOW || !MC_BANDS) return;
+  const {{ paths, horizon, S0 }} = MC_BANDS;
+  const steps = horizon + 1;
+
+  // Point de départ : fin de la vue actuelle
+  const lastX = toX(N - 1);
+  const toMCX = step => lastX + step * CW;
+  const clipX  = W - PAD.r;   // ne pas déborder sur l'axe prix
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, clipX, H);
+  ctx.clip();
+
+  // ── Fonction dessiner une bande remplie entre deux courbes ──
+  function drawBand(pHigh, pLow, fillStyle) {{
+    ctx.beginPath();
+    let started = false;
+    for(let t=0; t<steps; t++) {{
+      const x = toMCX(t);
+      if(x > clipX) break;
+      const y = toY(pHigh[t]);
+      if(!started) {{ ctx.moveTo(x, y); started=true; }}
+      else           ctx.lineTo(x, y);
+    }}
+    for(let t=steps-1; t>=0; t--) {{
+      const x = toMCX(t);
+      if(x > clipX) continue;
+      ctx.lineTo(x, toY(pLow[t]));
+    }}
+    ctx.closePath();
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+  }}
+
+  // ── Bande P5–P95  (très transparente) ──
+  drawBand(paths.p95, paths.p5,  'rgba(77,159,255,0.07)');
+  // ── Bande P10–P90 ──
+  drawBand(paths.p90, paths.p10, 'rgba(77,159,255,0.10)');
+  // ── Bande P25–P75  (cœur de distribution) ──
+  drawBand(paths.p75, paths.p25, 'rgba(77,159,255,0.18)');
+
+  // ── Lignes P5 / P95 ──
+  [[paths.p5,'rgba(255,80,80,0.55)'],[paths.p95,'rgba(0,230,118,0.55)']].forEach(([arr,col]) => {{
+    ctx.beginPath(); let s2=false;
+    for(let t=0; t<steps; t++) {{
+      const x=toMCX(t); if(x>clipX) break;
+      const y=toY(arr[t]);
+      s2 ? ctx.lineTo(x,y) : (ctx.moveTo(x,y), s2=true);
+    }}
+    ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.setLineDash([4,3]); ctx.stroke();
+    ctx.setLineDash([]);
+  }});
+
+  // ── Médiane P50 (ligne principale) ──
+  ctx.beginPath(); let sm=false;
+  for(let t=0; t<steps; t++) {{
+    const x=toMCX(t); if(x>clipX) break;
+    const y=toY(paths.p50[t]);
+    sm ? ctx.lineTo(x,y) : (ctx.moveTo(x,y), sm=true);
+  }}
+  ctx.strokeStyle='rgba(77,159,255,0.85)';
+  ctx.lineWidth=1.8; ctx.setLineDash([]); ctx.stroke();
+
+  // ── Ligne de départ (S0) ──
+  const x0 = toMCX(0);
+  const yS0 = toY(S0);
+  ctx.beginPath(); ctx.moveTo(x0, yS0); ctx.lineTo(x0, H-PAD.b);
+  ctx.strokeStyle='rgba(77,159,255,0.25)'; ctx.lineWidth=1;
+  ctx.setLineDash([2,4]); ctx.stroke(); ctx.setLineDash([]);
+
+  // ── Label ──
+  ctx.font='bold 9px Share Tech Mono,monospace';
+  ctx.fillStyle='rgba(77,159,255,0.75)';
+  ctx.textAlign='left';
+  ctx.fillText('MERTON MC', x0+4, 20);
+
+  ctx.restore();
+}}
+
 function toggleMA() {{
   showMA=!showMA; $('btnMA').classList.toggle('on',showMA); render();
 }}
