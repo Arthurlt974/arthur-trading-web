@@ -1892,64 +1892,101 @@ if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
 # ============================================================
 
 def _toolbar(key, outils, default=None):
-    """Barre d'outils horizontale — vrais boutons Streamlit stylés."""
+    """Barre d'outils horizontale compacte — st.radio horizontal caché + boutons HTML cliquables."""
     if default is None:
         default = outils[0]
     if key not in st.session_state:
         st.session_state[key] = default
 
-    # CSS spécifique à cette toolbar (boutons visibles et cliquables)
+    # CSS : masquer le radio natif + styler les boutons de sélection
     st.markdown(f"""
     <style>
-    div[data-testid="stHorizontalBlock"]:has(button[data-toolbar-key="{key}"]) {{
-        gap: 4px !important;
-        flex-wrap: wrap !important;
+    /* Masquer uniquement le radio de cette toolbar */
+    div[data-testid="stRadio"].toolbar-radio-{key} {{
+        display: none !important;
+    }}
+    /* Conteneur toolbar */
+    .toolbar-{key} {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
         background: #080808;
         border: 1px solid #1a1a1a;
         border-radius: 6px;
-        padding: 8px 10px;
+        padding: 8px 12px;
         margin-bottom: 16px;
     }}
-    button[data-toolbar-key="{key}"] {{
-        font-family: 'IBM Plex Mono', monospace !important;
-        font-size: 10px !important;
-        padding: 4px 10px !important;
-        border-radius: 4px !important;
-        border: 1px solid #1a1a1a !important;
-        background: transparent !important;
-        color: #666 !important;
-        white-space: nowrap !important;
-        min-height: 0 !important;
-        height: auto !important;
+    /* Boutons toolbar */
+    .tbtn-{key} {{
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 10px;
+        color: #555;
+        background: transparent;
+        border: 1px solid #1c1c1c;
+        border-radius: 3px;
+        padding: 4px 10px;
+        cursor: pointer;
+        white-space: nowrap;
+        letter-spacing: 0.3px;
+        line-height: 1.4;
+        text-decoration: none;
     }}
-    button[data-toolbar-key="{key}"]:hover {{
-        border-color: #333 !important;
-        color: #fff !important;
-        background: #111 !important;
+    .tbtn-{key}:hover {{
+        color: #ccc;
+        border-color: #333;
+        background: #0f0f0f;
+    }}
+    .tbtn-{key}.active {{
+        color: #ff6600;
+        border-color: #ff6600;
+        background: #0d0800;
+        font-weight: 600;
     }}
     </style>
     """, unsafe_allow_html=True)
 
-    # Nombre de boutons par ligne (max 8 par ligne)
-    n = len(outils)
-    max_per_row = 8
-    rows = [outils[i:i+max_per_row] for i in range(0, n, max_per_row)]
+    # Rendu HTML pur des boutons (décoratif)
+    html = f'<div class="toolbar-{key}">'
+    for o in outils:
+        active_class = "active" if st.session_state[key] == o else ""
+        html += f'<span class="tbtn-{key} {active_class}">{o}</span>'
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
 
-    for row in rows:
-        cols = st.columns(len(row))
-        for col, o in zip(cols, row):
-            with col:
-                is_active = st.session_state[key] == o
-                # Bouton normal — type primary si actif pour différenciation
-                label = f"● {o}" if is_active else o
-                if st.button(
-                    label,
-                    key=f"{key}_btn_{outils.index(o)}",
-                    use_container_width=True,
-                    type="primary" if is_active else "secondary"
-                ):
-                    st.session_state[key] = o
-                    st.rerun()
+    # Selectbox caché pour la vraie logique de sélection
+    current_idx = outils.index(st.session_state[key]) if st.session_state[key] in outils else 0
+
+    # Utiliser selectbox compact (1 ligne, pas de label visible)
+    st.markdown("""
+    <style>
+    div.toolbar-select > div[data-testid="stSelectbox"] > label { display:none !important; }
+    div.toolbar-select > div[data-testid="stSelectbox"] > div {
+        background: #0a0a0a !important;
+        border: 1px solid #222 !important;
+        border-radius: 4px !important;
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 11px !important;
+        color: #ff6600 !important;
+        margin-bottom: 12px;
+        max-width: 260px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    with st.container():
+        st.markdown('<div class="toolbar-select">', unsafe_allow_html=True)
+        choix = st.selectbox(
+            "outil",
+            options=outils,
+            index=current_idx,
+            key=f"{key}_select",
+            label_visibility="collapsed"
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if choix != st.session_state[key]:
+        st.session_state[key] = choix
+        st.rerun()
 
     return st.session_state[key]
 
