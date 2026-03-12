@@ -1814,7 +1814,11 @@ if "whale_logs" not in st.session_state:
 #  CONFIGURATION GLOBALE
 # ============================================================
 
-st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
+st.set_page_config(
+    page_title="AM-Trading | Bloomberg Terminal",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
@@ -1827,6 +1831,18 @@ if "multi_charts" not in st.session_state:
 
 st.markdown("""
     <style>
+    /* Supprimer le flash/assombrissement au rerun */
+    [data-testid="stApp"] {
+        transition: none !important;
+    }
+    [data-testid="stAppViewContainer"] > div {
+        animation: none !important;
+        transition: none !important;
+    }
+    /* Masquer l'overlay de chargement */
+    .stSpinner, [data-testid="stStatusWidget"] {
+        display: none !important;
+    }
         header[data-testid="stHeader"] {
             background-color: rgba(0,0,0,0) !important;
             color: #ff9800 !important;
