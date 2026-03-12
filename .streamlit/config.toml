@@ -1,0 +1,12 @@
+[global]
+disableWatchdogWarning = true
+
+[client]
+showErrorDetails = false
+toolbarMode = "minimal"
+
+[runner]
+fastReruns = true
+
+[browser]
+gatherUsageStats = false
