@@ -24,6 +24,7 @@ import interface_portfolio
 import interface_alertes
 import interface_screener
 import Terminal as terminal_module
+import interface_finance_marche
 from utils import (
     save_watchlist_firebase, load_watchlist_firebase,
     save_alerts_firebase, load_alerts_firebase,
@@ -1894,11 +1895,15 @@ if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
 
 st.sidebar.markdown("### 🗂️ NAVIGATION")
 categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
-    "ACTIONS & BOURSE", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "MARCHÉ CRYPTO",
+    "ACTIONS & BOURSE", "FINANCE DE MARCHÉ", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "MARCHÉ CRYPTO",
     "BOITE À OUTILS", "INTERFACE PRO", "INTERFACE CRYPTO PRO",
     "PORTFOLIO", "ALERTES", "SCREENER", "TERMINAL", "MON ESPACE ANALYSE"
 ])
 st.sidebar.markdown("---")
+
+if categorie == "FINANCE DE MARCHÉ":
+    interface_finance_marche.show_finance_marche()
+    st.stop()
 
 if categorie == "TERMINAL":
     terminal_module.show_terminal()
