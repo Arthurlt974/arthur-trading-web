@@ -1890,6 +1890,40 @@ if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
 
 
 # ============================================================
+
+def _toolbar(key, outils, default=None):
+    """Barre d'outils horizontale en haut de page via st.radio caché."""
+    # CSS pour masquer le radio natif
+    st.markdown("""
+    <style>
+    div[data-testid="stRadio"][data-toolbar="1"] { display: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    if default is None:
+        default = outils[0]
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+    # Rendu HTML des boutons
+    btns_html = '<div class="toolbar-wrap">'
+    for o in outils:
+        active = "tb-active" if st.session_state[key] == o else ""
+        btns_html += f'<span class="tb-btn {active}">{o}</span>'
+    btns_html += '</div>'
+    st.markdown(btns_html, unsafe_allow_html=True)
+
+    # Colonnes de boutons invisibles pour la logique
+    cols = st.columns(len(outils))
+    for i, (col, o) in enumerate(zip(cols, outils)):
+        with col:
+            if st.button(o, key=f"{key}_btn_{i}", use_container_width=True):
+                st.session_state[key] = o
+                st.rerun()
+
+    return st.session_state[key]
+
+
 #  NAVIGATION SIDEBAR
 # ============================================================
 
@@ -1962,6 +1996,31 @@ st.markdown("""
 [data-testid="stSidebar"] [data-testid="stRadio"] label {
     font-family: 'IBM Plex Mono', monospace !important;
     font-size: 10px !important; color: #4d9fff !important;
+}
+
+/* ── TOOLBAR HAUT DE PAGE ── */
+.toolbar-wrap {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin: 0 0 20px 0;
+    padding: 10px 14px;
+    background: #080808;
+    border: 1px solid #1a1a1a;
+    border-radius: 6px;
+}
+.tb-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 500;
+    color: #666; background: transparent;
+    border: 1px solid #1a1a1a; border-radius: 4px;
+    padding: 5px 12px; cursor: pointer;
+    letter-spacing: 0.5px; white-space: nowrap;
+}
+.tb-btn.tb-active {
+    color: #ff6600; border-color: #ff6600; background: #0d0800;
+}
+/* Masquer les vrais boutons toolbar */
+div[data-testid="stHorizontalBlock"] button {
+    display: none !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -2384,16 +2443,10 @@ if categorie == "MON ESPACE ANALYSE":
     st.stop()
 
 if categorie == "MARCHÉ CRYPTO":
-    outil = st.sidebar.radio("MODULES CRYPTO :", [
-        "GRAPHIQUE CRYPTO",
-        "BITCOIN DOMINANCE",
-        "CRYPTO WALLET",
-        "HEATMAP LIQUIDATIONS",
-        "ORDER BOOK LIVE",
-        "WHALE WATCHER",
-        "ON-CHAIN ANALYTICS",
-        "LIQUIDATIONS & FUNDING",
-        "STAKING & YIELD"
+    outil = _toolbar("tb_crypto", [
+        "GRAPHIQUE CRYPTO", "BITCOIN DOMINANCE", "CRYPTO WALLET",
+        "HEATMAP LIQUIDATIONS", "ORDER BOOK LIVE", "WHALE WATCHER",
+        "ON-CHAIN ANALYTICS", "LIQUIDATIONS & FUNDING", "STAKING & YIELD"
     ])
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
@@ -2409,34 +2462,21 @@ elif categorie == "MATIÈRES PREMIÈRES":
     interface_matieres_premieres.show_matieres_premieres()
     st.stop()
 elif categorie == "ACTIONS & BOURSE":
-    outil = st.sidebar.radio("MODULES ACTIONS :", [
-        "ANALYSEUR PRO",
-        "ANALYSE TECHNIQUE PRO",
-        "FIBONACCI CALCULATOR",
-        "BACKTESTING ENGINE",
-        "VALORISATION FONDAMENTALE",
-        "MULTI-CHARTS",
-        "EXPERT SYSTEM",
-        "THE GRAND COUNCIL️",
-        "MODE DUEL",
-        "MARKET MONITOR",
-        "SCREENER CAC 40",
-        "DIVIDEND CALENDAR"
+    outil = _toolbar("tb_actions", [
+        "ANALYSEUR PRO", "ANALYSE TECHNIQUE PRO", "FIBONACCI CALCULATOR",
+        "BACKTESTING ENGINE", "VALORISATION FONDAMENTALE", "MULTI-CHARTS",
+        "EXPERT SYSTEM", "THE GRAND COUNCIL️", "MODE DUEL",
+        "MARKET MONITOR", "SCREENER CAC 40", "DIVIDEND CALENDAR"
     ])
 
 elif categorie == "BOITE À OUTILS":
-    outil = st.sidebar.radio("MES OUTILS :", [
-        "DAILY BRIEF",
-        "CALENDRIER ÉCO",
-        "Fear and Gread Index",
-        "CORRÉLATION DASH",
-        "INTERETS COMPOSES",
-        "HEATMAP MARCHÉ",
-        "ALERTS MANAGER"
+    outil = _toolbar("tb_outils", [
+        "DAILY BRIEF", "CALENDRIER ÉCO", "Fear and Gread Index",
+        "CORRÉLATION DASH", "INTERETS COMPOSES", "HEATMAP MARCHÉ", "ALERTS MANAGER"
     ])
 
 st.sidebar.markdown("---")
-st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
+# secteur info removed
 
 # Barre utilisateur (compte + déconnexion)
 # ── Profil utilisateur en bas de sidebar ──
