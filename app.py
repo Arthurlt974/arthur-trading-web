@@ -1892,34 +1892,64 @@ if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
 # ============================================================
 
 def _toolbar(key, outils, default=None):
-    """Barre d'outils horizontale en haut de page via st.radio caché."""
-    # CSS pour masquer le radio natif
-    st.markdown("""
-    <style>
-    div[data-testid="stRadio"][data-toolbar="1"] { display: none !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
+    """Barre d'outils horizontale — vrais boutons Streamlit stylés."""
     if default is None:
         default = outils[0]
     if key not in st.session_state:
         st.session_state[key] = default
 
-    # Rendu HTML des boutons
-    btns_html = '<div class="toolbar-wrap">'
-    for o in outils:
-        active = "tb-active" if st.session_state[key] == o else ""
-        btns_html += f'<span class="tb-btn {active}">{o}</span>'
-    btns_html += '</div>'
-    st.markdown(btns_html, unsafe_allow_html=True)
+    # CSS spécifique à cette toolbar (boutons visibles et cliquables)
+    st.markdown(f"""
+    <style>
+    div[data-testid="stHorizontalBlock"]:has(button[data-toolbar-key="{key}"]) {{
+        gap: 4px !important;
+        flex-wrap: wrap !important;
+        background: #080808;
+        border: 1px solid #1a1a1a;
+        border-radius: 6px;
+        padding: 8px 10px;
+        margin-bottom: 16px;
+    }}
+    button[data-toolbar-key="{key}"] {{
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 10px !important;
+        padding: 4px 10px !important;
+        border-radius: 4px !important;
+        border: 1px solid #1a1a1a !important;
+        background: transparent !important;
+        color: #666 !important;
+        white-space: nowrap !important;
+        min-height: 0 !important;
+        height: auto !important;
+    }}
+    button[data-toolbar-key="{key}"]:hover {{
+        border-color: #333 !important;
+        color: #fff !important;
+        background: #111 !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
-    # Colonnes de boutons invisibles pour la logique
-    cols = st.columns(len(outils))
-    for i, (col, o) in enumerate(zip(cols, outils)):
-        with col:
-            if st.button(o, key=f"{key}_btn_{i}", use_container_width=True):
-                st.session_state[key] = o
-                st.rerun()
+    # Nombre de boutons par ligne (max 8 par ligne)
+    n = len(outils)
+    max_per_row = 8
+    rows = [outils[i:i+max_per_row] for i in range(0, n, max_per_row)]
+
+    for row in rows:
+        cols = st.columns(len(row))
+        for col, o in zip(cols, row):
+            with col:
+                is_active = st.session_state[key] == o
+                # Bouton normal — type primary si actif pour différenciation
+                label = f"● {o}" if is_active else o
+                if st.button(
+                    label,
+                    key=f"{key}_btn_{outils.index(o)}",
+                    use_container_width=True,
+                    type="primary" if is_active else "secondary"
+                ):
+                    st.session_state[key] = o
+                    st.rerun()
 
     return st.session_state[key]
 
@@ -2018,10 +2048,7 @@ st.markdown("""
 .tb-btn.tb-active {
     color: #ff6600; border-color: #ff6600; background: #0d0800;
 }
-/* Masquer les vrais boutons toolbar */
-div[data-testid="stHorizontalBlock"] button {
-    display: none !important;
-}
+/* toolbar buttons visible */
 </style>
 """, unsafe_allow_html=True)
 
