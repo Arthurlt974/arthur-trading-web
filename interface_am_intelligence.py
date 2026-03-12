@@ -13,7 +13,6 @@ ANALYSTES = {
         "border": "#2d6abf",
         "champs": [
             ("entreprise", "Nom de l'entreprise", "ex: Apple, NVIDIA, LVMH..."),
-            ("date_publication", "Date de publication des résultats (si connue)", "ex: 25 avril 2026"),
         ],
         "prompt": lambda d: f"""Tu es un analyste senior en recherche actions chez JPMorgan, spécialisé dans les notes de pré-publication de résultats pour investisseurs institutionnels.
 
@@ -32,7 +31,7 @@ J'ai besoin d'une analyse complète, structurée et professionnelle des résulta
 Présente le tout sous forme de note d'analyse pré-résultats professionnelle et concise, avec un ton senior JPMorgan (factuel, précis, sans hype).
 
 Entreprise : {d['entreprise']}
-Date de publication : {d['date_publication'] or 'Non communiquée'}"""
+"""
     },
 
     "🌑 BlackRock — Multi-Asset Allocation": {
@@ -71,7 +70,9 @@ Ma situation :
 - Objectif : {d['objectif']}
 - Tolérance au risque : {d['risque']}
 - Type de compte : {d['compte']}
-- Horizon : {d['horizon']}"""
+- Horizon : {d['horizon']}
+
+IMPORTANT : Commence IMMÉDIATEMENT par l'allocation d'actifs. Pas d'introduction. Structure directe et professionnelle."""
     },
 
     "⚜️ Rothschild — Legacy Portfolio": {
@@ -110,7 +111,9 @@ Ma situation :
 - Objectif : {d['objectif']}
 - Tolérance au risque : {d['risque']}
 - Type de compte : {d['compte']}
-- Horizon : {d['horizon']}"""
+- Horizon : {d['horizon']}
+
+IMPORTANT : Commence IMMÉDIATEMENT par l'allocation. Pas d'introduction ni d'espace vide."""
     },
 
     "🎩 Buffett — Value Portfolio": {
@@ -142,7 +145,9 @@ Ma situation :
 - Tolérance au risque : {d['risque']}
 - Montant total investi : {d['montant']}
 - Horizon : {d['horizon']}
-- Secteurs préférés : {d['secteurs']}"""
+- Secteurs préférés : {d['secteurs']}
+
+IMPORTANT : Présente IMMÉDIATEMENT le tableau des actions sans aucune introduction. Commence directement par le tableau récapitulatif. Pas de phrases d'introduction, pas d'espace vide. Structure : 1) Tableau actions 2) Répartition sectorielle 3) Projection composée 4) Commentaire global."""
     },
 
     "🎓 Harvard Endowment — Dividendes": {
@@ -209,7 +214,9 @@ Mon profil :
 - Tolérance au risque : {d['risque']}
 - Montant investi : {d['montant']}
 - Horizon : {d['horizon']}
-- Secteurs préférés : {d['secteurs']}"""
+- Secteurs préférés : {d['secteurs']}
+
+IMPORTANT : Présente IMMÉDIATEMENT le tableau des actions sans aucune introduction. Commence directement par le tableau récapitulatif. Pas de phrases d'introduction, pas d'espace vide. Structure : 1) Tableau actions 2) Répartition sectorielle 3) Projection composée 4) Commentaire global."""
     },
 }
 
@@ -341,7 +348,39 @@ def show_am_intelligence():
     # Afficher le résultat
     if "ai_result" in st.session_state and st.session_state["ai_result"]:
         st.markdown("---")
-        st.markdown(f'<div class="result-box">{st.session_state["ai_result"]}</div>', unsafe_allow_html=True)
+        # Affichage markdown natif (tableaux, gras, bullet points)
+        st.markdown("""
+        <style>
+        .stMarkdown p, .stMarkdown li, .stMarkdown td, .stMarkdown th {
+            font-family: 'IBM Plex Mono', monospace !important;
+            font-size: 12px !important;
+            color: #ccc !important;
+        }
+        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+            font-family: 'IBM Plex Mono', monospace !important;
+            color: #ff6600 !important;
+            letter-spacing: 1px !important;
+        }
+        .stMarkdown table {
+            background: #080808 !important;
+            border: 1px solid #1a1a1a !important;
+            width: 100% !important;
+        }
+        .stMarkdown th {
+            background: #0d0800 !important;
+            color: #ff6600 !important;
+            border: 1px solid #333 !important;
+            padding: 6px 10px !important;
+        }
+        .stMarkdown td {
+            border: 1px solid #1a1a1a !important;
+            padding: 5px 10px !important;
+        }
+        .stMarkdown strong { color: #ff6600 !important; }
+        </style>
+        """, unsafe_allow_html=True)
+        with st.container():
+            st.markdown(st.session_state["ai_result"])
         
         # Bouton copier
         st.download_button(
