@@ -25,6 +25,7 @@ import interface_alertes
 import interface_screener
 import Terminal as terminal_module
 import interface_finance_marche
+import interface_am_intelligence
 from utils import (
     save_watchlist_firebase, load_watchlist_firebase,
     save_alerts_firebase, load_alerts_firebase,
@@ -2098,6 +2099,7 @@ SECTEURS = {
         ("🧠 INTERFACE PRO",    "🧠"),
         ("🤖 INTERFACE CRYPTO PRO","🤖"),
         ("📐 MON ESPACE ANALYSE","📐"),
+        ("🤖 AM INTELLIGENCE",  "🤖"),
     ],
     "🛠 OUTILS": [
         ("💼 PORTFOLIO",        "💼"),
@@ -2120,6 +2122,7 @@ LABEL_TO_KEY = {
     "🧠 INTERFACE PRO":         "INTERFACE PRO",
     "🤖 INTERFACE CRYPTO PRO":  "INTERFACE CRYPTO PRO",
     "📐 MON ESPACE ANALYSE":    "MON ESPACE ANALYSE",
+    "🤖 AM INTELLIGENCE":       "AM INTELLIGENCE",
     "💼 PORTFOLIO":             "PORTFOLIO",
     "🔭 SCREENER":              "SCREENER",
     "🔔 ALERTES":               "ALERTES",
@@ -2467,6 +2470,10 @@ if categorie == "ACCUEIL":
     else:
         st.markdown('<div style="font-family:IBM Plex Mono;font-size:11px;color:#333;">Actualités indisponibles</div>', unsafe_allow_html=True)
 
+    st.stop()
+
+if categorie == "AM INTELLIGENCE":
+    interface_am_intelligence.show_am_intelligence()
     st.stop()
 
 if categorie == "FINANCE DE MARCHÉ":
