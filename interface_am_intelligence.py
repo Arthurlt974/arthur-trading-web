@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 import json
+import io
+from datetime import datetime
 
 # ── Modèle Groq ──
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -245,6 +247,107 @@ def _call_groq(prompt: str) -> str:
         return f"❌ Erreur API : {e}"
 
 
+
+def _generate_pdf(analyste_nom: str, donnees: dict, rapport: str) -> bytes:
+    """Génère un PDF du rapport AM Intelligence."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.enums import TA_CENTER
+
+    C_ORANGE = colors.HexColor("#ff9800")
+    C_GREY   = colors.HexColor("#aaaaaa")
+    C_WHITE  = colors.HexColor("#ffffff")
+    C_BORDER = colors.HexColor("#333333")
+    C_AMBER  = colors.HexColor("#ffb84d")
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+        leftMargin=15*mm, rightMargin=15*mm,
+        topMargin=12*mm, bottomMargin=15*mm,
+    )
+
+    def S(name, **kw):
+        return ParagraphStyle(name, **kw)
+
+    s_title  = S("t", fontName="Helvetica-Bold", fontSize=24, textColor=C_ORANGE, alignment=TA_CENTER, spaceAfter=4)
+    s_sub    = S("s", fontName="Helvetica", fontSize=10, textColor=C_GREY, alignment=TA_CENTER, spaceAfter=3)
+    s_sect   = S("se", fontName="Helvetica-Bold", fontSize=12, textColor=C_ORANGE, spaceBefore=10, spaceAfter=4)
+    s_h1     = S("h1", fontName="Helvetica-Bold", fontSize=11, textColor=C_ORANGE, spaceBefore=8, spaceAfter=3)
+    s_h2     = S("h2", fontName="Helvetica-Bold", fontSize=10, textColor=C_AMBER, spaceBefore=6, spaceAfter=2)
+    s_h3     = S("h3", fontName="Helvetica-Bold", fontSize=9, textColor=C_WHITE, spaceBefore=4, spaceAfter=2)
+    s_body   = S("b", fontName="Helvetica", fontSize=8, textColor=C_GREY, spaceAfter=3, leading=13)
+    s_bullet = S("bl", fontName="Helvetica", fontSize=8, textColor=C_WHITE, spaceAfter=2, leading=12, leftIndent=12)
+    s_param  = S("p", fontName="Helvetica", fontSize=8, textColor=C_AMBER, spaceAfter=2)
+    s_footer = S("f", fontName="Helvetica", fontSize=7, textColor=C_BORDER, alignment=TA_CENTER)
+
+    story = []
+
+    # ── En-tête ──
+    story.append(Spacer(1, 4*mm))
+    story.append(Paragraph("AM-TRADING", s_title))
+    story.append(Paragraph("AM INTELLIGENCE — RAPPORT D'ANALYSE", s_sub))
+    story.append(Paragraph(f"Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}", s_sub))
+    story.append(HRFlowable(width="100%", thickness=2, color=C_ORANGE, spaceAfter=8))
+
+    # ── Analyste ──
+    story.append(Paragraph(f"Analyste : {analyste_nom}", s_sect))
+
+    # ── Paramètres ──
+    if donnees:
+        story.append(Paragraph("Paramètres de l'analyse :", s_h2))
+        for k, v in donnees.items():
+            if v and str(v).strip():
+                story.append(Paragraph(f"• {k.upper()} : {v}", s_param))
+        story.append(Spacer(1, 3*mm))
+
+    story.append(HRFlowable(width="100%", thickness=1, color=C_BORDER, spaceAfter=8))
+
+    # ── Corps du rapport — parser le markdown ──
+    story.append(Paragraph("RAPPORT", s_sect))
+
+    import re
+    for line in rapport.split("\n"):
+        line = line.strip()
+        if not line:
+            story.append(Spacer(1, 2*mm))
+            continue
+
+        # Nettoyer les caractères spéciaux non supportés
+        line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        # Supprimer les * et # pour le texte brut
+        clean = re.sub(r"[*#`]", "", line).strip()
+        if not clean:
+            continue
+
+        if line.startswith("# "):
+            story.append(Paragraph(re.sub(r"^#+\s*", "", clean), s_h1))
+        elif line.startswith("## "):
+            story.append(Paragraph(re.sub(r"^#+\s*", "", clean), s_h2))
+        elif line.startswith("### "):
+            story.append(Paragraph(re.sub(r"^#+\s*", "", clean), s_h3))
+        elif line.startswith("- ") or line.startswith("• "):
+            story.append(Paragraph(f"• {clean[2:]}", s_bullet))
+        elif re.match(r"^\d+\.\s", line):
+            story.append(Paragraph(clean, s_bullet))
+        elif line.startswith("---"):
+            story.append(HRFlowable(width="100%", thickness=0.5, color=C_BORDER, spaceAfter=4))
+        else:
+            story.append(Paragraph(clean, s_body))
+
+    # ── Footer ──
+    story.append(Spacer(1, 6*mm))
+    story.append(HRFlowable(width="100%", thickness=1, color=C_BORDER))
+    story.append(Spacer(1, 2*mm))
+    story.append(Paragraph(
+        "AM-Trading Bloomberg Terminal  •  Analyse générée par IA  •  Ne constitue pas un conseil en investissement",
+        s_footer))
+
+    doc.build(story)
+    return buf.getvalue()
+
 def show_am_intelligence():
     st.markdown("""
     <style>
@@ -343,7 +446,9 @@ def show_am_intelligence():
             with st.spinner(f"⏳ Analyse en cours... (30-60 secondes)"):
                 prompt = analyste["prompt"](donnees)
                 result = _call_groq(prompt)
-                st.session_state["ai_result"] = result
+                st.session_state["ai_result"]   = result
+                st.session_state["ai_donnees"]  = donnees
+                st.session_state["ai_analyste"] = analyste_choisi
 
     # Afficher le résultat
     if "ai_result" in st.session_state and st.session_state["ai_result"]:
@@ -382,14 +487,26 @@ def show_am_intelligence():
         with st.container():
             st.markdown(st.session_state["ai_result"])
         
-        # Bouton copier
-        st.download_button(
-            "📥 Télécharger l'analyse",
-            data=st.session_state["ai_result"],
-            file_name=f"AM_Intelligence_{st.session_state['ai_analyste'].replace(' ', '_')}.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
+        # Bouton PDF
+        if st.button("📄 EXPORTER EN PDF", key="btn_pdf_intelligence", use_container_width=True, type="primary"):
+            with st.spinner("Génération du PDF..."):
+                try:
+                    pdf_bytes = _generate_pdf(
+                        analyste_nom = st.session_state.get("ai_analyste", ""),
+                        donnees      = st.session_state.get("ai_donnees", {}),
+                        rapport      = st.session_state["ai_result"],
+                    )
+                    fname = f"AM_Intelligence_{st.session_state.get('ai_analyste','rapport').replace(' ','_').replace('/','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                    st.download_button(
+                        "⬇️ Télécharger le rapport PDF",
+                        data=pdf_bytes,
+                        file_name=fname,
+                        mime="application/pdf",
+                        key="dl_pdf_intel",
+                        use_container_width=True,
+                    )
+                except Exception as e:
+                    st.error(f"Erreur PDF : {e}")
 
         st.markdown("""
         <div class="disclaimer-ai">
