@@ -1892,29 +1892,69 @@ if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
 # ============================================================
 
 def _toolbar(key, outils, default=None):
-    """Barre de tags HTML décorative + selectbox Streamlit fonctionnel."""
+    """Barre d'outils horizontale — st.radio stylisé fonctionnel."""
     if default is None:
         default = outils[0]
     if key not in st.session_state:
         st.session_state[key] = default
 
-    actif = st.session_state[key]
+    # CSS pour styler le radio horizontal comme une toolbar
+    st.markdown(f"""
+    <style>
+    div[data-testid="stRadio"][aria-label="{key}"] > div {{
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 5px !important;
+        background: #080808 !important;
+        border: 1px solid #1a1a1a !important;
+        border-radius: 6px !important;
+        padding: 8px 12px !important;
+        margin-bottom: 16px !important;
+    }}
+    div[data-testid="stRadio"][aria-label="{key}"] label {{
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-size: 10px !important;
+        color: #555 !important;
+        background: transparent !important;
+        border: 1px solid #1c1c1c !important;
+        border-radius: 3px !important;
+        padding: 4px 10px !important;
+        cursor: pointer !important;
+        white-space: nowrap !important;
+        letter-spacing: 0.3px !important;
+    }}
+    div[data-testid="stRadio"][aria-label="{key}"] label:hover {{
+        color: #ccc !important;
+        border-color: #333 !important;
+        background: #0f0f0f !important;
+    }}
+    div[data-testid="stRadio"][aria-label="{key}"] label[data-checked="true"] {{
+        color: #ff6600 !important;
+        border-color: #ff6600 !important;
+        background: #0d0800 !important;
+        font-weight: 600 !important;
+    }}
+    div[data-testid="stRadio"][aria-label="{key}"] [data-testid="stMarkdownContainer"] p {{
+        font-size: 10px !important;
+        margin: 0 !important;
+    }}
+    /* Cacher les cercles radio natifs */
+    div[data-testid="stRadio"][aria-label="{key}"] input[type="radio"] {{
+        display: none !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
-    # Barre de tags HTML — alignés, pas de wrapping de texte
-    tags = ''.join(
-        f'<span class="tb-tag tb-on">{o}</span>' if o == actif
-        else f'<span class="tb-tag">{o}</span>'
-        for o in outils
+    current_idx = outils.index(st.session_state[key]) if st.session_state[key] in outils else 0
+    choix = st.radio(
+        key,
+        options=outils,
+        index=current_idx,
+        horizontal=True,
+        label_visibility="collapsed",
+        key=f"{key}_radio"
     )
-    st.markdown(f'<div class="toolbar-outer">{tags}</div>', unsafe_allow_html=True)
-
-    # Selectbox fonctionnel pour changer l'outil actif
-    idx = outils.index(actif) if actif in outils else 0
-    st.markdown('<div class="tb-select">', unsafe_allow_html=True)
-    choix = st.selectbox("outil", outils, index=idx, key=f"{key}_sel", label_visibility="collapsed")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    if choix != actif:
+    if choix != st.session_state[key]:
         st.session_state[key] = choix
         st.rerun()
 
@@ -1995,57 +2035,27 @@ st.markdown("""
     font-size: 10px !important; color: #4d9fff !important;
 }
 
-/* Boutons sidebar invisibles superposés */
-[data-testid="stSidebar"] button {
-    position: relative !important;
-    margin-top: -34px !important;
-    height: 34px !important;
-    width: 100% !important;
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    color: transparent !important;
-    font-size: 1px !important;
-    cursor: pointer !important;
-    z-index: 10 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-}
-[data-testid="stSidebar"] button:hover { background: transparent !important; }
-[data-testid="stSidebar"] button:focus { outline: none !important; box-shadow: none !important; }
-
-/* ── SIDEBAR ITEMS ── */
-.sb-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 16px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px; color: #555;
-    border-left: 2px solid transparent;
-    white-space: nowrap;
-}
-.sb-item.active { color: #ff6600; background: #0d0800; border-left: 2px solid #ff6600; }
-.sb-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
-
 /* ── TOOLBAR HAUT DE PAGE ── */
-.toolbar-outer {
-    display: flex; flex-wrap: wrap; gap: 5px;
-    background: #080808; border: 1px solid #1a1a1a;
-    border-radius: 6px; padding: 8px 12px; margin-bottom: 16px;
+.toolbar-wrap {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin: 0 0 20px 0;
+    padding: 10px 14px;
+    background: #080808;
+    border: 1px solid #1a1a1a;
+    border-radius: 6px;
 }
-.tb-tag {
+.tb-btn {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px; color: #555;
-    border: 1px solid #1c1c1c; border-radius: 3px;
-    padding: 3px 9px; white-space: nowrap;
+    font-size: 10px; font-weight: 500;
+    color: #666; background: transparent;
+    border: 1px solid #1a1a1a; border-radius: 4px;
+    padding: 5px 12px; cursor: pointer;
+    letter-spacing: 0.5px; white-space: nowrap;
 }
-.tb-tag.tb-on { color: #ff6600; border-color: #ff6600; background: #0d0800; font-weight: 600; }
-div.tb-select label { display: none !important; }
-div.tb-select > div > div {
-    background: #0a0a0a !important; border: 1px solid #222 !important;
-    border-radius: 4px !important; font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 11px !important; color: #ff6600 !important;
-    max-width: 280px; margin-bottom: 14px;
+.tb-btn.tb-active {
+    color: #ff6600; border-color: #ff6600; background: #0d0800;
 }
+/* toolbar buttons visible */
 </style>
 """, unsafe_allow_html=True)
 
@@ -2105,24 +2115,15 @@ LABEL_TO_KEY = {
 if "categorie" not in st.session_state:
     st.session_state.categorie = "ACCUEIL"
 
-# Rendu des groupes — HTML pur pour alignement parfait
+# Rendu des groupes
 for groupe, secteurs in SECTEURS.items():
     st.sidebar.markdown(f'<div class="sb-cat">{groupe}</div>', unsafe_allow_html=True)
-    for label, icone in secteurs:
+    for label, _ in secteurs:
         key_interne = LABEL_TO_KEY[label]
         is_active = st.session_state.categorie == key_interne
-        # Extraire le nom sans l'icône du label
-        nom = label.split(" ", 1)[1] if " " in label else label
-        active_class = "active" if is_active else ""
-        st.sidebar.markdown(
-            f'<div class="sb-item {active_class}">'
-            f'<span class="sb-icon">{icone}</span>'
-            f'<span>{nom}</span>'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-        # Bouton invisible par-dessus pour capter le clic
-        if st.sidebar.button("​", key=f"sb_{key_interne}", use_container_width=True):  # zero-width space
+        btn_label = label
+        if st.sidebar.button(btn_label, key=f"sb_{key_interne}", use_container_width=True,
+                             type="primary" if is_active else "secondary"):
             st.session_state.categorie = key_interne
             st.rerun()
 
