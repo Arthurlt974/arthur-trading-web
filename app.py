@@ -1892,99 +1892,29 @@ if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
 # ============================================================
 
 def _toolbar(key, outils, default=None):
-    """Barre d'outils horizontale compacte — st.radio horizontal caché + boutons HTML cliquables."""
+    """Barre de tags HTML décorative + selectbox Streamlit fonctionnel."""
     if default is None:
         default = outils[0]
     if key not in st.session_state:
         st.session_state[key] = default
 
-    # CSS : masquer le radio natif + styler les boutons de sélection
-    st.markdown(f"""
-    <style>
-    /* Masquer uniquement le radio de cette toolbar */
-    div[data-testid="stRadio"].toolbar-radio-{key} {{
-        display: none !important;
-    }}
-    /* Conteneur toolbar */
-    .toolbar-{key} {{
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        background: #080808;
-        border: 1px solid #1a1a1a;
-        border-radius: 6px;
-        padding: 8px 12px;
-        margin-bottom: 16px;
-    }}
-    /* Boutons toolbar */
-    .tbtn-{key} {{
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 10px;
-        color: #555;
-        background: transparent;
-        border: 1px solid #1c1c1c;
-        border-radius: 3px;
-        padding: 4px 10px;
-        cursor: pointer;
-        white-space: nowrap;
-        letter-spacing: 0.3px;
-        line-height: 1.4;
-        text-decoration: none;
-    }}
-    .tbtn-{key}:hover {{
-        color: #ccc;
-        border-color: #333;
-        background: #0f0f0f;
-    }}
-    .tbtn-{key}.active {{
-        color: #ff6600;
-        border-color: #ff6600;
-        background: #0d0800;
-        font-weight: 600;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+    actif = st.session_state[key]
 
-    # Rendu HTML pur des boutons (décoratif)
-    html = f'<div class="toolbar-{key}">'
-    for o in outils:
-        active_class = "active" if st.session_state[key] == o else ""
-        html += f'<span class="tbtn-{key} {active_class}">{o}</span>'
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
+    # Barre de tags HTML — alignés, pas de wrapping de texte
+    tags = ''.join(
+        f'<span class="tb-tag tb-on">{o}</span>' if o == actif
+        else f'<span class="tb-tag">{o}</span>'
+        for o in outils
+    )
+    st.markdown(f'<div class="toolbar-outer">{tags}</div>', unsafe_allow_html=True)
 
-    # Selectbox caché pour la vraie logique de sélection
-    current_idx = outils.index(st.session_state[key]) if st.session_state[key] in outils else 0
+    # Selectbox fonctionnel pour changer l'outil actif
+    idx = outils.index(actif) if actif in outils else 0
+    st.markdown('<div class="tb-select">', unsafe_allow_html=True)
+    choix = st.selectbox("outil", outils, index=idx, key=f"{key}_sel", label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Utiliser selectbox compact (1 ligne, pas de label visible)
-    st.markdown("""
-    <style>
-    div.toolbar-select > div[data-testid="stSelectbox"] > label { display:none !important; }
-    div.toolbar-select > div[data-testid="stSelectbox"] > div {
-        background: #0a0a0a !important;
-        border: 1px solid #222 !important;
-        border-radius: 4px !important;
-        font-family: 'IBM Plex Mono', monospace !important;
-        font-size: 11px !important;
-        color: #ff6600 !important;
-        margin-bottom: 12px;
-        max-width: 260px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    with st.container():
-        st.markdown('<div class="toolbar-select">', unsafe_allow_html=True)
-        choix = st.selectbox(
-            "outil",
-            options=outils,
-            index=current_idx,
-            key=f"{key}_select",
-            label_visibility="collapsed"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    if choix != st.session_state[key]:
+    if choix != actif:
         st.session_state[key] = choix
         st.rerun()
 
@@ -2065,27 +1995,57 @@ st.markdown("""
     font-size: 10px !important; color: #4d9fff !important;
 }
 
-/* ── TOOLBAR HAUT DE PAGE ── */
-.toolbar-wrap {
-    display: flex; flex-wrap: wrap; gap: 6px;
-    margin: 0 0 20px 0;
-    padding: 10px 14px;
-    background: #080808;
-    border: 1px solid #1a1a1a;
-    border-radius: 6px;
+/* Boutons sidebar invisibles superposés */
+[data-testid="stSidebar"] button {
+    position: relative !important;
+    margin-top: -34px !important;
+    height: 34px !important;
+    width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    color: transparent !important;
+    font-size: 1px !important;
+    cursor: pointer !important;
+    z-index: 10 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
 }
-.tb-btn {
+[data-testid="stSidebar"] button:hover { background: transparent !important; }
+[data-testid="stSidebar"] button:focus { outline: none !important; box-shadow: none !important; }
+
+/* ── SIDEBAR ITEMS ── */
+.sb-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 16px;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px; font-weight: 500;
-    color: #666; background: transparent;
-    border: 1px solid #1a1a1a; border-radius: 4px;
-    padding: 5px 12px; cursor: pointer;
-    letter-spacing: 0.5px; white-space: nowrap;
+    font-size: 11px; color: #555;
+    border-left: 2px solid transparent;
+    white-space: nowrap;
 }
-.tb-btn.tb-active {
-    color: #ff6600; border-color: #ff6600; background: #0d0800;
+.sb-item.active { color: #ff6600; background: #0d0800; border-left: 2px solid #ff6600; }
+.sb-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+
+/* ── TOOLBAR HAUT DE PAGE ── */
+.toolbar-outer {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    background: #080808; border: 1px solid #1a1a1a;
+    border-radius: 6px; padding: 8px 12px; margin-bottom: 16px;
 }
-/* toolbar buttons visible */
+.tb-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; color: #555;
+    border: 1px solid #1c1c1c; border-radius: 3px;
+    padding: 3px 9px; white-space: nowrap;
+}
+.tb-tag.tb-on { color: #ff6600; border-color: #ff6600; background: #0d0800; font-weight: 600; }
+div.tb-select label { display: none !important; }
+div.tb-select > div > div {
+    background: #0a0a0a !important; border: 1px solid #222 !important;
+    border-radius: 4px !important; font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 11px !important; color: #ff6600 !important;
+    max-width: 280px; margin-bottom: 14px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -2145,14 +2105,24 @@ LABEL_TO_KEY = {
 if "categorie" not in st.session_state:
     st.session_state.categorie = "ACCUEIL"
 
-# Rendu des groupes
+# Rendu des groupes — HTML pur pour alignement parfait
 for groupe, secteurs in SECTEURS.items():
     st.sidebar.markdown(f'<div class="sb-cat">{groupe}</div>', unsafe_allow_html=True)
-    for label, _ in secteurs:
+    for label, icone in secteurs:
         key_interne = LABEL_TO_KEY[label]
         is_active = st.session_state.categorie == key_interne
-        btn_label = f"▶ {label}" if is_active else f"   {label}"
-        if st.sidebar.button(btn_label, key=f"sb_{key_interne}", use_container_width=True):
+        # Extraire le nom sans l'icône du label
+        nom = label.split(" ", 1)[1] if " " in label else label
+        active_class = "active" if is_active else ""
+        st.sidebar.markdown(
+            f'<div class="sb-item {active_class}">'
+            f'<span class="sb-icon">{icone}</span>'
+            f'<span>{nom}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        # Bouton invisible par-dessus pour capter le clic
+        if st.sidebar.button("​", key=f"sb_{key_interne}", use_container_width=True):  # zero-width space
             st.session_state.categorie = key_interne
             st.rerun()
 
