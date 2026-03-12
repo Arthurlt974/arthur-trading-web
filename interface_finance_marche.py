@@ -894,7 +894,8 @@ def show_finance_marche():
     </div>
     """, unsafe_allow_html=True)
 
-    outil = st.sidebar.radio("MODULES QUANT :", [
+    import streamlit as _st
+    _outils_fm = [
         "⚙️ Pricing Options (BS + Greeks)",
         "📊 Surface de Volatilité",
         "📈 Courbe des Taux & Obligations",
@@ -903,7 +904,44 @@ def show_finance_marche():
         "🔁 Backtest Quantitatif",
         "🎲 Monte Carlo (GBM)",
         "📐 CAPM & Analyse Factorielle",
-    ], key="fm_outil")
+    ]
+    if "fm_outil" not in st.session_state:
+        st.session_state["fm_outil"] = _outils_fm[0]
+
+    # Toolbar horizontale style app-3
+    st.markdown("""
+    <style>
+    div[data-testid="stRadio"][aria-label="fm_outil"] > div {
+        display: flex !important; flex-wrap: wrap !important; gap: 5px !important;
+        background: #080808 !important; border: 1px solid #1a1a1a !important;
+        border-radius: 6px !important; padding: 8px 12px !important; margin-bottom: 16px !important;
+    }
+    div[data-testid="stRadio"][aria-label="fm_outil"] label {
+        font-family: 'IBM Plex Mono', monospace !important; font-size: 10px !important;
+        color: #555 !important; background: transparent !important;
+        border: 1px solid #1c1c1c !important; border-radius: 3px !important;
+        padding: 4px 10px !important; cursor: pointer !important; white-space: nowrap !important;
+    }
+    div[data-testid="stRadio"][aria-label="fm_outil"] label:hover {
+        color: #ccc !important; border-color: #333 !important; background: #0f0f0f !important;
+    }
+    div[data-testid="stRadio"][aria-label="fm_outil"] label[data-checked="true"] {
+        color: #ff6600 !important; border-color: #ff6600 !important;
+        background: #0d0800 !important; font-weight: 600 !important;
+    }
+    div[data-testid="stRadio"][aria-label="fm_outil"] input[type="radio"] { display: none !important; }
+    div[data-testid="stRadio"][aria-label="fm_outil"] [data-testid="stMarkdownContainer"] p {
+        font-size: 10px !important; margin: 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    _cur_idx = _outils_fm.index(st.session_state["fm_outil"]) if st.session_state["fm_outil"] in _outils_fm else 0
+    outil = st.radio("fm_outil", options=_outils_fm, index=_cur_idx,
+                     horizontal=True, label_visibility="collapsed", key="fm_outil_radio")
+    if outil != st.session_state["fm_outil"]:
+        st.session_state["fm_outil"] = outil
+        st.rerun()
 
     if outil == "⚙️ Pricing Options (BS + Greeks)":
         show_options_pricing()
