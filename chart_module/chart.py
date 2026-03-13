@@ -45,6 +45,34 @@ def render_chart(
     except Exception:
         mc_mu, mc_sigma = 50.0, 80.0
 
+    # ── Quant : Kelly Criterion depuis l'historique ──────────
+    try:
+        from kelly import kelly_full_analysis
+        kp = kelly_full_analysis(
+            closes   = closes_list,
+            capital  = 10_000.0,
+            freq     = interval.lower(),
+            fraction = 0.5,
+        )
+    except Exception:
+        kp = {
+            "kelly_win_rate":      50.0,
+            "kelly_ratio_wl":      1.50,
+            "kelly_n_candles":     0,
+            "kelly_reliable":      "0",
+            "kelly_edge_pct":      0.0,
+            "kelly_ruin_risk_pct": 100.0,
+            "kelly_mu_pct":        50.0,
+            "kelly_sigma_pct":     80.0,
+            "kelly_sharpe":        0.0,
+            "kelly_f_full":        0.0,
+            "kelly_f_half":        0.0,
+            "kelly_f_quarter":     0.0,
+            "kelly_f_pct":         0.0,
+            "kelly_pos_size":      0.0,
+            "kelly_capital":       10000.0,
+        }
+
     # ── Affichage du nom de la paire ──
     pair_disp = pair_label or (
         symbol.upper() + "/USD"
@@ -113,6 +141,22 @@ def render_chart(
     cls_bb  = "indicator-btn on" if show_bb     else "indicator-btn"
     cls_gc  = "indicator-btn"
     cls_ob  = "indicator-btn"
+
+    # ── Dépaquetage Kelly pour le f-string (évite NameError sur kp[key]) ──
+    kelly_win_rate      = kp["kelly_win_rate"]
+    kelly_ratio_wl      = kp["kelly_ratio_wl"]
+    kelly_n_candles     = kp["kelly_n_candles"]
+    kelly_mu_pct        = kp["kelly_mu_pct"]
+    kelly_sigma_pct     = kp["kelly_sigma_pct"]
+    kelly_capital       = kp["kelly_capital"]
+    kelly_f_full        = kp["kelly_f_full"]
+    kelly_f_half        = kp["kelly_f_half"]
+    kelly_f_quarter     = kp["kelly_f_quarter"]
+    kelly_f_pct         = kp["kelly_f_pct"]
+    kelly_pos_size      = kp["kelly_pos_size"]
+    kelly_edge_pct      = kp["kelly_edge_pct"]
+    kelly_ruin_risk_pct = kp["kelly_ruin_risk_pct"]
+    kelly_sharpe        = kp["kelly_sharpe"]
 
     return f"""<!DOCTYPE html>
 <html>
@@ -502,7 +546,7 @@ body.is-fullscreen{{
   transition:background .12s;
 }}
 .mode-btn:hover{{background:var(--surface2);}}
-.mode-icon{{font-size:13px;}}
+.mode-icon{{font-size:13px;color:#ffffff;}}
 .mode-info{{display:flex;flex-direction:column;gap:1px;text-align:left;}}
 .mode-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);}}
 .mode-sub{{font-size:8px;color:var(--faint);}}
@@ -533,7 +577,8 @@ body.is-fullscreen{{
 .mode-opt:last-child{{border-bottom:none;}}
 .mode-opt:hover{{background:var(--surface2);}}
 .mode-opt.active{{background:rgba(255,152,0,0.05);}}
-.mo-icon{{font-size:16px;min-width:20px;}}
+.mo-icon{{font-size:16px;min-width:20px;color:#555;transition:color .15s;}}
+.mode-opt.active .mo-icon{{color:#ffffff;}}
 .mo-text{{flex:1;}}
 .mo-lbl{{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}}
 .mo-desc{{font-size:9px;color:var(--faint);margin-top:2px;}}
@@ -591,7 +636,7 @@ body.is-fullscreen{{
   <!-- MODE DROPDOWN -->
   <div class="mode-wrap">
     <button class="mode-btn" id="modeBtn" data-mode="normal" onclick="toggleModeDD()">
-      <span class="mode-icon" id="modeIcon">📊</span>
+      <span class="mode-icon" id="modeIcon">▣</span>
       <div class="mode-info">
         <div class="mode-lbl" id="modeLbl">Normal</div>
         <div class="mode-sub" id="modeSub">Vue standard</div>
@@ -599,16 +644,16 @@ body.is-fullscreen{{
       <span class="mode-caret" id="modeCaret">&#9660;</span>
     </button>
     <div class="mode-dd" id="modeDD">
-      <div class="mode-opt active" onclick="pickMode('normal','Normal','Vue standard','📊')">
-        <span class="mo-icon">📊</span>
+      <div class="mode-opt active" onclick="pickMode('normal','Normal','Vue standard','▣')">
+        <span class="mo-icon">▣</span>
         <div class="mo-text">
           <div class="mo-lbl" style="color:var(--text2)">Normal</div>
           <div class="mo-desc">Bougies · MA · Volume</div>
         </div>
         <span class="mo-check">✓</span>
       </div>
-      <div class="mode-opt" onclick="pickMode('pro','Pro','Vue avancée','⚡')">
-        <span class="mo-icon">⚡</span>
+      <div class="mode-opt" onclick="pickMode('pro','Pro','Vue avancée','◈')">
+        <span class="mo-icon">◈</span>
         <div class="mo-text">
           <div class="mo-lbl" style="color:var(--orange)">Pro</div>
           <div class="mo-desc">Indicateurs avancés · RSI · MACD</div>
@@ -616,8 +661,8 @@ body.is-fullscreen{{
         <span class="mo-badge">Bientôt</span>
         <span class="mo-check">✓</span>
       </div>
-      <div class="mode-opt" onclick="pickMode('quant','Quant','Algorithmique','🤖')">
-        <span class="mo-icon">🤖</span>
+      <div class="mode-opt" onclick="pickMode('quant','Quant','Algorithmique','⬡')">
+        <span class="mo-icon">⬡</span>
         <div class="mo-text">
           <div class="mo-lbl" style="color:var(--yellow)">Quant</div>
           <div class="mo-desc">Signaux algo · Patterns · AI</div>
@@ -668,12 +713,12 @@ body.is-fullscreen{{
   <div class="mc-panel" id="mcPanel">
     <div class="mc-resize-bar" id="mcResizeBar"></div>
     <div class="mc-bar">
-      <div class="mc-bar-title">🎲 MONTE CARLO</div>
+      <div class="mc-bar-title">◈ MONTE CARLO</div>
       <button class="mc-tab active" id="mcTabFan" onclick="mcSetVis('fan')">
         <span class="mc-tab-dot"></span>Fan Chart
       </button>
-      <button class="mc-tab" id="mcTabSpag" onclick="mcSetVis('spaghetti')">
-        <span class="mc-tab-dot"></span>Spaghetti
+      <button class="mc-tab" id="mcTabHist" onclick="mcSetVis('histogram')">
+        <span class="mc-tab-dot"></span>Distribution
       </button>
       <span id="mcBarInfo" style="margin-left:auto;font-size:8px;color:#444;font-family:'Share Tech Mono',monospace;padding:0 10px;">—</span>
     </div>
@@ -693,7 +738,7 @@ body.is-fullscreen{{
 <!-- QUANT PANEL (hidden by default, shown in quant mode) -->
 <div class="quant-panel" id="quantPanel" style="display:none">
   <div class="qp-header">
-    <span style="color:#FABE2C;font-size:14px">⚙</span>
+    <span style="color:#FABE2C;font-size:14px">⬡</span>
     <span class="qp-title">QUANT TOOLS</span>
     <span class="qp-sub" id="qpSub">— · —</span>
   </div>
@@ -708,7 +753,7 @@ body.is-fullscreen{{
     <!-- Monte Carlo Merton Jump-Diffusion -->
     <div class="tool-card tc-active" id="tc-montecarlo" data-tab="simul">
       <div class="tool-header-q" onclick="toggleToolCard('tc-montecarlo')">
-        <span class="tool-icon">🎲</span>
+        <span class="tool-icon">◈</span>
         <span class="tool-name">Monte Carlo · Merton JD</span>
         <span class="tool-tag tag-sim">JUMP DIFF</span>
       </div>
@@ -764,14 +809,14 @@ body.is-fullscreen{{
         <!-- Sélecteur visualisation -->
         <div style="font-size:7px;letter-spacing:1.5px;color:#FABE2C;margin:8px 0 4px;border-bottom:1px solid #1a1a1a;padding-bottom:3px;">VISUALISATION</div>
         <div style="display:flex;gap:4px;margin-bottom:8px;">
-          <div id="mc_vis_fan" onclick="mcSetVis('fan')" style="flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;border:1px solid rgba(250,190,44,0.5);background:rgba(250,190,44,0.10);color:#FABE2C;transition:all .15s;">📊 FAN</div>
-          <div id="mc_vis_spag" onclick="mcSetVis('spaghetti')" style="flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;border:1px solid #2a2a2a;background:transparent;color:#555;transition:all .15s;">〰 SPAGHETTI</div>
+          <div id="mc_vis_fan" onclick="mcSetVis('fan')" style="flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;border:1px solid rgba(250,190,44,0.5);background:rgba(250,190,44,0.10);color:#FABE2C;transition:all .15s;">≋ FAN CHART</div>
+          <div id="mc_vis_hist" onclick="mcSetVis('histogram')" style="flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;border:1px solid #2a2a2a;background:transparent;color:#555;transition:all .15s;">▨ DISTRIBUTION</div>
         </div>
 
         <!-- Boutons -->
         <div style="display:flex;gap:6px;margin-top:2px;">
           <div class="run-btn" style="flex:1;" id="mc_calc_btn" onclick="runMonteCarlo()">▶ CALCULER</div>
-          <div class="run-btn" id="mc_graph_btn" style="flex:1;background:rgba(77,159,255,0.10);border-color:rgba(77,159,255,0.35);color:#4d9fff;" onclick="toggleMCPanel()">📈 GRAPHIQUE</div>
+          <div class="run-btn" id="mc_graph_btn" style="flex:1;background:rgba(77,159,255,0.10);border-color:rgba(77,159,255,0.35);color:#4d9fff;" onclick="toggleMCPanel()">↗ GRAPHIQUE</div>
         </div>
 
         <!-- Résultats -->
@@ -795,8 +840,8 @@ body.is-fullscreen{{
     <!-- VaR / CVaR -->
     <div class="tool-card tc-running" id="tc-var"        data-tab="risk">
       <div class="tool-header-q" onclick="toggleToolCard('tc-var')">
-        <span class="tool-icon">📉</span>
-        <span class="tool-name">VaR / CVaR</span>
+        <span class="tool-icon">▽</span>
+        <span class="tool-name">Value at Risk · CVaR</span>
         <span class="tool-tag tag-risk">AVEC LEVIER</span>
       </div>
       <div class="tool-body-q">
@@ -825,24 +870,113 @@ body.is-fullscreen{{
     </div>
 
     <!-- Kelly Criterion -->
-    <div class="tool-card" id="tc-kelly"      data-tab="risk">
+    <div class="tool-card" id="tc-kelly" data-tab="risk">
       <div class="tool-header-q" onclick="toggleToolCard('tc-kelly')">
-        <span class="tool-icon">⚖️</span>
+        <span class="tool-icon">⊛</span>
         <span class="tool-name">Kelly Criterion</span>
         <span class="tool-tag tag-opt">POSITION</span>
       </div>
       <div class="tool-body-q">
-        <div class="field-row"><span class="field-lbl">WIN RATE</span><input class="field-inp" value="55" style="max-width:50px"><span class="field-unit">%</span></div>
-        <div class="field-row"><span class="field-lbl">RATIO W/L</span><input class="field-inp" value="1.5" style="max-width:50px"></div>
-        <div class="run-btn" style="background:rgba(0,200,83,0.08);border-color:rgba(0,200,83,0.3);color:#00E676">▶ CALCULER</div>
+
+        <div style="font-size:7px;letter-spacing:1.5px;color:#4d9fff;margin:4px 0 2px;border-bottom:1px solid #1a1a1a;padding-bottom:3px;">
+          AUTO-CALIBRÉ <span style="color:#555;font-size:8px;">{kelly_n_candles} bougies</span>
+        </div>
+
+        <!-- Mode tabs -->
+        <div style="display:flex;gap:4px;margin-bottom:6px;">
+          <div id="kelly_tab_trade" onclick="kellySetMode('trade')"
+            style="flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;
+                   border:1px solid rgba(0,255,65,0.4);background:rgba(0,255,65,0.08);color:#00FF41;transition:all .15s;">
+            ◆ TRADE
+          </div>
+          <div id="kelly_tab_ret" onclick="kellySetMode('rendement')"
+            style="flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;
+                   border:1px solid #2a2a2a;background:transparent;color:#555;transition:all .15s;">
+            ∫ RENDEMENT
+          </div>
+        </div>
+
+        <!-- Inputs Trade -->
+        <div id="kelly_inputs_trade">
+          <div class="field-row">
+            <span class="field-lbl">WIN RATE</span>
+            <input class="field-inp" id="kelly_p" value="{kelly_win_rate}" style="max-width:55px" oninput="calcKelly()">
+            <span class="field-unit">%</span>
+          </div>
+          <div class="field-row">
+            <span class="field-lbl">RATIO W/L</span>
+            <input class="field-inp" id="kelly_b" value="{kelly_ratio_wl}" style="max-width:55px" oninput="calcKelly()">
+          </div>
+        </div>
+
+        <!-- Inputs Rendement -->
+        <div id="kelly_inputs_ret" style="display:none">
+          <div class="field-row">
+            <span class="field-lbl">DÉRIVE μ/AN</span>
+            <input class="field-inp" id="kelly_mu" value="{kelly_mu_pct}" style="max-width:55px" oninput="calcKelly()">
+            <span class="field-unit">%</span>
+          </div>
+          <div class="field-row">
+            <span class="field-lbl">VOL σ/AN</span>
+            <input class="field-inp" id="kelly_sigma" value="{kelly_sigma_pct}" style="max-width:55px" oninput="calcKelly()">
+            <span class="field-unit">%</span>
+          </div>
+        </div>
+
+        <!-- Capital -->
+        <div class="field-row" style="margin-top:4px">
+          <span class="field-lbl">CAPITAL</span>
+          <input class="field-inp" id="kelly_capital" value="{kelly_capital}" style="max-width:70px" oninput="calcKelly()">
+          <span class="field-unit">USDT</span>
+        </div>
+
+        <!-- Résultats -->
+        <div class="result-box" id="kelly-result-box" style="margin-top:6px;">
+          <div style="font-size:7px;color:#666;letter-spacing:1px;margin-bottom:4px;">— FRACTIONS KELLY —</div>
+          <div class="result-row">
+            <span class="result-lbl">FULL KELLY</span>
+            <span class="result-val val-green" id="kelly_r_full">{kelly_f_full}</span>
+          </div>
+          <div class="result-row">
+            <span class="result-lbl">½ KELLY</span>
+            <span class="result-val val-orange" id="kelly_r_half">{kelly_f_half}</span>
+          </div>
+          <div class="result-row">
+            <span class="result-lbl">¼ KELLY</span>
+            <span class="result-val val-yellow" id="kelly_r_quarter">{kelly_f_quarter}</span>
+          </div>
+          <div style="font-size:7px;color:#666;letter-spacing:1px;margin:6px 0 4px;">— SIZING (½ KELLY) —</div>
+          <div class="result-row">
+            <span class="result-lbl">% DU CAPITAL</span>
+            <span class="result-val val-green" id="kelly_r_pct">{kelly_f_pct}%</span>
+          </div>
+          <div class="result-row">
+            <span class="result-lbl">TAILLE POSITION</span>
+            <span class="result-val val-green" id="kelly_r_size">${{kelly_pos_size}}</span>
+          </div>
+          <div style="font-size:7px;color:#666;letter-spacing:1px;margin:6px 0 4px;">— RISQUE —</div>
+          <div class="result-row">
+            <span class="result-lbl">EDGE</span>
+            <span class="result-val" id="kelly_r_edge">{kelly_edge_pct}%</span>
+          </div>
+          <div class="result-row">
+            <span class="result-lbl">RISQUE RUINE</span>
+            <span class="result-val val-red" id="kelly_r_ruin">{kelly_ruin_risk_pct}%</span>
+          </div>
+          <div class="result-row">
+            <span class="result-lbl">SHARPE</span>
+            <span class="result-val" id="kelly_r_sharpe">{kelly_sharpe}</span>
+          </div>
+        </div>
+
       </div>
     </div>
 
     <!-- Sharpe / Sortino -->
     <div class="tool-card" id="tc-sharpe"     data-tab="stats">
       <div class="tool-header-q" onclick="toggleToolCard('tc-sharpe')">
-        <span class="tool-icon">📊</span>
-        <span class="tool-name">Sharpe / Sortino</span>
+        <span class="tool-icon">∑</span>
+        <span class="tool-name">Sharpe · Sortino</span>
         <span class="tool-tag tag-stat">PERF</span>
       </div>
       <div class="tool-body-q">
@@ -854,7 +988,7 @@ body.is-fullscreen{{
     <!-- GARCH -->
     <div class="tool-card" id="tc-garch"      data-tab="stats">
       <div class="tool-header-q" onclick="toggleToolCard('tc-garch')">
-        <span class="tool-icon">〰️</span>
+        <span class="tool-icon">σ</span>
         <span class="tool-name">GARCH Volatility</span>
         <span class="tool-tag tag-stat">VOL MODEL</span>
       </div>
@@ -867,7 +1001,7 @@ body.is-fullscreen{{
     <!-- Correlation Matrix -->
     <div class="tool-card" id="tc-corr"       data-tab="stats">
       <div class="tool-header-q" onclick="toggleToolCard('tc-corr')">
-        <span class="tool-icon">🔗</span>
+        <span class="tool-icon">⊞</span>
         <span class="tool-name">Correlation Matrix</span>
         <span class="tool-tag tag-stat">MULTI-ASSET</span>
       </div>
@@ -880,7 +1014,7 @@ body.is-fullscreen{{
     <!-- Portfolio Optim -->
     <div class="tool-card" id="tc-portfolio"  data-tab="optim">
       <div class="tool-header-q" onclick="toggleToolCard('tc-portfolio')">
-        <span class="tool-icon">🎯</span>
+        <span class="tool-icon">◎</span>
         <span class="tool-name">Portfolio Optim.</span>
         <span class="tool-tag tag-opt">MARKOWITZ</span>
       </div>
@@ -893,7 +1027,7 @@ body.is-fullscreen{{
     <!-- ML Predictions -->
     <div class="tool-card" id="tc-ml"         data-tab="simul">
       <div class="tool-header-q" onclick="toggleToolCard('tc-ml')">
-        <span class="tool-icon">🤖</span>
+        <span class="tool-icon">⬡</span>
         <span class="tool-name">ML Predictions</span>
         <span class="tool-tag tag-sim">BETA</span>
       </div>
@@ -2456,6 +2590,7 @@ function mertonJDSim(S0, mu, sigma, lam, mu_j, sigma_j, horizon, nSim) {{
 
   return {{
     paths: pPaths,                // percentile paths (Float64Array per pct)
+    finals,                       // Float64Array des prix finaux (histogramme)
     mean, p5:p5v, p25:p25v, p50:p50v, p75:p75v, p95:p95v,
     probProfit: probProfit/nSim*100,
     var95: p5v - S0,
@@ -2553,8 +2688,9 @@ function runMonteCarlo() {{
     // ── Alimenter le panel MC avec les mêmes résultats ──────
     // Convertir format mertonJDSim → format panel mcDraw
     MC_RESULT = {{
-      percs:       res.paths,        // {{p5, p10, p25, p50, p75, p90, p95}}  Float64Array
-      allPaths:    null,             // pas de trajectoires individuelles (perf)
+      percs:       res.paths,
+      allPaths:    null,
+      finals:      res.finals,
       S0:          res.S0,
       horizon:     res.horizon,
       mean:        res.mean,
@@ -2848,6 +2984,9 @@ function init() {{
   VIEW_START=0; VIEW_END=0;
   render();
 
+  // Init Kelly (valeurs Python déjà injectées dans les inputs)
+  calcKelly();
+
   // Charger les données PUIS démarrer
   fetchInit().then(()=>{{
     VIEW_START=Math.max(0,D.t.length-120);
@@ -2897,39 +3036,33 @@ function mcClose() {{
 
 
 // ════════════════════════════════════════════════════════
-//  SÉLECTEUR FAN / SPAGHETTI (carte + panel synchronisés)
+//  SÉLECTEUR FAN / HISTOGRAMME
 // ════════════════════════════════════════════════════════
 function mcSetVis(mode) {{
   MC_MODE = mode;
-
-  // Mise à jour boutons dans la carte outil
   const btnFan  = $('mc_vis_fan');
-  const btnSpag = $('mc_vis_spag');
+  const btnHist = $('mc_vis_hist');
   if(btnFan) {{
-    btnFan.style.borderColor  = mode === 'fan' ? 'rgba(250,190,44,0.5)' : '#2a2a2a';
-    btnFan.style.background   = mode === 'fan' ? 'rgba(250,190,44,0.10)' : 'transparent';
-    btnFan.style.color        = mode === 'fan' ? '#FABE2C' : '#555';
+    btnFan.style.borderColor = mode==='fan' ? 'rgba(250,190,44,0.5)' : '#2a2a2a';
+    btnFan.style.background  = mode==='fan' ? 'rgba(250,190,44,0.10)' : 'transparent';
+    btnFan.style.color       = mode==='fan' ? '#FABE2C' : '#555';
   }}
-  if(btnSpag) {{
-    btnSpag.style.borderColor  = mode === 'spaghetti' ? 'rgba(250,190,44,0.5)' : '#2a2a2a';
-    btnSpag.style.background   = mode === 'spaghetti' ? 'rgba(250,190,44,0.10)' : 'transparent';
-    btnSpag.style.color        = mode === 'spaghetti' ? '#FABE2C' : '#555';
+  if(btnHist) {{
+    btnHist.style.borderColor = mode==='histogram' ? 'rgba(250,190,44,0.5)' : '#2a2a2a';
+    btnHist.style.background  = mode==='histogram' ? 'rgba(250,190,44,0.10)' : 'transparent';
+    btnHist.style.color       = mode==='histogram' ? '#FABE2C' : '#555';
   }}
-
-  // Mise à jour onglets dans la barre du panel
   const tabFan  = $('mcTabFan');
-  const tabSpag = $('mcTabSpag');
-  if(tabFan)  tabFan.classList.toggle('active',  mode === 'fan');
-  if(tabSpag) tabSpag.classList.toggle('active', mode === 'spaghetti');
-
-  // Redessiner
+  const tabHist = $('mcTabHist');
+  if(tabFan)  tabFan.classList.toggle('active',  mode==='fan');
+  if(tabHist) tabHist.classList.toggle('active', mode==='histogram');
   if(MC_RESULT && MC_OPEN) mcDraw();
 }}
 
 function mcSetMode(mode) {{
   MC_MODE = mode;
-  document.getElementById('mcTabFan').classList.toggle('active', mode === 'fan');
-  document.getElementById('mcTabSpag').classList.toggle('active', mode === 'spaghetti');
+  document.getElementById('mcTabFan').classList.toggle('active',  mode==='fan');
+  document.getElementById('mcTabHist').classList.toggle('active', mode==='histogram');
   if(MC_RESULT) mcDraw();
 }}
 
@@ -3021,7 +3154,7 @@ function mcSimulate(closes, horizon, nSim, lam) {{
   const p5v     = finals[Math.floor(0.05 * finals.length)];
   const probP   = finals.filter(v => v > S0).length / finals.length * 100;
 
-  return {{ percs, allPaths, S0, horizon, mean,
+  return {{ percs, allPaths, finals, S0, horizon, mean,
     p5:  finals[Math.floor(0.05 * finals.length)],
     p25: finals[Math.floor(0.25 * finals.length)],
     p50: finals[Math.floor(0.50 * finals.length)],
@@ -3139,22 +3272,24 @@ function mcDraw() {{
   ctx.textAlign = 'center';
   ctx.fillText('NOW', xNow, PT - 1);
 
-  // ── Bougies historiques ─────────────────────────────────────
-  for(let i = 0; i < nHist; i++) {{
-    const o = histO[i], h = histH[i], l = histL[i], cl = histC[i];
-    const bull = cl >= o;
-    const x    = toX(i);
-    const bw   = Math.max(1, CW * 0.65);
-    ctx.strokeStyle = bull ? '#1A6B38' : '#7A2020';
-    ctx.fillStyle   = bull ? '#00C853' : '#FF3B30';
-    ctx.lineWidth   = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, toY(h));
-    ctx.lineTo(x, toY(l));
-    ctx.stroke();
-    const y1 = toY(Math.max(o, cl));
-    const y2 = toY(Math.min(o, cl));
-    ctx.fillRect(x - bw/2, y1, bw, Math.max(1, y2 - y1));
+  // ── Bougies historiques (Fan uniquement) ────────────────────
+  if(MC_MODE !== 'histogram') {{
+    for(let i = 0; i < nHist; i++) {{
+      const o = histO[i], h = histH[i], l = histL[i], cl = histC[i];
+      const bull = cl >= o;
+      const x    = toX(i);
+      const bw   = Math.max(1, CW * 0.65);
+      ctx.strokeStyle = bull ? '#1A6B38' : '#7A2020';
+      ctx.fillStyle   = bull ? '#00C853' : '#FF3B30';
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, toY(h));
+      ctx.lineTo(x, toY(l));
+      ctx.stroke();
+      const y1 = toY(Math.max(o, cl));
+      const y2 = toY(Math.min(o, cl));
+      ctx.fillRect(x - bw/2, y1, bw, Math.max(1, y2 - y1));
+    }}
   }}
 
   // ── Ligne de prix courant ───────────────────────────────────
@@ -3172,7 +3307,7 @@ function mcDraw() {{
   if(MC_MODE === 'fan') {{
     mcDrawFan(ctx, r, toX, toY, nHist, W, PR);
   }} else {{
-    mcDrawSpaghetti(ctx, r, toX, toY, nHist, W, PR);
+    mcDrawHistogram(ctx, r, toX, toY, nHist, W, H, PR, PT, PB, pMin, pMax, pRng);
   }}
 }}
 
@@ -3240,73 +3375,294 @@ function mcDrawFan(ctx, r, toX, toY, offset, W, PR) {{
   }});
 }}
 
-function mcDrawSpaghetti(ctx, r, toX, toY, offset, W, PR) {{
-  // Trajectoires individuelles (si disponibles)
-  const paths = r.allPaths;
-  if(paths && paths.length > 0) {{
-    ctx.lineWidth = 0.7;
-    for(let s = 0; s < paths.length; s++) {{
-      const finals = paths[s][paths[s].length - 1];
-      const bull   = finals >= r.S0;
-      ctx.strokeStyle = bull
-        ? 'rgba(0,200,83,0.10)'
-        : 'rgba(255,59,48,0.10)';
-      ctx.beginPath();
-      for(let i = 0; i < paths[s].length; i++) {{
-        const x = toX(offset + i), y = toY(paths[s][i]);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }}
-      ctx.stroke();
-    }}
-  }} else {{
-    // Fallback : dessiner des bandes à partir des percentiles (beaucoup de sims)
-    for(let p = 0; p < 95; p += 5) {{
-      const k1 = 'p' + p, k2 = 'p' + (p + 5);
-      if(!r.percs[k1] || !r.percs[k2]) continue;
-      const ratio = 1 - Math.abs(p - 50) / 50;
-      ctx.strokeStyle = p >= 50
-        ? `rgba(0,200,83,${{(ratio * 0.25).toFixed(2)}})`
-        : `rgba(255,59,48,${{(ratio * 0.25).toFixed(2)}})`;
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      for(let i = 0; i <= r.horizon; i++) {{
-        const x = toX(offset + i), y = toY(r.percs[k1][i]);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }}
-      ctx.stroke();
-    }}
-  }}
+function mcDrawHistogram(ctx, r, toX, toY, offset, W, H, PR, PT, PB, pMin, pMax, pRng) {{
+  const rawFinals = r.finals;
+  if(!rawFinals || rawFinals.length === 0) return;
 
-  // Médiane (toujours visible)
+  const finals  = Array.from(rawFinals);
+  const n       = finals.length;
+  const S0      = r.S0;
+  const plotH   = H - PT - PB;
+
+  // ── Bornes de la zone MC (pleine largeur, collé à gauche) ───
+  const xLeft  = 4;                    // bord gauche = bord du canvas
+  const xRight = W - PR - 2;          // bord droit (avant labels)
+  const maxBarW = xRight - xLeft;
+  if(maxBarW <= 0) return;
+
+  // ── Clip ──────────────────────────────────────────────────
   ctx.save();
-  ctx.strokeStyle = '#FABE2C'; ctx.lineWidth = 2; ctx.setLineDash([]);
   ctx.beginPath();
-  for(let i = 0; i <= r.horizon; i++) {{
-    const x = toX(offset + i), y = toY(r.percs.p50[i]);
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  ctx.rect(xLeft, PT, xRight - xLeft + PR, plotH);
+  ctx.clip();
+
+  // ── Binning ───────────────────────────────────────────────
+  const N_BINS  = 48;
+  const binSize = (pMax - pMin) / N_BINS;
+  const counts  = new Array(N_BINS).fill(0);
+  for(const v of finals) {{
+    const b = Math.min(N_BINS - 1, Math.max(0, Math.floor((v - pMin) / binSize)));
+    counts[b]++;
   }}
-  ctx.stroke();
-  ctx.restore();
+  const maxCount = Math.max(...counts) || 1;
 
-  // P5 / P95 en pointillé
-  [['p5','rgba(255,59,48,0.75)'],['p95','rgba(0,200,83,0.75)']].forEach(([k,c]) => {{
-    ctx.save();
-    ctx.strokeStyle = c; ctx.lineWidth = 1.2; ctx.setLineDash([4,4]);
-    ctx.beginPath();
-    for(let i = 0; i <= r.horizon; i++) {{
-      const x = toX(offset + i), y = toY(r.percs[k][i]);
-      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  // ── Fond semi-transparent ─────────────────────────────────
+  ctx.fillStyle = 'rgba(255,255,255,0.015)';
+  ctx.fillRect(xLeft, PT, maxBarW, plotH);
+
+  // ── Barres ───────────────────────────────────────────────
+  const barH = Math.max(1, plotH / N_BINS - 0.5);
+  for(let b = 0; b < N_BINS; b++) {{
+    if(counts[b] === 0) continue;
+    const barPrice = pMin + (b + 0.5) * binSize;
+    const y        = toY(pMin + (b + 1) * binSize);
+    const bw       = (counts[b] / maxCount) * maxBarW;
+    const isBull   = barPrice >= S0;
+    const alpha    = 0.15 + 0.65 * (counts[b] / maxCount);
+
+    const grad = ctx.createLinearGradient(xLeft, 0, xLeft + bw, 0);
+    if(isBull) {{
+      grad.addColorStop(0, `rgba(0,200,83,${{(alpha * 0.3).toFixed(2)}})`);
+      grad.addColorStop(1, `rgba(0,200,83,${{alpha.toFixed(2)}})`);
+    }} else {{
+      grad.addColorStop(0, `rgba(255,59,48,${{(alpha * 0.3).toFixed(2)}})`);
+      grad.addColorStop(1, `rgba(255,59,48,${{alpha.toFixed(2)}})`);
     }}
-    ctx.stroke(); ctx.restore();
+    ctx.fillStyle = grad;
+    ctx.fillRect(xLeft, y, bw, barH);
+
+    // Tranche brillante droite
+    ctx.fillStyle = isBull
+      ? `rgba(0,230,100,${{(alpha * 0.5).toFixed(2)}})`
+      : `rgba(255,80,60,${{(alpha * 0.5).toFixed(2)}})`;
+    ctx.fillRect(xLeft + bw - 1, y, 1, barH);
+  }}
+
+  // ── Courbe de densité (KDE approximée) ────────────────────
+  ctx.beginPath();
+  let first = true;
+  for(let b = 0; b < N_BINS; b++) {{
+    const bw   = (counts[b] / maxCount) * maxBarW;
+    const yMid = toY(pMin + (b + 0.5) * binSize);
+    if(first) {{ ctx.moveTo(xLeft + bw, yMid); first = false; }}
+    else ctx.lineTo(xLeft + bw, yMid);
+  }}
+  ctx.strokeStyle = 'rgba(250,190,44,0.6)';
+  ctx.lineWidth   = 1.2;
+  ctx.setLineDash([]);
+  ctx.stroke();
+
+  // ── Ligne S0 (prix actuel) ────────────────────────────────
+  const yS0 = toY(S0);
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(xLeft, yS0);
+  ctx.lineTo(xRight, yS0);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Lignes de percentiles + labels ───────────────────────
+  ctx.restore();   // libérer le clip pour écrire les labels à droite
+  ctx.save();
+
+  const annots = [
+    {{ price: r.p5,   color: '#FF3B30', dash: [4,4], lbl: 'P5'  }},
+    {{ price: r.p25,  color: '#FF7043', dash: [2,4], lbl: 'P25' }},
+    {{ price: r.mean, color: '#4d9fff', dash: [3,3], lbl: 'MED' }},
+    {{ price: r.p75,  color: '#66BB6A', dash: [2,4], lbl: 'P75' }},
+    {{ price: r.p95,  color: '#00C853', dash: [4,4], lbl: 'P95' }},
+  ];
+
+  ctx.font = '8px Share Tech Mono,monospace';
+  annots.forEach(a => {{
+    const y = toY(a.price);
+    if(y < PT || y > H - PB) return;
+
+    // Ligne uniquement dans la zone MC (xLeft → xRight)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(xLeft, PT, xRight - xLeft, plotH);
+    ctx.clip();
+    ctx.strokeStyle = a.color;
+    ctx.lineWidth   = 1;
+    ctx.setLineDash(a.dash);
+    ctx.beginPath();
+    ctx.moveTo(xLeft, y);
+    ctx.lineTo(xRight, y);
+    ctx.stroke();
+    ctx.restore();
+
+    // Label à droite (hors clip)
+    ctx.fillStyle = a.color;
+    ctx.textAlign = 'left';
+    ctx.setLineDash([]);
+    ctx.fillText(a.lbl + ' ' + fmt(a.price), W - PR + 4, y + 3);
   }});
 
-  // Labels à droite
-  const endX = toX(offset + r.horizon) + 4;
-  ctx.font = '8px Share Tech Mono,monospace'; ctx.textAlign = 'left';
-  [['p95','#00C853','P95'],['p50','#FABE2C','MED'],['p5','#FF3B30','P5']].forEach(([k,c,l]) => {{
-    ctx.fillStyle = c;
-    ctx.fillText(l + ' ' + fmt(r.percs[k][r.horizon]), endX, toY(r.percs[k][r.horizon]) + 3);
-  }});
+  // ── Encart stats ──────────────────────────────────────────
+  const profitPct  = (finals.filter(v => v > S0).length / n * 100).toFixed(1);
+  const lossPct    = (100 - parseFloat(profitPct)).toFixed(1);
+  const isProfit   = parseFloat(profitPct) >= 50;
+  const profitColor = '#00C853';
+  const lossColor   = '#FF3B30';
+
+  // Dimensions de l'encart
+  const bx = xLeft + 8, by = PT + 8;
+  const bw2 = 178, bh = 82;
+  const pad = 10;
+
+  // Fond avec dégradé subtil
+  const bgGrad = ctx.createLinearGradient(bx, by, bx, by + bh);
+  bgGrad.addColorStop(0, 'rgba(10,10,10,0.92)');
+  bgGrad.addColorStop(1, 'rgba(0,0,0,0.88)');
+  ctx.fillStyle = bgGrad;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, bw2, bh, 4);
+  ctx.fill();
+
+  // Bordure colorée selon profit/perte
+  ctx.strokeStyle = isProfit ? 'rgba(0,200,83,0.35)' : 'rgba(255,59,48,0.35)';
+  ctx.lineWidth   = 1;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.roundRect(bx, by, bw2, bh, 4);
+  ctx.stroke();
+
+  // Barre colorée à gauche (accent)
+  ctx.fillStyle = isProfit ? 'rgba(0,200,83,0.7)' : 'rgba(255,59,48,0.7)';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, 3, bh, [4, 0, 0, 4]);
+  ctx.fill();
+
+  // Titre
+  ctx.font      = '8px Share Tech Mono,monospace';
+  ctx.fillStyle = '#555';
+  ctx.textAlign = 'left';
+  ctx.letterSpacing = '1px';
+  ctx.fillText('DISTRIBUTION FINALE', bx + pad, by + 16);
+
+  // Séparateur
+  ctx.strokeStyle = '#1e1e1e';
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(bx + pad, by + 22); ctx.lineTo(bx + bw2 - pad, by + 22);
+  ctx.stroke();
+
+  // Ligne PROFIT
+  const pBarW = Math.round((parseFloat(profitPct) / 100) * (bw2 - pad * 2));
+  ctx.fillStyle = 'rgba(0,200,83,0.12)';
+  ctx.fillRect(bx + pad, by + 27, pBarW, 16);
+  ctx.fillStyle = profitColor;
+  ctx.font      = '10px Share Tech Mono,monospace';
+  ctx.fillText('▲ PROFIT', bx + pad + 4, by + 39);
+  ctx.textAlign = 'right';
+  ctx.font      = '11px Share Tech Mono,monospace';
+  ctx.fillText(profitPct + '%', bx + bw2 - pad, by + 39);
+
+  // Ligne PERTE
+  ctx.textAlign = 'left';
+  const lBarW = Math.round((parseFloat(lossPct) / 100) * (bw2 - pad * 2));
+  ctx.fillStyle = 'rgba(255,59,48,0.10)';
+  ctx.fillRect(bx + pad, by + 47, lBarW, 16);
+  ctx.fillStyle = lossColor;
+  ctx.font      = '10px Share Tech Mono,monospace';
+  ctx.fillText('▼ PERTE ', bx + pad + 4, by + 59);
+  ctx.textAlign = 'right';
+  ctx.font      = '11px Share Tech Mono,monospace';
+  ctx.fillText(lossPct + '%', bx + bw2 - pad, by + 59);
+
+  // Mini barre de progression globale
+  ctx.textAlign = 'left';
+  const trackY = by + bh - 12;
+  ctx.fillStyle = 'rgba(255,59,48,0.3)';
+  ctx.fillRect(bx + pad, trackY, bw2 - pad * 2, 4);
+  ctx.fillStyle = 'rgba(0,200,83,0.7)';
+  ctx.fillRect(bx + pad, trackY, pBarW, 4);
+
+  ctx.restore();
+}}
+
+// ════════════════════════════════════════════════════════
+//  KELLY CRITERION — Calculs JS (interactif)
+//  Valeurs initiales auto-calibrées depuis Python/NumPy
+// ════════════════════════════════════════════════════════
+
+let KELLY_MODE = 'trade';
+
+function kellySetMode(mode) {{
+  KELLY_MODE = mode;
+  const tradeTab = document.getElementById('kelly_tab_trade');
+  const retTab   = document.getElementById('kelly_tab_ret');
+  const tradeInp = document.getElementById('kelly_inputs_trade');
+  const retInp   = document.getElementById('kelly_inputs_ret');
+  if(!tradeTab || !retTab) return;
+
+  const onStyle  = 'flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;border:1px solid rgba(0,255,65,0.4);background:rgba(0,255,65,0.08);color:#00FF41;transition:all .15s;';
+  const offStyle = 'flex:1;padding:5px 0;text-align:center;font-size:8px;letter-spacing:1px;cursor:pointer;border:1px solid #2a2a2a;background:transparent;color:#555;transition:all .15s;';
+
+  if (mode === 'trade') {{
+    tradeTab.style.cssText = onStyle;
+    retTab.style.cssText   = offStyle;
+    if(tradeInp) tradeInp.style.display = 'block';
+    if(retInp)   retInp.style.display   = 'none';
+  }} else {{
+    retTab.style.cssText   = onStyle;
+    tradeTab.style.cssText = offStyle;
+    if(retInp)   retInp.style.display   = 'block';
+    if(tradeInp) tradeInp.style.display = 'none';
+  }}
+  calcKelly();
+}}
+
+function calcKelly() {{
+  const capital = parseFloat(document.getElementById('kelly_capital')?.value) || 10000;
+  let f_full = 0, edge = 0, ruin = null, sharpe = null;
+
+  if (KELLY_MODE === 'trade') {{
+    const p = (parseFloat(document.getElementById('kelly_p')?.value) || 50) / 100;
+    const b =  parseFloat(document.getElementById('kelly_b')?.value) || 1.5;
+    const q = 1 - p;
+    f_full = (p * b - q) / b;
+    edge   = (p * b - q) * 100;
+    ruin   = f_full > 0.001 ? Math.pow(q / p, 1 / f_full) * 100 : 100;
+  }} else {{
+    const mu    = (parseFloat(document.getElementById('kelly_mu')?.value)    || 50)  / 100;
+    const sigma = (parseFloat(document.getElementById('kelly_sigma')?.value) || 80)  / 100;
+    f_full = sigma > 0 ? mu / (sigma * sigma) : 0;
+    edge   = mu * 100;
+    sharpe = sigma > 0 ? (mu / sigma) : 0;
+  }}
+
+  f_full = Math.max(0, Math.min(1, f_full || 0));
+  const f_half    = f_full * 0.5;
+  const f_quarter = f_full * 0.25;
+  const pos_size  = capital * f_half;
+
+  const fmt4 = v => (v != null && isFinite(v)) ? v.toFixed(4) : '—';
+  const fmtP = v => (v != null && isFinite(v)) ? v.toFixed(2) + '%' : '—';
+  const fmtD = v => (v != null && isFinite(v))
+    ? '$' + v.toLocaleString('en-US', {{minimumFractionDigits:2, maximumFractionDigits:2}})
+    : '—';
+
+  const setTxtK = (id, v) => {{ const e = document.getElementById(id); if(e) e.textContent = v; }};
+  const setColK = (id, c) => {{ const e = document.getElementById(id); if(e) e.style.color  = c; }};
+
+  setTxtK('kelly_r_full',    fmt4(f_full));
+  setTxtK('kelly_r_half',    fmt4(f_half));
+  setTxtK('kelly_r_quarter', fmt4(f_quarter));
+  setTxtK('kelly_r_pct',     fmtP(f_half * 100));
+  setTxtK('kelly_r_size',    fmtD(pos_size));
+  setTxtK('kelly_r_edge',    fmtP(edge));
+  setTxtK('kelly_r_ruin',    ruin   != null ? fmtP(Math.min(ruin, 100)) : '—');
+  setTxtK('kelly_r_sharpe',  sharpe != null ? sharpe.toFixed(2) : '—');
+
+  const col = f_full > 0.01 ? '#00FF41' : '#FF2222';
+  setColK('kelly_r_full', col);
+  setColK('kelly_r_pct',  col);
+  setColK('kelly_r_size', col);
+  setColK('kelly_r_edge', f_full > 0.01 ? '#00E676' : '#FF6B6B');
 }}
 
 // ── Resize handle ─────────────────────────────────────────────
