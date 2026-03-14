@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 import requests
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from translations import t, get_lang
 
 # ══════════════════════════════════════════
 #  UNIVERS PAR DÉFAUT
