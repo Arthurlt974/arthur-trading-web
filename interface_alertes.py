@@ -15,6 +15,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
+from translations import t, get_lang
 
 # ══════════════════════════════════════════════
 #  HELPERS FIREBASE (réutilise firebase_auth)
@@ -224,7 +225,7 @@ def show_alertes():
         c_left, c_right = st.columns(2)
 
         with c_left:
-            ticker_input = st.text_input("TICKER", value="NVDA", key="new_alert_ticker").upper().strip()
+            ticker_input = st.text_input(t("ticker"), value="NVDA", key="new_alert_ticker").upper().strip()
             alert_type   = st.selectbox("TYPE D'ALERTE", [
                 "Prix au-dessus", "Prix en-dessous",
                 "Variation % positive", "Variation % négative",
@@ -390,7 +391,7 @@ def show_alertes():
                     """, unsafe_allow_html=True)
                 with col_del:
                     st.markdown("<div style='margin-top:18px;'></div>", unsafe_allow_html=True)
-                    if st.button("🗑️", key=f"del_{alert['id']}", help="Supprimer"):
+                    if st.button("🗑️", key=f"del_{alert['id']}", help=t("supprimer")):
                         alerts.remove(alert)
                         _save_alerts(alerts)
                         st.rerun()
