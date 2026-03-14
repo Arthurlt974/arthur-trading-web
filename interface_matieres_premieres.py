@@ -12,6 +12,7 @@ import pandas as pd
 import feedparser
 import requests
 from datetime import datetime, timedelta
+from translations import t, get_lang
 
 
 HEADERS = {
@@ -499,7 +500,7 @@ def _show_category(category):
 
     st.markdown(f'<div class="section-header">⛏️ {category}</div>', unsafe_allow_html=True)
 
-    with st.spinner("Chargement..."):
+    with st.spinner(t("chargement")):
         prices = {item["ticker"]: get_commodity_price(item["ticker"]) for item in items}
 
     col_cards, col_detail = st.columns([1, 2])
@@ -566,7 +567,7 @@ def _fetch_candles(ticker: str, period: str = "6mo", interval: str = "1d") -> li
                     "h": float(row["High"]),
                     "l": float(row["Low"]),
                     "c": float(row["Close"]),
-                    "v": float(row.get("Volume", 0) or 0),
+                    "v": float(row.get(t("volume"), 0) or 0),
                 })
             except Exception:
                 continue
@@ -1166,7 +1167,7 @@ def _show_charts():
     with col_sel2:
         sel2 = st.selectbox("GRAPHIQUE 2", names, index=4, key="mp_chart2")
     with col_sel3:
-        period = st.selectbox("PÉRIODE", ["1W","1M","3M","6M","1Y","2Y","5Y"],
+        period = st.selectbox(t("periode"), ["1W","1M","3M","6M","1Y","2Y","5Y"],
                               index=2, key="mp_period")
 
     period_map = {"1W":"5d","1M":"1mo","3M":"3mo","6M":"6mo","1Y":"1y","2Y":"2y","5Y":"5y"}
