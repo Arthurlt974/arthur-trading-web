@@ -2087,57 +2087,34 @@ st.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Toggle langue discret ──
+# ── Toggle langue — boutons compacts ──
 lang = get_lang()
-st.sidebar.markdown(f"""
-<style>
-div.lang-wrap {{
-    display: flex; align-items: center; gap: 6px;
-    padding: 4px 16px 10px;
-    border-bottom: 1px solid #111;
-    margin-bottom: 4px;
-}}
-.lang-pill {{
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px; letter-spacing: 1px;
-    padding: 2px 7px; border-radius: 10px;
-    border: 1px solid #1a1a1a;
-    color: #333; background: transparent;
-    cursor: pointer;
-}}
-.lang-pill.on {{
-    color: #ff6600; border-color: #ff6600;
-    background: #0d0800;
-}}
-</style>
-<div class="lang-wrap">
-    <span class="lang-pill {'on' if lang=='FR' else ''}">🇫🇷 FR</span>
-    <span class="lang-pill {'on' if lang=='EN' else ''}">🇬🇧 EN</span>
-</div>
-""", unsafe_allow_html=True)
-
-# Selectbox caché pour la logique
 st.sidebar.markdown("""
 <style>
-div.lang-sel label { display:none !important; }
-div.lang-sel > div > div {
-    background: transparent !important;
-    border: none !important;
+[data-testid="stSidebar"] button[kind="primary"].lang-active,
+[data-testid="stSidebar"] div[data-testid="stHorizontalBlock"] button {
     font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 9px !important; color: #333 !important;
-    padding: 0 16px !important; margin-top: -8px;
-    max-width: 80px;
+    font-size: 9px !important;
+    letter-spacing: 1px !important;
+    padding: 2px 8px !important;
+    min-height: 26px !important;
+    height: 26px !important;
+    border-radius: 3px !important;
 }
 </style>
 """, unsafe_allow_html=True)
-st.sidebar.markdown('<div class="lang-sel">', unsafe_allow_html=True)
-new_lang = st.sidebar.selectbox("lang", ["FR", "EN"],
-    index=0 if lang=="FR" else 1,
-    key="lang_select", label_visibility="collapsed")
-st.sidebar.markdown('</div>', unsafe_allow_html=True)
-if new_lang != lang:
-    st.session_state.lang = new_lang
-    st.rerun()
+_lc1, _lc2, _lc3 = st.sidebar.columns([1, 1, 4])
+with _lc1:
+    if st.button("🇫🇷 FR", key="lang_fr",
+                 type="primary" if lang == "FR" else "secondary"):
+        st.session_state.lang = "FR"
+        st.rerun()
+with _lc2:
+    if st.button("🇬🇧 EN", key="lang_en",
+                 type="primary" if lang == "EN" else "secondary"):
+        st.session_state.lang = "EN"
+        st.rerun()
+st.sidebar.markdown("<div style='border-bottom:1px solid #111;margin:4px 0 6px;'></div>", unsafe_allow_html=True)
 
 # ── Secteurs avec icônes groupés ──
 SECTEURS = {
