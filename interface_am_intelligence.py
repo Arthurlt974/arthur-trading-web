@@ -3,6 +3,7 @@ import requests
 import json
 import io
 from datetime import datetime
+from translations import t, get_lang
 
 # ── Modèle Groq ──
 GROQ_MODEL = "llama-3.3-70b-versatile"
