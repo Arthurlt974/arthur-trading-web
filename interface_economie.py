@@ -14,6 +14,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import time
+from translations import t, get_lang
 
 # ══════════════════════════════════════════════════════════════
 #  CONFIG PAYS
@@ -648,7 +649,7 @@ def show_economie():
             rows.append({
                 "Pays":           pays,
                 "Chômage":        _fmt(CHOMAGE, pays, "%"),
-                "Inflation":      _fmt(INFLATION, pays, "%"),
+                t("eco_inflation"):      _fmt(INFLATION, pays, "%"),
                 "PIB":            _fmt(PIB, pays, "%"),
                 "Taux Directeur": _fmt(TAUX_DIRECTEURS, pays, "%"),
                 "Confiance":      _fmt(CONFIANCE, pays),
@@ -758,7 +759,7 @@ def show_economie():
                           annotation=dict(font=dict(color="#ff9800", size=11)))
             st.plotly_chart(fig, use_container_width=True)
         with col_t:
-            tableau_comparatif("Inflation", INFLATION, pays_selectionnes, "%", inverse=True)
+            tableau_comparatif(t("eco_inflation"), INFLATION, pays_selectionnes, "%", inverse=True)
             st.markdown("#### 🎯 Écart vs cible 2%")
             for pays in pays_selectionnes:
                 diff  = INFLATION[pays]["actuel"] - 2.0
