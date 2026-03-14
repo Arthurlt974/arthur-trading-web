@@ -2085,17 +2085,57 @@ st.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Toggle langue ──
+# ── Toggle langue discret ──
 lang = get_lang()
-col_fr, col_en, _ = st.sidebar.columns([1,1,3])
-with col_fr:
-    if st.sidebar.button("🇫🇷", key="lang_fr", type="primary" if lang=="FR" else "secondary"):
-        st.session_state.lang = "FR"
-        st.rerun()
-with col_en:
-    if st.sidebar.button("🇬🇧", key="lang_en", type="primary" if lang=="EN" else "secondary"):
-        st.session_state.lang = "EN"
-        st.rerun()
+st.sidebar.markdown(f"""
+<style>
+div.lang-wrap {{
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 16px 10px;
+    border-bottom: 1px solid #111;
+    margin-bottom: 4px;
+}}
+.lang-pill {{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; letter-spacing: 1px;
+    padding: 2px 7px; border-radius: 10px;
+    border: 1px solid #1a1a1a;
+    color: #333; background: transparent;
+    cursor: pointer;
+}}
+.lang-pill.on {{
+    color: #ff6600; border-color: #ff6600;
+    background: #0d0800;
+}}
+</style>
+<div class="lang-wrap">
+    <span class="lang-pill {'on' if lang=='FR' else ''}">🇫🇷 FR</span>
+    <span class="lang-pill {'on' if lang=='EN' else ''}">🇬🇧 EN</span>
+</div>
+""", unsafe_allow_html=True)
+
+# Selectbox caché pour la logique
+st.sidebar.markdown("""
+<style>
+div.lang-sel label { display:none !important; }
+div.lang-sel > div > div {
+    background: transparent !important;
+    border: none !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 9px !important; color: #333 !important;
+    padding: 0 16px !important; margin-top: -8px;
+    max-width: 80px;
+}
+</style>
+""", unsafe_allow_html=True)
+st.sidebar.markdown('<div class="lang-sel">', unsafe_allow_html=True)
+new_lang = st.sidebar.selectbox("lang", ["FR", "EN"],
+    index=0 if lang=="FR" else 1,
+    key="lang_select", label_visibility="collapsed")
+st.sidebar.markdown('</div>', unsafe_allow_html=True)
+if new_lang != lang:
+    st.session_state.lang = new_lang
+    st.rerun()
 
 # ── Secteurs avec icônes groupés ──
 SECTEURS = {
