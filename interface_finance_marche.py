@@ -1,3 +1,4 @@
+from translations import t, get_lang
 # ============================================================
 #  interface_finance_marche.py
 #  Secteur : FINANCE DE MARCHÉ — Outils Ingénieur Quant
@@ -63,16 +64,16 @@ def show_options_pricing():
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        S  = st.number_input("Spot (S)", value=182.65, step=1.0, key="bs_s")
-        K  = st.number_input("Strike (K)", value=185.0, step=1.0, key="bs_k")
-        T  = st.number_input("Maturité (années)", value=0.25, step=0.01, min_value=0.01, key="bs_t")
+        S  = st.number_input(t("fm_spot"), value=182.65, step=1.0, key="bs_s")
+        K  = st.number_input(t("fm_strike"), value=185.0, step=1.0, key="bs_k")
+        T  = st.number_input(t("fm_maturite"), value=0.25, step=0.01, min_value=0.01, key="bs_t")
     with c2:
-        r  = st.number_input("Taux sans risque (%)", value=4.5, step=0.1, key="bs_r") / 100
-        sigma = st.number_input("Volatilité implicite (%)", value=35.0, step=0.5, key="bs_sigma") / 100
-        q  = st.number_input("Dividende continu (%)", value=0.0, step=0.1, key="bs_q") / 100
+        r  = st.number_input(t("fm_taux_rf"), value=4.5, step=0.1, key="bs_r") / 100
+        sigma = st.number_input(t("fm_vol_impl"), value=35.0, step=0.5, key="bs_sigma") / 100
+        q  = st.number_input(t("fm_dividende"), value=0.0, step=0.1, key="bs_q") / 100
     with c3:
-        opt_type = st.selectbox("Type", ["Call", "Put"], key="bs_type")
-        style    = st.selectbox("Style", ["Européen", "Américain (approx)"], key="bs_style")
+        opt_type = st.selectbox(t("fm_type"), ["Call", "Put"], key="bs_type")
+        style    = st.selectbox(t("fm_style"), ["Européen", "Américain (approx)"], key="bs_style")
         st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Calcul Black-Scholes ──
@@ -137,7 +138,7 @@ def show_options_pricing():
     fig.add_trace(go.Scatter(x=spots, y=pnl, name="P&L net",
         line=dict(color="#00C853", width=1.5),
         fill="tozeroy", fillcolor="rgba(0,200,83,0.05)"))
-    fig.add_vline(x=S, line=dict(color="#fff", width=1, dash="dash"), annotation_text="Spot")
+    fig.add_vline(x=S, line=dict(color="#fff", width=1, dash="dash"), annotation_text=t("fm_spot"))
     fig.add_vline(x=K, line=dict(color="#ff6600", width=1, dash="dash"), annotation_text="Strike")
     fig.add_hline(y=0, line=dict(color="#333", width=1))
     fig.update_layout(**PLOTLY_DARK, height=380, title=f"{opt_type} {K} | σ={sigma*100:.1f}% | T={T:.2f}y")
@@ -150,7 +151,7 @@ def show_options_pricing():
     fig2.add_trace(go.Scatter(x=spots, y=deltas_call, name="Delta Call", line=dict(color="#00C853", width=2)))
     fig2.add_trace(go.Scatter(x=spots, y=deltas_put, name="Delta Put", line=dict(color="#FF3B30", width=2)))
     fig2.add_vline(x=S, line=dict(color="#fff", width=1, dash="dash"))
-    fig2.update_layout(**PLOTLY_DARK, height=280, yaxis_title="Delta", xaxis_title="Spot")
+    fig2.update_layout(**PLOTLY_DARK, height=280, yaxis_title="Delta", xaxis_title=t("fm_spot"))
     st.plotly_chart(fig2, use_container_width=True)
 
 
@@ -163,8 +164,8 @@ def show_vol_surface():
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        S0 = st.number_input("Spot", value=100.0, key="vs_s")
-        r0 = st.number_input("Taux (%)", value=4.5, key="vs_r") / 100
+        S0 = st.number_input(t("fm_spot"), value=100.0, key="vs_s")
+        r0 = st.number_input(t("fm_taux_rf"), value=4.5, key="vs_r") / 100
     with c2:
         atm_vol  = st.slider("Vol ATM (%)", 10, 80, 25, key="vs_atm") / 100
         skew     = st.slider("Skew (pente)", -0.5, 0.5, -0.15, step=0.01, key="vs_skew")
@@ -265,7 +266,7 @@ def show_yield_curve():
         fig.add_hline(y=0, line=dict(color="#333"), row=1, col=1)
         fig.update_layout(**PLOTLY_DARK, height=420,
                           title="Courbe des taux — Nelson-Siegel")
-        fig.update_yaxes(title_text="Taux (%)", row=1, col=1)
+        fig.update_yaxes(title_text=t("fm_taux_rf"), row=1, col=1)
         fig.update_yaxes(title_text="Fwd (%)", row=2, col=1)
         st.plotly_chart(fig, use_container_width=True)
 
@@ -286,7 +287,7 @@ def show_yield_curve():
         c1, c2, c3 = st.columns(3)
         face   = c1.number_input("Nominal ($)", value=1000, step=100, key="ob_face")
         coupon = c2.number_input("Coupon annuel (%)", value=5.0, step=0.1, key="ob_coupon") / 100
-        maturity_y = c3.number_input("Maturité (années)", value=10, min_value=1, max_value=50, key="ob_mat")
+        maturity_y = c3.number_input(t("fm_maturite"), value=10, min_value=1, max_value=50, key="ob_mat")
         c4, c5, c6 = st.columns(3)
         ytm    = c4.number_input("YTM (%)", value=4.5, step=0.1, key="ob_ytm") / 100
         freq   = c5.selectbox("Fréquence coupon", [1, 2, 4], index=1, key="ob_freq",
@@ -349,9 +350,9 @@ def show_var():
     import yfinance as yf
 
     c1, c2, c3 = st.columns(3)
-    tickers_input = c1.text_input("Tickers (séparés par virgule)", value="NVDA,AAPL,MSFT", key="var_tickers")
-    confidence    = c2.slider("Niveau de confiance (%)", 90, 99, 95, key="var_conf") / 100
-    horizon       = c3.number_input("Horizon (jours)", value=1, min_value=1, max_value=30, key="var_hor")
+    tickers_input = c1.text_input(t("ticker"), value="NVDA,AAPL,MSFT", key="var_tickers")
+    confidence    = c2.slider(t("fm_confiance"), 90, 99, 95, key="var_conf") / 100
+    horizon       = c3.number_input(t("fm_horizon"), value=1, min_value=1, max_value=30, key="var_hor")
 
     tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
 
@@ -451,8 +452,8 @@ def show_markowitz():
     import yfinance as yf
 
     c1, c2 = st.columns([3,1])
-    tickers_input = c1.text_input("Tickers", value="AAPL,NVDA,MSFT,TSLA,JPM,GLD", key="mk_tickers")
-    rf = c2.number_input("Taux sans risque (%)", value=4.5, step=0.1, key="mk_rf") / 100
+    tickers_input = c1.text_input(t("ticker"), value="AAPL,NVDA,MSFT,TSLA,JPM,GLD", key="mk_tickers")
+    rf = c2.number_input(t("fm_taux_rf"), value=4.5, step=0.1, key="mk_rf") / 100
 
     tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()][:10]
 
@@ -568,8 +569,8 @@ def show_backtest_quant():
     import yfinance as yf
 
     c1, c2, c3 = st.columns(3)
-    ticker   = c1.text_input("Ticker", value="NVDA", key="bq_ticker").upper()
-    strategy = c2.selectbox("Stratégie", [
+    ticker   = c1.text_input(t("ticker"), value="NVDA", key="bq_ticker").upper()
+    strategy = c2.selectbox(t("fm_alpha"), [
         "Mean Reversion (Bollinger)",
         "Momentum (SMA Crossover)",
         "RSI Reversal",
@@ -661,7 +662,7 @@ def show_backtest_quant():
     fig = make_subplots(rows=3, cols=1, shared_xaxes=True,
                         row_heights=[0.55, 0.25, 0.20], vertical_spacing=0.04)
     fig.add_trace(go.Scatter(x=df.index, y=df["cum_strat"]*capital,
-        name="Stratégie", line=dict(color="#ff6600", width=2)), row=1, col=1)
+        name=t("fm_alpha"), line=dict(color="#ff6600", width=2)), row=1, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["cum_ret"]*capital,
         name="Buy & Hold", line=dict(color="#4d9fff", width=1.5, dash="dot")), row=1, col=1)
     fig.add_trace(go.Bar(x=df.index, y=df["strat_ret"]*100,
@@ -690,9 +691,9 @@ def show_monte_carlo():
     import yfinance as yf
 
     c1, c2, c3 = st.columns(3)
-    ticker   = c1.text_input("Ticker", value="NVDA", key="mc_ticker").upper()
-    n_sims   = c2.select_slider("Nombre de simulations", [100,500,1000,5000,10000], value=1000, key="mc_nsims")
-    horizon  = c3.number_input("Horizon (jours)", value=252, min_value=1, max_value=756, key="mc_hor")
+    ticker   = c1.text_input(t("ticker"), value="NVDA", key="mc_ticker").upper()
+    n_sims   = c2.select_slider(t("fm_simulations"), [100,500,1000,5000,10000], value=1000, key="mc_nsims")
+    horizon  = c3.number_input(t("fm_horizon"), value=252, min_value=1, max_value=756, key="mc_hor")
 
     with st.spinner("Simulation..."):
         try:
@@ -759,7 +760,7 @@ def show_monte_carlo():
             line=dict(color="rgba(255,102,0,0.15)", width=0.5), showlegend=False))
     fig.add_trace(go.Scatter(x=t_axis, y=np.percentile(paths, 50, axis=1),
         line=dict(color="#ff6600", width=2.5), name="Médiane"))
-    fig.add_hline(y=S0, line=dict(color="#fff", dash="dash", width=1), annotation_text="Spot")
+    fig.add_hline(y=S0, line=dict(color="#fff", dash="dash", width=1), annotation_text=t("fm_spot"))
     fig.update_layout(**PLOTLY_DARK, height=400,
                       xaxis_title="Jours", yaxis_title=f"Prix {ticker} ($)",
                       title=f"Monte Carlo GBM — μ={mu*252*100:.1f}%/an, σ={sigma*np.sqrt(252)*100:.1f}%/an")
@@ -771,7 +772,7 @@ def show_monte_carlo():
         marker_color="#4d9fff", opacity=0.8, name="Prix finaux"))
     for p, lbl, col in [(p5,"P5","#FF3B30"),(p50,"P50","#ff6600"),(p95,"P95","#00C853")]:
         fig2.add_vline(x=p, line=dict(color=col, dash="dash"), annotation_text=lbl)
-    fig2.add_vline(x=S0, line=dict(color="#fff", width=1.5), annotation_text="Spot")
+    fig2.add_vline(x=S0, line=dict(color="#fff", width=1.5), annotation_text=t("fm_spot"))
     fig2.update_layout(**PLOTLY_DARK, height=300,
                        xaxis_title=f"Prix final {ticker}", yaxis_title="Fréquence")
     st.plotly_chart(fig2, use_container_width=True)
@@ -788,10 +789,10 @@ def show_factor_analysis():
 
     c1, c2, c3 = st.columns(3)
     ticker    = c1.text_input("Actif à analyser", value="NVDA", key="fa_ticker").upper()
-    benchmark = c2.text_input("Benchmark", value="SPY", key="fa_bench").upper()
+    benchmark = c2.text_input(t("fm_benchmark"), value="SPY", key="fa_bench").upper()
     period    = c3.selectbox("Période", ["1y","2y","3y","5y"], index=2, key="fa_period")
 
-    rf_annual = st.sidebar.number_input("Taux sans risque (%)", value=4.5, key="fa_rf") / 100 / 252
+    rf_annual = st.sidebar.number_input(t("fm_taux_rf"), value=4.5, key="fa_rf") / 100 / 252
 
     with st.spinner("Chargement..."):
         try:
