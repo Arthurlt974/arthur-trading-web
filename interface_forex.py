@@ -12,6 +12,7 @@ from plotly.subplots import make_subplots
 import yfinance as yf
 import requests
 from datetime import datetime, timedelta
+from translations import t, get_lang
 
 # ══════════════════════════════════════════════
 #  CONFIG PAIRES FOREX
@@ -264,7 +265,7 @@ def show_forex():
         st.markdown("### 🏆 CLASSEMENT DE FORCE DES MONNAIES")
         st.info("Calcul basé sur la performance moyenne de chaque monnaie contre toutes les autres.")
 
-        period_rank = st.selectbox("Période", ["1d", "5d", "1mo", "3mo"], index=1, key="rank_period")
+        period_rank = st.selectbox(t("periode"), ["1d", "5d", "1mo", "3mo"], index=1, key="rank_period")
 
         if st.button("🚀 CALCULER LE CLASSEMENT", key="calc_rank"):
             with st.spinner("Analyse de toutes les paires en cours..."):
@@ -355,7 +356,7 @@ def show_forex():
         st.markdown("### 🚀 TOP HAUSSE & BAISSE DU JOUR")
 
         type_pairs = st.selectbox("Type de paires", ["Majeures", "Mineures", "Exotiques", "Toutes"], key="top_type")
-        period_top = st.selectbox("Période", ["1d", "5d", "1mo"], index=0, key="top_period")
+        period_top = st.selectbox(t("periode"), ["1d", "5d", "1mo"], index=0, key="top_period")
 
         pairs_to_scan = {
             "Majeures": MAJOR_PAIRS,
@@ -452,7 +453,7 @@ def show_forex():
         st.markdown("### 🔥 HEATMAP FOREX")
         st.info("Visualisation de la performance de chaque paire sur la période sélectionnée.")
 
-        period_heat = st.selectbox("Période", ["1d", "5d", "1mo", "3mo"], index=1, key="heat_period")
+        period_heat = st.selectbox(t("periode"), ["1d", "5d", "1mo", "3mo"], index=1, key="heat_period")
 
         if st.button("🎨 GÉNÉRER LA HEATMAP", key="gen_heat"):
             with st.spinner("Chargement des données..."):
@@ -523,13 +524,13 @@ def show_forex():
         with col_g1:
             paire_chart = st.selectbox("Paire", list(ALL_PAIRS.keys()), key="chart_pair")
         with col_g2:
-            period_chart = st.selectbox("Période",
+            period_chart = st.selectbox(t("periode"),
                 ["5d", "1mo", "3mo", "6mo", "1y", "2y"], index=2, key="chart_period")
         with col_g3:
             chart_type = st.selectbox("Type", ["Chandeliers", "Ligne", "Aire"], key="chart_type")
 
         if st.button("📊 AFFICHER LE GRAPHIQUE", key="show_chart"):
-            with st.spinner("Chargement..."):
+            with st.spinner(t("chargement")):
                 ticker = ALL_PAIRS[paire_chart]
                 df = get_forex_data(ticker, period_chart)
 
@@ -609,7 +610,7 @@ def show_forex():
         st.markdown("### 🔗 MATRICE DE CORRÉLATION FOREX")
         st.info("Corrélation = +1 : paires identiques | 0 : indépendantes | -1 : opposées")
 
-        period_corr = st.selectbox("Période", ["1mo", "3mo", "6mo"], index=0, key="corr_period")
+        period_corr = st.selectbox(t("periode"), ["1mo", "3mo", "6mo"], index=0, key="corr_period")
 
         if st.button("🔗 CALCULER LA CORRÉLATION", key="calc_corr"):
             with st.spinner("Calcul des corrélations..."):
@@ -832,7 +833,7 @@ def show_forex():
                         rate = get_current_price(ticker_t)
                         if rate:
                             table_rows.append({
-                                "Devise": f"{CURRENCY_FLAGS[target]} {target}",
+                                t("devise"): f"{CURRENCY_FLAGS[target]} {target}",
                                 "Taux": f"{rate:.4f}",
                                 f"{montant_table:.0f} {base_curr} =": f"{montant_table * rate:,.2f} {target}"
                             })
