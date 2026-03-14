@@ -25,6 +25,7 @@ import requests
 from datetime import datetime
 import json
 from fpdf import FPDF
+from translations import t, get_lang
 
 # ══════════════════════════════════════════════
 #  CONFIG FIREBASE (réutilise les secrets)
@@ -773,7 +774,7 @@ def show_analyse_perso():
             st.info("👤 Mode invité — créez un compte gratuit pour accéder au tableau de bord.")
             st.stop()
 
-        with st.spinner("Chargement..."):
+        with st.spinner(t("chargement")):
             analyses = load_analyses(uid)
 
         if not analyses:
@@ -858,7 +859,7 @@ def show_analyse_perso():
         # ── Tableau récapitulatif ────────────────────────────
         st.markdown("### 📋 RÉCAPITULATIF")
         df_recap = pd.DataFrame([{
-            "Ticker":    a.get("ticker", "?"),
+            t("ticker"):    a.get("ticker", "?"),
             "Nom":       a.get("nom", "?")[:25],
             "Score":     f"{a.get('score_perso', 0)}/10",
             "Technique": f"{a.get('score_technique', 0)}/10",
