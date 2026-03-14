@@ -15,6 +15,7 @@ from plotly.subplots import make_subplots
 import requests
 from datetime import datetime, timedelta
 import json
+from translations import t, get_lang
 
 
 # ══════════════════════════════════════════════════════════════
@@ -381,7 +382,7 @@ def _render_positions_table(enriched: list) -> int | None:
                         f"font-weight:600;color:{pnl_c};'>{sign}${pos['pnl_abs']:,.2f}"
                         f"<br><span style='font-size:10px;'>{sign}{pos['pnl_pct']:.2f}%</span></div>",
                         unsafe_allow_html=True)
-        if row[8].button("✕", key=f"del_pos_{i}", help="Supprimer"):
+        if row[8].button("✕", key=f"del_pos_{i}", help=t("supprimer")):
             to_delete = i
 
     return to_delete
@@ -587,10 +588,10 @@ def _render_add_form(positions: list) -> list | None:
                                    placeholder="ex: AAPL, BTC, EURUSD",
                                    key="add_symbol").strip().upper()
         with col_qty:
-            qty = st.number_input("Quantité", min_value=0.0, value=1.0,
+            qty = st.number_input(t("port_quantite"), min_value=0.0, value=1.0,
                                   step=0.001, format="%.6g", key="add_qty")
         with col_price:
-            buy_price = st.number_input("Prix d'achat", min_value=0.0, value=0.0,
+            buy_price = st.number_input(t("port_prix_achat"), min_value=0.0, value=0.0,
                                         step=0.01, format="%.6g", key="add_price")
         with col_fees:
             fees = st.number_input("Frais ($)", min_value=0.0, value=0.0,
@@ -665,7 +666,7 @@ def _render_detail_tab(enriched: list):
     # Métriques détaillées
     c1, c2, c3, c4, c5 = st.columns(5)
     sign = "+" if pos["pnl_abs"] >= 0 else ""
-    c1.metric("Prix d'achat",  f"${pos['buy_price']:,.4g}")
+    c1.metric(t("port_prix_achat"),  f"${pos['buy_price']:,.4g}")
     c2.metric("Prix actuel",   f"${pos['current_price']:,.4g}")
     c3.metric("Valeur marché", f"${pos['market_value']:,.2f}")
     c4.metric("P&L ($)",       f"{sign}${pos['pnl_abs']:,.2f}", f"{sign}{pos['pnl_pct']:.2f}%",
