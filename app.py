@@ -24,6 +24,7 @@ import interface_portfolio
 import interface_alertes
 import interface_screener
 import Terminal as terminal_module
+from translations import t, get_lang, render_lang_toggle
 import interface_finance_marche
 import interface_am_intelligence
 from utils import (
@@ -2084,53 +2085,69 @@ st.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Toggle langue ──
+lang = get_lang()
+col_fr, col_en, _ = st.sidebar.columns([1,1,3])
+with col_fr:
+    if st.sidebar.button("🇫🇷", key="lang_fr", type="primary" if lang=="FR" else "secondary"):
+        st.session_state.lang = "FR"
+        st.rerun()
+with col_en:
+    if st.sidebar.button("🇬🇧", key="lang_en", type="primary" if lang=="EN" else "secondary"):
+        st.session_state.lang = "EN"
+        st.rerun()
+
 # ── Secteurs avec icônes groupés ──
 SECTEURS = {
-    "📊 MARCHÉS": [
-        ("🏠 ACCUEIL",          "🏠"),
-        ("📈 ACTIONS & BOURSE", "📈"),
-        ("🪙 MARCHÉ CRYPTO",    "🪙"),
-        ("💱 FOREX",            "💱"),
-        ("🛢 MATIÈRES PREMIÈRES","🛢"),
-        ("🌍 ÉCONOMIE",         "🌍"),
+    t("nav_markets"): [
+        (t("nav_home"),          "🏠"),
+        (t("nav_actions"), "📈"),
+        (t("nav_crypto"),    "🪙"),
+        (t("nav_forex"),            "💱"),
+        (t("nav_matieres"),"🛢"),
+        (t("nav_economie"),         "🌍"),
     ],
-    "⚙️ ANALYSE": [
-        ("🔬 FINANCE DE MARCHÉ","🔬"),
-        ("🧠 INTERFACE PRO",    "🧠"),
-        ("🤖 INTERFACE CRYPTO PRO","🤖"),
-        ("📐 MON ESPACE ANALYSE","📐"),
+    t("nav_analyse"): [
+        (t("nav_finance"),"🔬"),
+        (t("nav_pro"),    "🧠"),
+        (t("nav_crypto_pro"),"🤖"),
+        (t("nav_espace"),"📐"),
         ("🤖 AM INTELLIGENCE",  "🤖"),
     ],
-    "🛠 OUTILS": [
-        ("💼 PORTFOLIO",        "💼"),
-        ("🔭 SCREENER",         "🔭"),
-        ("🔔 ALERTES",          "🔔"),
-        ("🧰 BOITE À OUTILS",   "🧰"),
-        ("🖥 TERMINAL",         "🖥"),
+    t("nav_outils"): [
+        (t("nav_portfolio"),        "💼"),
+        (t("nav_screener"),         "🔭"),
+        (t("nav_alertes"),          "🔔"),
+        (t("nav_boite"),   "🧰"),
+        (t("nav_terminal"),         "🖥"),
     ],
 }
 
 # Mapping label affiché → clé interne
 LABEL_TO_KEY = {
-    "🏠 ACCUEIL":               "ACCUEIL",
-    "📈 ACTIONS & BOURSE":      "ACTIONS & BOURSE",
-    "🪙 MARCHÉ CRYPTO":         "MARCHÉ CRYPTO",
-    "💱 FOREX":                  "FOREX",
-    "🛢 MATIÈRES PREMIÈRES":    "MATIÈRES PREMIÈRES",
-    "🌍 ÉCONOMIE":              "ÉCONOMIE",
-    "🔬 FINANCE DE MARCHÉ":     "FINANCE DE MARCHÉ",
-    "🧠 INTERFACE PRO":         "INTERFACE PRO",
-    "🤖 INTERFACE CRYPTO PRO":  "INTERFACE CRYPTO PRO",
-    "📐 MON ESPACE ANALYSE":    "MON ESPACE ANALYSE",
+    t("nav_home"):               "ACCUEIL",
+    t("nav_actions"):      "ACTIONS & BOURSE",
+    t("nav_crypto"):         "MARCHÉ CRYPTO",
+    t("nav_forex"):                  "FOREX",
+    t("nav_matieres"):    "MATIÈRES PREMIÈRES",
+    t("nav_economie"):              "ÉCONOMIE",
+    t("nav_finance"):     "FINANCE DE MARCHÉ",
+    t("nav_pro"):         "INTERFACE PRO",
+    t("nav_crypto_pro"):  "INTERFACE CRYPTO PRO",
+    t("nav_espace"):    "MON ESPACE ANALYSE",
     "🤖 AM INTELLIGENCE":       "AM INTELLIGENCE",
-    "💼 PORTFOLIO":             "PORTFOLIO",
-    "🔭 SCREENER":              "SCREENER",
-    "🔔 ALERTES":               "ALERTES",
-    "🧰 BOITE À OUTILS":        "BOITE À OUTILS",
-    "🖥 TERMINAL":              "TERMINAL",
+    t("nav_portfolio"):             "PORTFOLIO",
+    t("nav_screener"):              "SCREENER",
+    t("nav_alertes"):               "ALERTES",
+    t("nav_boite"):        "BOITE À OUTILS",
+    t("nav_terminal"):              "TERMINAL",
 }
 
 # Init session state
+# Init langue
+if "lang" not in st.session_state:
+    st.session_state.lang = "FR"
+
 if "categorie" not in st.session_state:
     st.session_state.categorie = "ACCUEIL"
 
@@ -2502,9 +2519,9 @@ if categorie == "MON ESPACE ANALYSE":
 
 if categorie == "MARCHÉ CRYPTO":
     outil = _toolbar("tb_crypto", [
-        "GRAPHIQUE CRYPTO", "BITCOIN DOMINANCE", "CRYPTO WALLET",
-        "HEATMAP LIQUIDATIONS", "ORDER BOOK LIVE", "WHALE WATCHER",
-        "ON-CHAIN ANALYTICS", "LIQUIDATIONS & FUNDING", "STAKING & YIELD"
+        t("mod_graphique_crypto"), t("mod_btc_dom"), t("mod_wallet"),
+        t("mod_heatmap_liq"), t("mod_orderbook"), t("mod_whale"),
+        t("mod_onchain"), t("mod_liq_funding"), t("mod_staking")
     ])
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
@@ -2521,16 +2538,16 @@ elif categorie == "MATIÈRES PREMIÈRES":
     st.stop()
 elif categorie == "ACTIONS & BOURSE":
     outil = _toolbar("tb_actions", [
-        "ANALYSEUR PRO", "ANALYSE TECHNIQUE PRO", "FIBONACCI CALCULATOR",
-        "BACKTESTING ENGINE", "VALORISATION FONDAMENTALE", "MULTI-CHARTS",
-        "EXPERT SYSTEM", "THE GRAND COUNCIL️", "MODE DUEL",
-        "MARKET MONITOR", "SCREENER CAC 40", "DIVIDEND CALENDAR"
+        t("mod_analyseur"), t("mod_technique"), t("mod_fibonacci"),
+        t("mod_backtest"), t("mod_valorisation"), t("mod_multicharts"),
+        t("mod_expert"), t("mod_council"), t("mod_duel"),
+        t("mod_monitor"), t("mod_screener_cac"), t("mod_dividend")
     ])
 
 elif categorie == "BOITE À OUTILS":
     outil = _toolbar("tb_outils", [
-        "DAILY BRIEF", "CALENDRIER ÉCO", "Fear and Gread Index",
-        "CORRÉLATION DASH", "INTERETS COMPOSES", "HEATMAP MARCHÉ", "ALERTS MANAGER"
+        t("mod_daily"), t("mod_calendrier"), t("mod_fear"),
+        t("mod_correlation"), t("mod_interets"), t("mod_heatmap"), t("mod_alerts")
     ])
 
 st.sidebar.markdown("---")
