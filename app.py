@@ -1909,71 +1909,73 @@ if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
 
 # ============================================================
 
-def _toolbar(key, outils, default=None):
-    """Barre d'outils horizontale — st.radio stylisé fonctionnel."""
+def _toolbar(key, outils, default=None, labels=None):
+    """
+    Barre d'outils horizontale.
+    - outils : clés internes fixes (FR, indépendantes de la langue)
+    - labels : textes affichés traduits (optionnel, sinon = outils)
+    Retourne toujours une clé interne fixe → les if outil == "X" fonctionnent en FR et EN.
+    """
+    if labels is None:
+        labels = outils
     if default is None:
         default = outils[0]
     if key not in st.session_state:
         st.session_state[key] = default
+    # Si la valeur stockée n'est plus valide (changement de langue), reset
+    if st.session_state[key] not in outils:
+        st.session_state[key] = default
 
-    # CSS pour styler le radio horizontal comme une toolbar
+    # Mapping label affiché → clé interne
+    label_to_key = {lbl: k for lbl, k in zip(labels, outils)}
+    key_to_label = {k: lbl for k, lbl in zip(outils, labels)}
+
+    current_label = key_to_label.get(st.session_state[key], labels[0])
+    current_idx   = labels.index(current_label) if current_label in labels else 0
+
     st.markdown(f"""
     <style>
     div[data-testid="stRadio"][aria-label="{key}"] > div {{
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 5px !important;
-        background: #080808 !important;
-        border: 1px solid #1a1a1a !important;
-        border-radius: 6px !important;
-        padding: 8px 12px !important;
-        margin-bottom: 16px !important;
+        display: flex !important; flex-wrap: wrap !important;
+        gap: 5px !important; background: #080808 !important;
+        border: 1px solid #1a1a1a !important; border-radius: 6px !important;
+        padding: 8px 12px !important; margin-bottom: 16px !important;
     }}
     div[data-testid="stRadio"][aria-label="{key}"] label {{
         font-family: 'IBM Plex Mono', monospace !important;
-        font-size: 10px !important;
-        color: #555 !important;
-        background: transparent !important;
-        border: 1px solid #1c1c1c !important;
-        border-radius: 3px !important;
-        padding: 4px 10px !important;
-        cursor: pointer !important;
-        white-space: nowrap !important;
+        font-size: 10px !important; color: #555 !important;
+        background: transparent !important; border: 1px solid #1c1c1c !important;
+        border-radius: 3px !important; padding: 4px 10px !important;
+        cursor: pointer !important; white-space: nowrap !important;
         letter-spacing: 0.3px !important;
     }}
     div[data-testid="stRadio"][aria-label="{key}"] label:hover {{
-        color: #ccc !important;
-        border-color: #333 !important;
+        color: #ccc !important; border-color: #333 !important;
         background: #0f0f0f !important;
     }}
     div[data-testid="stRadio"][aria-label="{key}"] label[data-checked="true"] {{
-        color: #ff6600 !important;
-        border-color: #ff6600 !important;
-        background: #0d0800 !important;
-        font-weight: 600 !important;
+        color: #ff6600 !important; border-color: #ff6600 !important;
+        background: #0d0800 !important; font-weight: 600 !important;
     }}
     div[data-testid="stRadio"][aria-label="{key}"] [data-testid="stMarkdownContainer"] p {{
-        font-size: 10px !important;
-        margin: 0 !important;
+        font-size: 10px !important; margin: 0 !important;
     }}
-    /* Cacher les cercles radio natifs */
     div[data-testid="stRadio"][aria-label="{key}"] input[type="radio"] {{
         display: none !important;
     }}
     </style>
     """, unsafe_allow_html=True)
 
-    current_idx = outils.index(st.session_state[key]) if st.session_state[key] in outils else 0
-    choix = st.radio(
-        key,
-        options=outils,
-        index=current_idx,
-        horizontal=True,
-        label_visibility="collapsed",
+    # Radio affiche les labels traduits
+    choix_label = st.radio(
+        key, options=labels, index=current_idx,
+        horizontal=True, label_visibility="collapsed",
         key=f"{key}_radio"
     )
-    if choix != st.session_state[key]:
-        st.session_state[key] = choix
+    # Convertir le label affiché → clé interne fixe
+    choix_key = label_to_key.get(choix_label, outils[0])
+    if choix_key != st.session_state[key]:
+        st.session_state[key] = choix_key
         st.rerun()
 
     return st.session_state[key]
@@ -2558,11 +2560,14 @@ if categorie == "MON ESPACE ANALYSE":
     st.stop()
 
 if categorie == "MARCHÉ CRYPTO":
-    outil = _toolbar("tb_crypto", [
-        t("mod_graphique_crypto"), t("mod_btc_dom"), t("mod_wallet"),
-        t("mod_heatmap_liq"), t("mod_orderbook"), t("mod_whale"),
-        t("mod_onchain"), t("mod_liq_funding"), t("mod_staking")
-    ])
+    # Toolbar crypto — clés internes fixes + labels traduits
+    _crypto_keys = ["GRAPHIQUE CRYPTO","BITCOIN DOMINANCE","CRYPTO WALLET",
+        "HEATMAP LIQUIDATIONS","ORDER BOOK LIVE","WHALE WATCHER",
+        "ON-CHAIN ANALYTICS","LIQUIDATIONS & FUNDING","STAKING & YIELD"]
+    _crypto_labels = [t("mod_graphique_crypto"),t("mod_btc_dom"),t("mod_wallet"),
+        t("mod_heatmap_liq"),t("mod_orderbook"),t("mod_whale"),
+        t("mod_onchain"),t("mod_liq_funding"),t("mod_staking")]
+    outil = _toolbar("tb_crypto", _crypto_keys, labels=_crypto_labels)
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
 if categorie == "INTERFACE CRYPTO PRO":
@@ -2577,18 +2582,24 @@ elif categorie == "MATIÈRES PREMIÈRES":
     interface_matieres_premieres.show_matieres_premieres()
     st.stop()
 elif categorie == "ACTIONS & BOURSE":
-    outil = _toolbar("tb_actions", [
-        t("mod_analyseur"), t("mod_technique"), t("mod_fibonacci"),
-        t("mod_backtest"), t("mod_valorisation"), t("mod_multicharts"),
-        t("mod_expert"), t("mod_council"), t("mod_duel"),
-        t("mod_monitor"), t("mod_screener_cac"), t("mod_dividend")
-    ])
+    # Toolbar actions — clés internes fixes + labels traduits
+    _actions_keys = ["ANALYSEUR PRO","ANALYSE TECHNIQUE PRO","FIBONACCI CALCULATOR",
+        "BACKTESTING ENGINE","VALORISATION FONDAMENTALE","MULTI-CHARTS",
+        "EXPERT SYSTEM","THE GRAND COUNCIL️","MODE DUEL",
+        "MARKET MONITOR","SCREENER CAC 40","DIVIDEND CALENDAR"]
+    _actions_labels = [t("mod_analyseur"),t("mod_technique"),t("mod_fibonacci"),
+        t("mod_backtest"),t("mod_valorisation"),t("mod_multicharts"),
+        t("mod_expert"),t("mod_council"),t("mod_duel"),
+        t("mod_monitor"),t("mod_screener_cac"),t("mod_dividend")]
+    outil = _toolbar("tb_actions", _actions_keys, labels=_actions_labels)
 
 elif categorie == "BOITE À OUTILS":
-    outil = _toolbar("tb_outils", [
-        t("mod_daily"), t("mod_calendrier"), t("mod_fear"),
-        t("mod_correlation"), t("mod_interets"), t("mod_heatmap"), t("mod_alerts")
-    ])
+    # Toolbar outils — clés internes fixes + labels traduits
+    _outils_keys = ["DAILY BRIEF","CALENDRIER ÉCO","Fear and Gread Index",
+        "CORRÉLATION DASH","INTERETS COMPOSES","HEATMAP MARCHÉ","ALERTS MANAGER"]
+    _outils_labels = [t("mod_daily"),t("mod_calendrier"),t("mod_fear"),
+        t("mod_correlation"),t("mod_interets"),t("mod_heatmap"),t("mod_alerts")]
+    outil = _toolbar("tb_outils", _outils_keys, labels=_outils_labels)
 
 st.sidebar.markdown("---")
 # secteur info removed
