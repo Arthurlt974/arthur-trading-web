@@ -479,7 +479,7 @@ def _show_dashboard():
                 </div>
             </div>""", unsafe_allow_html=True)
             components.html(
-                render_commodity_chart(sel_ticker, pair_label=f"{sel_item['emoji']} {sel_item['name']}", height=460),
+                render_chart_mp(sel_ticker, pair_label=f"{sel_item['emoji']} {sel_item['name']}", height=460),
                 height=470, scrolling=False
             )
             _show_commodity_info(sel_item, sel_d)
@@ -595,7 +595,7 @@ def _show_category(category):
 
         # Graphique AM.Terminal
         components.html(
-            render_commodity_chart(active_item["ticker"], pair_label=f"{active_item['emoji']} {active_item['name']}", height=420),
+            render_chart_mp(active_item["ticker"], pair_label=f"{active_item['emoji']} {active_item['name']}", height=420),
             height=430, scrolling=False
         )
 
@@ -674,6 +674,69 @@ def _fetch_candles(ticker: str, period: str = "6mo", interval: str = "1d") -> li
         print(f"[MP chart yf] {ticker}: {e}")
         return []
 
+
+def render_chart_mp(ticker: str, pair_label: str = "", height: int = 420) -> str:
+    """
+    Graphique AM.Terminal pour matières premières.
+    Utilise render_chart de chart_module mais injecte les candles
+    Yahoo Finance directement dans D (bypasse le fetch Binance).
+    """
+    import json as _json
+    try:
+        from chart_module.chart import render_chart as _render_chart
+    except ImportError:
+        # Fallback sur l'ancien render_commodity_chart si chart_module absent
+        return render_chart_mp(ticker, pair_label=pair_label, height=height)
+
+    # Fetch candles via Yahoo Finance v2
+    candles = _fetch_candles(ticker, period="6mo", interval="1d")
+
+    if not candles:
+        # Pas de données — retour ancien chart
+        return render_chart_mp(ticker, pair_label=pair_label, height=height)
+
+    # Générer le HTML de base avec render_chart (symbol factice)
+    html = _render_chart(
+        symbol=ticker,
+        interval="1d",
+        height=height,
+        pair_label=pair_label,
+        exchange="Yahoo Finance · Futures",
+        show_ma=True,
+        show_volume=True,
+        live_sim=False,
+        default_tf="1d",
+    )
+
+    # Injecter les candles Python dans le JS
+    # On remplace l'initialisation vide de D par nos données
+    candles_js = _json.dumps(candles)
+    inject = f"""
+// ── Données Yahoo Finance injectées (matières premières) ──
+(function() {{
+  const YF_CANDLES = {candles_js};
+  YF_CANDLES.forEach(c => {{
+    D.t.push(c.t);
+    D.o.push(c.o);
+    D.h.push(c.h);
+    D.l.push(c.l);
+    D.c.push(c.c);
+    D.v.push(c.v);
+  }});
+  console.log('[AM.Terminal] MP data injected:', D.t.length, 'candles for {ticker}');
+}})();
+"""
+    # Remplacer le fetchInit par notre injection
+    html = html.replace(
+        "fetchInit().then(()=>{",
+        inject + "Promise.resolve().then(()=>{"
+    )
+    # Désactiver le WebSocket Binance pour les futures
+    html = html.replace(
+        "startBinanceWS();",
+        "// WS Binance désactivé pour matières premières"
+    )
+    return html
 
 def render_commodity_chart(ticker: str, pair_label: str = "", height: int = 420) -> str:
     """Graphique Canvas AM.Terminal complet pour matières premières (yfinance).
@@ -1275,7 +1338,7 @@ def _show_charts():
         with col:
             ticker = tickers_map[sel]
             components.html(
-                render_commodity_chart(ticker, pair_label=sel, height=380),
+                render_chart_mp(ticker, pair_label=sel, height=380),
                 height=390, scrolling=False
             )
 
