@@ -54,39 +54,30 @@ COMMODITIES = {
 
 @st.cache_data(ttl=120)
 def get_commodity_price(ticker):
-    """Prix matière première — Yahoo Finance v2 direct → fast_info fallback."""
-    # Source 1 : Yahoo Finance v2 API directe (contourne le blocage yfinance)
+    """Prix matière première — curl_cffi yfinance (contourne Yahoo Streamlit Cloud)."""
+    # Source 1 : curl_cffi (contourne le blocage Yahoo sur Streamlit Cloud)
     try:
-        import requests as _rq
-        _hdrs = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/json",
-            "Referer": "https://finance.yahoo.com",
-        }
-        _r = _rq.get(
-            f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={ticker}",
-            headers=_hdrs, timeout=6)
-        if _r.status_code == 200:
-            _results = _r.json().get("quoteResponse", {}).get("result", [])
-            if _results:
-                _q = _results[0]
-                price      = float(_q.get("regularMarketPrice", 0))
-                prev_close = float(_q.get("regularMarketPreviousClose", price) or price)
-                change     = ((price - prev_close) / prev_close * 100) if prev_close else float(_q.get("regularMarketChangePercent", 0))
-                if price > 0:
-                    return {"price": price, "change": change, "prev": prev_close, "ok": True}
-    except:
+        from curl_cffi.requests import Session as CurlSession
+        with CurlSession(impersonate="chrome") as s:
+            fi = yf.Ticker(ticker, session=s).fast_info
+            price      = float(fi.last_price or 0)
+            prev_close = float(fi.previous_close or 0)
+            if price > 0 and prev_close > 0:
+                change = ((price - prev_close) / prev_close) * 100
+                return {"price": price, "change": change, "prev": prev_close, "ok": True}
+    except Exception:
         pass
-    # Source 2 : yfinance fast_info fallback
+    # Source 2 : yfinance standard fallback
     try:
-        t = yf.Ticker(ticker)
-        info = t.fast_info
-        price      = info['last_price']
-        prev_close = info['previous_close']
-        change     = ((price - prev_close) / prev_close) * 100
-        return {"price": price, "change": change, "prev": prev_close, "ok": True}
-    except:
-        return {"price": 0, "change": 0, "prev": 0, "ok": False}
+        fi = yf.Ticker(ticker).fast_info
+        price      = float(fi.last_price or 0)
+        prev_close = float(fi.previous_close or 0)
+        if price > 0 and prev_close > 0:
+            change = ((price - prev_close) / prev_close) * 100
+            return {"price": price, "change": change, "prev": prev_close, "ok": True}
+    except Exception:
+        pass
+    return {"price": 0, "change": 0, "prev": 0, "ok": False}
 
 @st.cache_data(ttl=300)
 def get_commodity_history(ticker, period="3mo"):
