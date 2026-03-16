@@ -1290,7 +1290,18 @@ class ValuationCalculator:
                     results["pb"]["excluded_from_consensus"] = True
                     results["pb"]["exclusion_reason"] = f"Growth stock (P/B={pb_ratio:.1f}) - P/B non pertinent pour entreprises avec rachats massifs"
         if fair_values:
-            consensus_value = np.median(fair_values)
+            # Moyenne pondérée : DCF=40%, PE=35%, Graham=15%, PB=10%
+            weights = {"dcf": 0.40, "pe": 0.35, "graham": 0.15, "pb": 0.10, "nvt": 0.40}
+            weighted_sum = 0.0
+            weight_total = 0.0
+            for method, fv in zip(
+                [k for k in ["dcf","pe","graham","pb","nvt"] if k in results and "fair_value" in results[k] and not results[k].get("excluded_from_consensus")],
+                fair_values
+            ):
+                w = weights.get(method, 0.25)
+                weighted_sum += fv * w
+                weight_total += w
+            consensus_value = (weighted_sum / weight_total) if weight_total > 0 else np.mean(fair_values)
             current_price = self.info.get('currentPrice', 0) or self.info.get('regularMarketPrice', 0)
             # Fallback history si prix toujours à 0
             if not current_price or current_price == 0:
