@@ -449,7 +449,7 @@ def show_am_intelligence():
                 result = _call_groq(prompt)
                 st.session_state["ai_result"]   = result
                 st.session_state["ai_donnees"]  = donnees
-                st.session_state["ai_analyste"] = analyste_choisi
+                st.session_state["ai_analyste"] = st.session_state["ai_analyste"]  # déjà mis à jour via st.radio
 
     # Afficher le résultat
     if "ai_result" in st.session_state and st.session_state["ai_result"]:
