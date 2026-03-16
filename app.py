@@ -1419,7 +1419,7 @@ def get_ticker_info(ticker):
         except Exception:
             pass
 
-    # ── Fusion : yfinance remplit les fondamentaux manquants ──
+    # ── Fusion : yfinance remplit TOUT ce qui manque ──
     FUNDAMENTALS = [
         'trailingPE','forwardPE','trailingEps','forwardEps',
         'bookValue','priceToBook','sector','industry',
@@ -1429,19 +1429,19 @@ def get_ticker_info(ticker):
         'revenueGrowth','earningsGrowth','grossMargins',
         'operatingMargins','profitMargins','totalRevenue',
         'freeCashflow','totalDebt','totalCash',
-        'shortName','longBusinessSummary','website','country',
+        'shortName','longName','longBusinessSummary','website','country',
         'fullTimeEmployees','auditRisk','boardRisk',
+        'currentPrice','regularMarketPrice','previousClose',
+        'currency','fiftyTwoWeekHigh','fiftyTwoWeekLow',
+        'fiftyDayAverage','twoHundredDayAverage','volume',
     ]
     for k in FUNDAMENTALS:
-        if k not in info and yf_info.get(k) not in (None, '', 0):
-            info[k] = yf_info[k]
-
-    # Prix yfinance seulement si Twelve Data n'a rien donné
-    if not info.get('currentPrice'):
-        for k in ('currentPrice','regularMarketPrice','previousClose',
-                  'currency','longName','shortName'):
-            if yf_info.get(k) not in (None, '', 0):
-                info[k] = yf_info[k]
+        val = yf_info.get(k)
+        if val not in (None, '', 0) and k not in info:
+            info[k] = val
+        # Forcer les fondamentaux clés même si info a déjà une valeur 0
+        elif val not in (None, '', 0) and info.get(k) in (None, '', 0):
+            info[k] = val
 
     # B4a : CoinGecko pour la crypto
     if not info.get('currentPrice') and ("-USD" in ticker.upper() or "USD" == ticker[-3:]):
@@ -2373,7 +2373,7 @@ if categorie == "ACCUEIL":
     # ── Fetch données ──
     @st.cache_data(ttl=60)
     def _fetch_accueil_data():
-        """Prix accueil — Yahoo Finance v2 direct → Binance/CoinGecko → yfinance."""
+        """Prix accueil — curl_cffi yfinance (contourne Yahoo) + CoinGecko crypto."""
         import yfinance as yf, requests as _rq
         results = {}
         tickers_map = {
@@ -2381,24 +2381,7 @@ if categorie == "ACCUEIL":
             "^GSPC": "S&P 500", "^IXIC": "NASDAQ",
             "^FCHI": "CAC 40", "NVDA": "NVDA", "AAPL": "AAPL"
         }
-        # Batch Yahoo Finance v2 pour actions/indices
-        _hdrs = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36","Accept":"application/json","Referer":"https://finance.yahoo.com"}
-        action_syms = ["^GSPC","^IXIC","^FCHI","NVDA","AAPL"]
-        try:
-            _batch = ",".join(action_syms)
-            _r = _rq.get(f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={_batch}", headers=_hdrs, timeout=6)
-            if _r.status_code == 200:
-                for _q in _r.json().get("quoteResponse",{}).get("result",[]):
-                    sym = _q.get("symbol","")
-                    label = tickers_map.get(sym)
-                    if label:
-                        price = float(_q.get("regularMarketPrice",0))
-                        prev  = float(_q.get("regularMarketPreviousClose", price) or price)
-                        chg   = ((price-prev)/prev*100) if prev else float(_q.get("regularMarketChangePercent",0))
-                        results[label] = {"price": price, "chg": chg, "sym": sym}
-        except:
-            pass
-        # CoinGecko pour BTC et ETH
+        # ── CoinGecko pour BTC et ETH (jamais bloqué) ──
         try:
             _cg = _rq.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", timeout=5).json()
             if _cg.get("bitcoin",{}).get("usd"):
@@ -2407,15 +2390,38 @@ if categorie == "ACCUEIL":
                 results["ETH"] = {"price": float(_cg["ethereum"]["usd"]), "chg": float(_cg["ethereum"].get("usd_24h_change",0)), "sym":"ETH-USD"}
         except:
             pass
-        # Fallback yfinance pour les manquants
+        # ── curl_cffi pour actions et indices (contourne Yahoo) ──
+        action_syms = ["^GSPC","^IXIC","^FCHI","NVDA","AAPL"]
+        curl_ok = False
+        try:
+            from curl_cffi.requests import Session as CurlSession
+            with CurlSession(impersonate="chrome") as _cs:
+                for sym in action_syms:
+                    label = tickers_map.get(sym)
+                    if not label or (label in results and results[label].get("price",0) > 0):
+                        continue
+                    try:
+                        fi = yf.Ticker(sym, session=_cs).fast_info
+                        price = float(fi.last_price or 0)
+                        prev  = float(fi.previous_close or price)
+                        chg   = ((price-prev)/prev*100) if prev else 0
+                        if price > 0:
+                            results[label] = {"price": price, "chg": chg, "sym": sym}
+                            curl_ok = True
+                    except:
+                        pass
+        except:
+            pass
+        # ── Fallback yfinance standard pour les manquants ──
         for sym, label in tickers_map.items():
-            if label not in results or results[label]["price"] == 0:
+            if label not in results or results[label].get("price",0) == 0:
                 try:
-                    h = yf.Ticker(sym).fast_info
-                    price = h.last_price
-                    prev  = h.previous_close
+                    fi = yf.Ticker(sym).fast_info
+                    price = float(fi.last_price or 0)
+                    prev  = float(fi.previous_close or price)
                     chg   = ((price-prev)/prev*100) if prev else 0
-                    results[label] = {"price": price, "chg": chg, "sym": sym}
+                    if price > 0:
+                        results[label] = {"price": price, "chg": chg, "sym": sym}
                 except:
                     results[label] = {"price": 0, "chg": 0, "sym": sym}
         return results
