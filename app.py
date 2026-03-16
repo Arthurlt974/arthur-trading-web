@@ -1290,16 +1290,19 @@ class ValuationCalculator:
                     results["pb"]["excluded_from_consensus"] = True
                     results["pb"]["exclusion_reason"] = f"Growth stock (P/B={pb_ratio:.1f}) - P/B non pertinent pour entreprises avec rachats massifs"
         if fair_values:
-            # Moyenne pondérée : DCF=40%, PE=35%, Graham=15%, PB=10%
+            # Moyenne pondérée directe depuis results (pas de zip désynchronisé)
             weights = {"dcf": 0.40, "pe": 0.35, "graham": 0.15, "pb": 0.10, "nvt": 0.40}
             weighted_sum = 0.0
             weight_total = 0.0
-            for method, fv in zip(
-                [k for k in ["dcf","pe","graham","pb","nvt"] if k in results and "fair_value" in results[k] and not results[k].get("excluded_from_consensus")],
-                fair_values
-            ):
+            for method, data in results.items():
+                if method == "consensus":
+                    continue
+                if "fair_value" not in data:
+                    continue
+                if data.get("excluded_from_consensus"):
+                    continue
                 w = weights.get(method, 0.25)
-                weighted_sum += fv * w
+                weighted_sum += data["fair_value"] * w
                 weight_total += w
             consensus_value = (weighted_sum / weight_total) if weight_total > 0 else np.mean(fair_values)
             current_price = self.info.get('currentPrice', 0) or self.info.get('regularMarketPrice', 0)
@@ -1388,9 +1391,10 @@ def get_ticker_info(ticker):
                 pass
         return info if info.get('currentPrice') else None
 
-    # ══ ACTIONS — Alpha Vantage (priorité) ══
+    # ══ ACTIONS — Alpha Vantage pour US, curl_cffi yfinance pour les autres ══
+    is_us = '.' not in ticker and not ticker.endswith('=F')  # MC.PA, TTE.PA = non-US
     av_key = _av_key()
-    if av_key:
+    if av_key and is_us:
         # GLOBAL_QUOTE → prix en temps réel
         try:
             _r1 = _rq.get("https://www.alphavantage.co/query", params={
@@ -1480,8 +1484,8 @@ def get_ticker_info(ticker):
         except Exception:
             pass
 
-    # ══ FALLBACK : curl_cffi + yfinance si Alpha Vantage vide ══
-    if not info.get('currentPrice') or not info.get('trailingPE'):
+    # ══ Non-US ou fallback : curl_cffi + yfinance ══
+    if not is_us or not info.get('currentPrice') or not info.get('trailingPE'):
         yf_info = {}
         # curl_cffi
         try:
