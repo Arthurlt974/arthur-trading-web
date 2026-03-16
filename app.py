@@ -969,18 +969,24 @@ class ValuationCalculator:
                 if len(hist) > 1: info['previousClose'] = float(hist['Close'].iloc[-2])
         except Exception: pass
         return info
-        return info
 
     def dcf_valuation(self, growth_rate=0.05, discount_rate=0.10, years=5):
         try:
-            cash_flow = self.ticker.cashflow
-            if cash_flow.empty:
+            # ── FCF : priorité info (Alpha Vantage), fallback yfinance cashflow ──
+            fcf = self.info.get('freeCashflow') or 0
+            if not fcf or fcf == 0:
+                try:
+                    cash_flow = self.ticker.cashflow
+                    if not cash_flow.empty:
+                        fcf = cash_flow.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cash_flow.index else None
+                        if fcf is None or pd.isna(fcf):
+                            operating_cf = cash_flow.loc['Operating Cash Flow'].iloc[0] if 'Operating Cash Flow' in cash_flow.index else 0
+                            capex = cash_flow.loc['Capital Expenditure'].iloc[0] if 'Capital Expenditure' in cash_flow.index else 0
+                            fcf = operating_cf + capex
+                except Exception:
+                    pass
+            if not fcf or fcf == 0:
                 return {"error": "Données de cash flow non disponibles"}
-            fcf = cash_flow.loc['Free Cash Flow'].iloc[0] if 'Free Cash Flow' in cash_flow.index else None
-            if fcf is None or pd.isna(fcf):
-                operating_cf = cash_flow.loc['Operating Cash Flow'].iloc[0] if 'Operating Cash Flow' in cash_flow.index else 0
-                capex = cash_flow.loc['Capital Expenditure'].iloc[0] if 'Capital Expenditure' in cash_flow.index else 0
-                fcf = operating_cf + capex
             projected_fcf = []
             for year in range(1, years + 1):
                 future_fcf = fcf * ((1 + growth_rate) ** year)
@@ -1322,7 +1328,6 @@ class ValuationCalculator:
 # ============================================================
 
 
-@st.cache_data(ttl=600, show_spinner=False)
 def _av_key():
     """Clé Alpha Vantage depuis secrets Streamlit."""
     try:
@@ -1445,6 +1450,22 @@ def get_ticker_info(ticker):
                 info['pegRatio']             = _f("PEGRatio")
                 info['priceToSales']         = _f("PriceToSalesRatioTTM")
                 info['ebitda']               = _f("EBITDA")
+                # Calculs dérivés — AV ne les fournit pas directement
+                _eps    = _f("EPS") or _f("DilutedEPSTTM") or 0
+                _div    = _f("DividendPerShare") or 0
+                _rev    = _f("RevenueTTM") or 0
+                _shares = _f("SharesOutstanding") or 0
+                _cash   = _f("CashAndCashEquivalentsBalanceSheet") or _f("CashAndShortTermInvestments") or 0
+                # Payout Ratio = Dividende / EPS
+                if _eps and _eps > 0 and _div:
+                    info['payoutRatio'] = round(_div / _eps, 4)
+                # Cash per Share = Cash total / Nombre d'actions
+                if _cash and _shares and _shares > 0:
+                    info['totalCashPerShare'] = round(_cash / _shares, 4)
+                # Données supplémentaires DCF
+                info['totalCash']  = _f("CashAndCashEquivalentsBalanceSheet") or _f("CashAndShortTermInvestments")
+                info['totalDebt']  = _f("LongTermDebtBalanceSheet") or _f("ShortLongTermDebtTotal")
+                info['freeCashflow'] = _f("FreeCashFlowTTM") or _f("OperatingCashflowTTM")
         except Exception:
             pass
 
