@@ -24,9 +24,6 @@ import interface_portfolio
 import interface_alertes
 import interface_screener
 import Terminal as terminal_module
-from translations import t, get_lang, render_lang_toggle
-import interface_finance_marche
-import interface_am_intelligence
 from utils import (
     save_watchlist_firebase, load_watchlist_firebase,
     save_alerts_firebase, load_alerts_firebase,
@@ -911,35 +908,17 @@ def show_staking():
 # ============================================================
 
 def get_crypto_price(symbol):
-    """Prix crypto — Binance → CoinGecko → yfinance."""
-    # Source 1 : Binance
     try:
         url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
-        res = requests.get(url, timeout=3).json()
-        if res.get('price'):
-            return float(res['price'])
+        res = requests.get(url, timeout=2).json()
+        return float(res['price'])
     except:
-        pass
-    # Source 2 : CoinGecko (gratuit, pas de clé)
-    try:
-        cg_map = {"BTC":"bitcoin","ETH":"ethereum","SOL":"solana",
-                  "BNB":"binancecoin","XRP":"ripple","ADA":"cardano",
-                  "DOGE":"dogecoin","DOT":"polkadot","MATIC":"matic-network",
-                  "AVAX":"avalanche-2","LINK":"chainlink","UNI":"uniswap"}
-        cg_id = cg_map.get(symbol.upper(), symbol.lower())
-        url2 = f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd"
-        r2 = requests.get(url2, timeout=4).json()
-        if r2.get(cg_id, {}).get("usd"):
-            return float(r2[cg_id]["usd"])
-    except:
-        pass
-    # Source 3 : yfinance fast_info
-    try:
-        tkr = symbol + "-USD"
-        data = yf.Ticker(tkr).fast_info
-        return float(data['last_price'])
-    except:
-        return None
+        try:
+            tkr = symbol + "-USD"
+            data = yf.Ticker(tkr).fast_info
+            return data['last_price']
+        except:
+            return None
 
 
 # ============================================================
@@ -1324,173 +1303,49 @@ class ValuationCalculator:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
-    """
-    Récupère les infos en deux passes PARALLÈLES :
-    - Twelve Data  → prix fiable (fonctionne sur Streamlit Cloud)
-    - yfinance     → fondamentaux (P/E, EPS, secteur, book value...)
-    Les deux sont TOUJOURS tentés, leurs résultats sont fusionnés.
-    Twelve Data gagne sur le prix, yfinance gagne sur les fondamentaux.
-    """
+    """Récupère les infos — yfinance avec curl_cffi pour contourner le blocage Yahoo."""
     info = {}
 
-    # ══ PASSE A : Twelve Data — prix + données marché ══
-    try:
-        _td_key = st.secrets.get("TWELVE_DATA_KEY", "")
-        if _td_key:
-            import requests as _req_td
-            r = _req_td.get("https://api.twelvedata.com/quote",
-                params={"symbol": ticker, "apikey": _td_key}, timeout=10)
-            td = r.json()
-            if td.get("status") != "error" and td.get("close"):
-                info['currentPrice']             = float(td["close"])
-                info['regularMarketPrice']       = float(td["close"])
-                if td.get("previous_close"):
-                    info['previousClose']        = float(td["previous_close"])
-                if td.get("currency"):
-                    info['currency']             = td["currency"]
-                if td.get("name"):
-                    info['longName']             = td["name"]
-                if td.get("percent_change"):
-                    info['regularMarketChangePercent'] = float(td["percent_change"])
-                if td.get("volume"):
-                    info['volume']               = int(float(td["volume"]))
-                if td.get("fifty_two_week"):
-                    fw = td["fifty_two_week"]
-                    if fw.get("high"): info['fiftyTwoWeekHigh'] = float(fw["high"])
-                    if fw.get("low"):  info['fiftyTwoWeekLow']  = float(fw["low"])
-    except Exception:
-        pass
-
-    # ══ PASSE B : yfinance — fondamentaux (toujours tenté) ══
-    # B1 : curl_cffi (meilleure chance de passer le blocage Yahoo)
-    yf_info = {}
+    # ── MÉTHODE 1 : curl_cffi (contourne le blocage Yahoo sur Streamlit Cloud) ──
     try:
         from curl_cffi.requests import Session as CurlSession
         with CurlSession(impersonate="chrome") as s:
-            full = yf.Ticker(ticker, session=s).info or {}
+            t = yf.Ticker(ticker, session=s)
+            full = t.info or {}
             if len(full) > 10:
-                yf_info = full
+                for k, v in full.items():
+                    if v not in (None, '', 0):
+                        info[k] = v
     except Exception:
         pass
 
-    # B2 : yfinance standard avec User-Agent si B1 a échoué
-    if len(yf_info) < 5:
+    # ── MÉTHODE 2 : yfinance fast_info (léger, souvent non bloqué) ──
+    if not info.get('currentPrice'):
+        try:
+            t = yf.Ticker(ticker)
+            fi = t.fast_info
+            if getattr(fi, 'last_price', None): info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
+            if getattr(fi, 'previous_close', None): info['previousClose'] = float(fi.previous_close)
+            if getattr(fi, 'market_cap', None): info['marketCap'] = float(fi.market_cap)
+            if getattr(fi, 'shares', None): info['sharesOutstanding'] = float(fi.shares)
+            if getattr(fi, 'currency', None): info['currency'] = fi.currency
+        except Exception:
+            pass
+
+    # ── MÉTHODE 3 : yfinance .info standard avec User-Agent ──
+    if not info.get('trailingPE') and not info.get('trailingEps'):
         try:
             import requests as _req
             s = _req.Session()
             s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
             full2 = yf.Ticker(ticker, session=s).info or {}
-            if len(full2) > len(yf_info):
-                yf_info = full2
+            if len(full2) < 5: full2 = yf.Ticker(ticker).info or {}
+            for k, v in full2.items():
+                if v not in (None, '', 0) and k not in info: info[k] = v
         except Exception:
             pass
 
-    # B3 : Yahoo Finance API v8 direct (contourne le blocage yfinance)
-    if len(yf_info) < 5:
-        try:
-            import requests as _rq
-            _hdrs = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
-                "Accept": "application/json",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://finance.yahoo.com",
-            }
-            _url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=price,summaryDetail,defaultKeyStatistics,financialData,assetProfile"
-            _r = _rq.get(_url, headers=_hdrs, timeout=6)
-            if _r.status_code == 200:
-                _d = _r.json().get("quoteSummary", {}).get("result", [{}])[0]
-                _merged = {}
-                for _mod in _d.values():
-                    if isinstance(_mod, dict):
-                        for _k, _v in _mod.items():
-                            if isinstance(_v, dict) and "raw" in _v:
-                                _merged[_k] = _v["raw"]
-                            elif not isinstance(_v, dict):
-                                _merged[_k] = _v
-                if len(_merged) > 5:
-                    yf_info = _merged
-        except Exception:
-            pass
-
-    # B3b : yfinance brut si toujours vide
-    if len(yf_info) < 5:
-        try:
-            yf_info = yf.Ticker(ticker).info or {}
-        except Exception:
-            pass
-
-    # ── Fusion : yfinance remplit les fondamentaux manquants ──
-    FUNDAMENTALS = [
-        'trailingPE','forwardPE','trailingEps','forwardEps',
-        'bookValue','priceToBook','sector','industry',
-        'marketCap','sharesOutstanding','debtToEquity',
-        'dividendRate','dividendYield','payoutRatio',
-        'totalCashPerShare','returnOnEquity','returnOnAssets',
-        'revenueGrowth','earningsGrowth','grossMargins',
-        'operatingMargins','profitMargins','totalRevenue',
-        'freeCashflow','totalDebt','totalCash',
-        'shortName','longBusinessSummary','website','country',
-        'fullTimeEmployees','auditRisk','boardRisk',
-    ]
-    for k in FUNDAMENTALS:
-        if k not in info and yf_info.get(k) not in (None, '', 0):
-            info[k] = yf_info[k]
-
-    # Prix yfinance seulement si Twelve Data n'a rien donné
-    if not info.get('currentPrice'):
-        for k in ('currentPrice','regularMarketPrice','previousClose',
-                  'currency','longName','shortName'):
-            if yf_info.get(k) not in (None, '', 0):
-                info[k] = yf_info[k]
-
-    # B4a : CoinGecko pour la crypto
-    if not info.get('currentPrice') and ("-USD" in ticker.upper() or "USD" == ticker[-3:]):
-        try:
-            sym = ticker.replace("-USD","").replace("USD","").upper()
-            cg_map = {"BTC":"bitcoin","ETH":"ethereum","SOL":"solana",
-                      "BNB":"binancecoin","XRP":"ripple","ADA":"cardano",
-                      "DOGE":"dogecoin","DOT":"polkadot","AVAX":"avalanche-2"}
-            cg_id = cg_map.get(sym, sym.lower())
-            import requests as _rcg
-            _rcg_r = _rcg.get(
-                f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd&include_24hr_change=true",
-                timeout=5)
-            _rcg_d = _rcg_r.json().get(cg_id, {})
-            if _rcg_d.get("usd"):
-                info['currentPrice'] = info['regularMarketPrice'] = float(_rcg_d["usd"])
-                info['currency'] = 'USD'
-                if _rcg_d.get("usd_24h_change"):
-                    info['regularMarketChangePercent'] = float(_rcg_d["usd_24h_change"])
-        except Exception:
-            pass
-
-    # B4b : Binance pour la crypto
-    if not info.get('currentPrice') and ("-USD" in ticker.upper() or ticker.upper() in ["BTCUSD","ETHUSD"]):
-        try:
-            sym = ticker.replace("-USD","").upper()
-            import requests as _rbn
-            _rbn_r = _rbn.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}USDT", timeout=3)
-            _rbn_d = _rbn_r.json()
-            if _rbn_d.get("lastPrice"):
-                info['currentPrice'] = info['regularMarketPrice'] = float(_rbn_d["lastPrice"])
-                info['previousClose'] = float(_rbn_d.get("prevClosePrice", _rbn_d["lastPrice"]))
-                info['volume'] = float(_rbn_d.get("volume", 0))
-                info['currency'] = 'USD'
-        except Exception:
-            pass
-
-    # B4c : fast_info yfinance
-    if not info.get('currentPrice'):
-        try:
-            fi = yf.Ticker(ticker).fast_info
-            if getattr(fi, 'last_price', None):
-                info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
-            if getattr(fi, 'previous_close', None):
-                info['previousClose'] = float(fi.previous_close)
-        except Exception:
-            pass
-
-    # B5 : historique en dernier recours pour le prix
+    # ── MÉTHODE 4 : historique pour le prix minimum ──
     if not info.get('currentPrice'):
         try:
             hist = yf.Ticker(ticker).history(period="5d")
@@ -1523,40 +1378,11 @@ def get_valuation_cached(ticker: str) -> dict:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_ticker_history(ticker, period="2d"):
-    # 1. Twelve Data en priorité
-    try:
-        _td_key = st.secrets.get("TWELVE_DATA_KEY", "")
-        if _td_key:
-            import requests as _req_td2
-            _period_days = {"1d":1,"2d":2,"5d":5,"1mo":30,"3mo":90,"6mo":180,"1y":365,"2y":730,"5y":1825}
-            days = _period_days.get(period, 30)
-            r = _req_td2.get("https://api.twelvedata.com/time_series",
-                params={"symbol": ticker, "interval": "1day", "outputsize": days,
-                        "apikey": _td_key, "format": "JSON", "order": "ASC"}, timeout=10)
-            td = r.json()
-            if td.get("status") != "error" and td.get("values"):
-                rows = []
-                for v in td["values"]:
-                    rows.append({
-                        "Open": float(v["open"]), "High": float(v["high"]),
-                        "Low": float(v["low"]),  "Close": float(v["close"]),
-                        "Volume": float(v.get("volume", 0) or 0),
-                    })
-                df = pd.DataFrame(rows)
-                df.index = pd.to_datetime([v["datetime"] for v in td["values"]])
-                if not df.empty:
-                    return df
-    except:
-        pass
-    # 2. yfinance fallback
     try:
         data = yf.Ticker(ticker)
-        hist = data.history(period=period)
-        if not hist.empty:
-            return hist
+        return data.history(period=period)
     except:
-        pass
-    return pd.DataFrame()
+        return pd.DataFrame()
 
 def trouver_ticker(nom):
     """Recherche le ticker Yahoo Finance — avec timeout et fallback robuste"""
@@ -1897,11 +1723,7 @@ if "whale_logs" not in st.session_state:
 #  CONFIGURATION GLOBALE
 # ============================================================
 
-st.set_page_config(
-    page_title="AM-Trading | Bloomberg Terminal",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.set_page_config(page_title="AM-Trading | Bloomberg Terminal", layout="wide")
 
 if "workspace" not in st.session_state:
     st.session_state.workspace = []
@@ -1914,18 +1736,6 @@ if "multi_charts" not in st.session_state:
 
 st.markdown("""
     <style>
-    /* Supprimer le flash/assombrissement au rerun */
-    [data-testid="stApp"] {
-        transition: none !important;
-    }
-    [data-testid="stAppViewContainer"] > div {
-        animation: none !important;
-        transition: none !important;
-    }
-    /* Masquer l'overlay de chargement */
-    .stSpinner, [data-testid="stStatusWidget"] {
-        display: none !important;
-    }
         header[data-testid="stHeader"] {
             background-color: rgba(0,0,0,0) !important;
             color: #ff9800 !important;
@@ -1976,8 +1786,9 @@ if not render_auth_page():
 
 st_autorefresh(interval=600000, key="global_refresh")
 
-# ── Tracker la visite ──
-_log_visit()
+# ── Tracker la visite (exclure le compte admin) ──
+if st.session_state.get("user_email") != "arthur.974.a@gmail.com":
+    _log_visit()
 
 # ── Auto-clear cache toutes les 1h pour éviter le blocage yfinance ──
 import time as _time
@@ -1989,668 +1800,16 @@ if _time.time() - st.session_state["last_cache_clear"] > 3600:  # 1h
 
 
 # ============================================================
-
-def _toolbar(key, outils, default=None, labels=None):
-    """
-    Barre d'outils horizontale.
-    - outils : clés internes fixes (FR, indépendantes de la langue)
-    - labels : textes affichés traduits (optionnel, sinon = outils)
-    Retourne toujours une clé interne fixe → les if outil == "X" fonctionnent en FR et EN.
-    """
-    if labels is None:
-        labels = outils
-    if default is None:
-        default = outils[0]
-    if key not in st.session_state:
-        st.session_state[key] = default
-    # Si la valeur stockée n'est plus valide (changement de langue), reset
-    if st.session_state[key] not in outils:
-        st.session_state[key] = default
-
-    # Mapping label affiché → clé interne
-    label_to_key = {lbl: k for lbl, k in zip(labels, outils)}
-    key_to_label = {k: lbl for k, lbl in zip(outils, labels)}
-
-    current_label = key_to_label.get(st.session_state[key], labels[0])
-    current_idx   = labels.index(current_label) if current_label in labels else 0
-
-    st.markdown(f"""
-    <style>
-    div[data-testid="stRadio"][aria-label="{key}"] > div {{
-        display: flex !important; flex-wrap: wrap !important;
-        gap: 5px !important; background: #080808 !important;
-        border: 1px solid #1a1a1a !important; border-radius: 6px !important;
-        padding: 8px 12px !important; margin-bottom: 16px !important;
-    }}
-    div[data-testid="stRadio"][aria-label="{key}"] label {{
-        font-family: 'IBM Plex Mono', monospace !important;
-        font-size: 10px !important; color: #555 !important;
-        background: transparent !important; border: 1px solid #1c1c1c !important;
-        border-radius: 3px !important; padding: 4px 10px !important;
-        cursor: pointer !important; white-space: nowrap !important;
-        letter-spacing: 0.3px !important;
-    }}
-    div[data-testid="stRadio"][aria-label="{key}"] label:hover {{
-        color: #ccc !important; border-color: #333 !important;
-        background: #0f0f0f !important;
-    }}
-    div[data-testid="stRadio"][aria-label="{key}"] label[data-checked="true"] {{
-        color: #ff6600 !important; border-color: #ff6600 !important;
-        background: #0d0800 !important; font-weight: 600 !important;
-    }}
-    div[data-testid="stRadio"][aria-label="{key}"] [data-testid="stMarkdownContainer"] p {{
-        font-size: 10px !important; margin: 0 !important;
-    }}
-    div[data-testid="stRadio"][aria-label="{key}"] input[type="radio"] {{
-        display: none !important;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Radio affiche les labels traduits
-    choix_label = st.radio(
-        key, options=labels, index=current_idx,
-        horizontal=True, label_visibility="collapsed",
-        key=f"{key}_radio"
-    )
-    # Convertir le label affiché → clé interne fixe
-    choix_key = label_to_key.get(choix_label, outils[0])
-    if choix_key != st.session_state[key]:
-        st.session_state[key] = choix_key
-        st.rerun()
-
-    return st.session_state[key]
-
-
 #  NAVIGATION SIDEBAR
 # ============================================================
 
-# ── CSS Sidebar ──
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
-[data-testid="stSidebar"] {
-    background: #030303 !important;
-    border-right: 1px solid #1a1a1a !important;
-}
-[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; }
-
-/* Logo */
-.sb-logo {
-    padding: 18px 16px 12px;
-    border-bottom: 1px solid #111;
-    margin-bottom: 8px;
-}
-.sb-logo-text {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 18px; font-weight: 700;
-    color: #ff6600; letter-spacing: 2px;
-}
-.sb-logo-text span { color: #4d9fff; }
-.sb-logo-sub {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 8px; color: #333;
-    letter-spacing: 2px; margin-top: 2px;
-}
-
-/* Catégories */
-.sb-cat {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 8px; color: #333;
-    letter-spacing: 2px; padding: 12px 16px 4px;
-    text-transform: uppercase;
-}
-
-/* Boutons secteur */
-[data-testid="stSidebar"] button {
-    width: 100% !important;
-    text-align: left !important;
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    padding: 6px 16px !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 11px !important;
-    color: #666 !important;
-    transition: all .1s !important;
-}
-[data-testid="stSidebar"] button:hover {
-    background: #0d0d0d !important;
-    color: #fff !important;
-}
-[data-testid="stSidebar"] button[kind="primary"],
-[data-testid="stSidebar"] button.active-sector {
-    background: #0d0800 !important;
-    color: #ff6600 !important;
-    border-left: 2px solid #ff6600 !important;
-}
-/* selectbox sidebar */
-[data-testid="stSidebar"] [data-testid="stSelectbox"] label {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 9px !important; color: #333 !important;
-    letter-spacing: 1px !important;
-}
-[data-testid="stSidebar"] [data-testid="stRadio"] label {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 10px !important; color: #4d9fff !important;
-}
-
-/* ── TOOLBAR HAUT DE PAGE ── */
-.toolbar-wrap {
-    display: flex; flex-wrap: wrap; gap: 6px;
-    margin: 0 0 20px 0;
-    padding: 10px 14px;
-    background: #080808;
-    border: 1px solid #1a1a1a;
-    border-radius: 6px;
-}
-.tb-btn {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px; font-weight: 500;
-    color: #666; background: transparent;
-    border: 1px solid #1a1a1a; border-radius: 4px;
-    padding: 5px 12px; cursor: pointer;
-    letter-spacing: 0.5px; white-space: nowrap;
-}
-.tb-btn.tb-active {
-    color: #ff6600; border-color: #ff6600; background: #0d0800;
-}
-/* toolbar buttons visible */
-</style>
-""", unsafe_allow_html=True)
-
-# ── Logo en haut de sidebar ──
-st.sidebar.markdown("""
-<div class="sb-logo">
-    <div class="sb-logo-text">AM<span>.</span>TERMINAL</div>
-    <div class="sb-logo-sub">BLOOMBERG-STYLE PLATFORM</div>
-</div>
-""", unsafe_allow_html=True)
-
-# ── Toggle langue — FR / EN vrais boutons stylés ──
-lang = get_lang()
-# CSS ciblé uniquement sur les boutons langue
-st.sidebar.markdown("""
-<style>
-[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:has(p:contains("FR")),
-[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:has(p:contains("EN")),
-[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:has(p:contains("FR")),
-[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:has(p:contains("EN")) {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 10px !important; font-weight: 600 !important;
-    letter-spacing: 1.5px !important;
-    padding: 3px 6px !important;
-    min-height: 26px !important; height: 26px !important;
-    border-radius: 3px !important;
-    width: 100% !important;
-}
-</style>
-""", unsafe_allow_html=True)
-_lc1, _lc2, _lc3 = st.sidebar.columns([1, 1, 5])
-with _lc1:
-    if st.button("FR", key="lang_fr",
-                 type="primary" if lang == "FR" else "secondary"):
-        st.session_state.lang = "FR"
-        st.rerun()
-with _lc2:
-    if st.button("EN", key="lang_en",
-                 type="primary" if lang == "EN" else "secondary"):
-        st.session_state.lang = "EN"
-        st.rerun()
-st.sidebar.markdown("<hr style='border:none;border-top:1px solid #111;margin:4px 0 6px;'>", unsafe_allow_html=True)
-
-# ── Secteurs avec icônes groupés ──
-SECTEURS = {
-    t("nav_markets"): [
-        (t("nav_home"),          "🏠"),
-        (t("nav_actions"), "📈"),
-        (t("nav_crypto"),    "🪙"),
-        (t("nav_forex"),            "💱"),
-        (t("nav_matieres"),"🛢"),
-        (t("nav_economie"),         "🌍"),
-    ],
-    t("nav_analyse"): [
-        (t("nav_finance"),"🔬"),
-        (t("nav_pro"),    "🧠"),
-        (t("nav_crypto_pro"),"🤖"),
-        (t("nav_espace"),"📐"),
-        ("🤖 AM INTELLIGENCE",  "🤖"),
-    ],
-    t("nav_outils"): [
-        (t("nav_portfolio"),        "💼"),
-        (t("nav_screener"),         "🔭"),
-        (t("nav_alertes"),          "🔔"),
-        (t("nav_boite"),   "🧰"),
-        (t("nav_terminal"),         "🖥"),
-    ],
-}
-
-# Mapping label affiché → clé interne
-LABEL_TO_KEY = {
-    t("nav_home"):               "ACCUEIL",
-    t("nav_actions"):      "ACTIONS & BOURSE",
-    t("nav_crypto"):         "MARCHÉ CRYPTO",
-    t("nav_forex"):                  "FOREX",
-    t("nav_matieres"):    "MATIÈRES PREMIÈRES",
-    t("nav_economie"):              "ÉCONOMIE",
-    t("nav_finance"):     "FINANCE DE MARCHÉ",
-    t("nav_pro"):         "INTERFACE PRO",
-    t("nav_crypto_pro"):  "INTERFACE CRYPTO PRO",
-    t("nav_espace"):    "MON ESPACE ANALYSE",
-    "🤖 AM INTELLIGENCE":       "AM INTELLIGENCE",
-    t("nav_portfolio"):             "PORTFOLIO",
-    t("nav_screener"):              "SCREENER",
-    t("nav_alertes"):               "ALERTES",
-    t("nav_boite"):        "BOITE À OUTILS",
-    t("nav_terminal"):              "TERMINAL",
-}
-
-# Init session state
-# Init langue
-if "lang" not in st.session_state:
-    st.session_state.lang = "FR"
-
-if "categorie" not in st.session_state:
-    st.session_state.categorie = "ACCUEIL"
-
-# Rendu des groupes
-for groupe, secteurs in SECTEURS.items():
-    st.sidebar.markdown(f'<div class="sb-cat">{groupe}</div>', unsafe_allow_html=True)
-    for label, _ in secteurs:
-        key_interne = LABEL_TO_KEY[label]
-        is_active = st.session_state.categorie == key_interne
-        btn_label = label
-        if st.sidebar.button(btn_label, key=f"sb_{key_interne}", use_container_width=True,
-                             type="primary" if is_active else "secondary"):
-            st.session_state.categorie = key_interne
-            st.rerun()
-
-categorie = st.session_state.categorie
+st.sidebar.markdown("### 🗂️ NAVIGATION")
+categorie = st.sidebar.selectbox("CHOISIR UN SECTEUR :", [
+    "ACTIONS & BOURSE", "ÉCONOMIE", "FOREX", "MATIÈRES PREMIÈRES", "MARCHÉ CRYPTO",
+    "BOITE À OUTILS", "INTERFACE PRO", "INTERFACE CRYPTO PRO",
+    "PORTFOLIO", "ALERTES", "SCREENER", "TERMINAL", "MON ESPACE ANALYSE"
+])
 st.sidebar.markdown("---")
-
-if categorie == "ACCUEIL":
-    # ══════════════════════════════════════════════════════
-    #  PAGE D'ACCUEIL — AM.TERMINAL DASHBOARD
-    # ══════════════════════════════════════════════════════
-    import datetime, requests
-
-    st.markdown("""
-    <style>
-    .acc-header {
-        font-family:'IBM Plex Mono',monospace;
-        font-size:28px; font-weight:700;
-        color:#ff6600; letter-spacing:3px;
-        margin-bottom:2px;
-    }
-    .acc-sub {
-        font-family:'IBM Plex Mono',monospace;
-        font-size:10px; color:#333;
-        letter-spacing:3px; margin-bottom:24px;
-    }
-    .kpi-card {
-        background:#080808;
-        border:1px solid #1a1a1a;
-        border-radius:6px;
-        padding:14px 16px;
-        font-family:'IBM Plex Mono',monospace;
-        transition: border-color .2s;
-    }
-    .kpi-card:hover { border-color:#ff6600; }
-    .kpi-label {
-        font-size:8px; color:#4d9fff;
-        letter-spacing:2px; margin-bottom:6px;
-    }
-    .kpi-value {
-        font-size:22px; font-weight:700; color:#ff6600;
-    }
-    .kpi-delta-pos { font-size:11px; color:#00C853; margin-top:2px; }
-    .kpi-delta-neg { font-size:11px; color:#FF3B30; margin-top:2px; }
-    .kpi-delta-neu { font-size:11px; color:#555; margin-top:2px; }
-    .section-title {
-        font-family:'IBM Plex Mono',monospace;
-        font-size:10px; color:#333;
-        letter-spacing:3px;
-        border-left:2px solid #ff6600;
-        padding-left:10px;
-        margin:24px 0 12px;
-    }
-    .news-item {
-        background:#080808;
-        border:1px solid #111;
-        border-radius:4px;
-        padding:10px 14px;
-        margin-bottom:6px;
-        font-family:'IBM Plex Mono',monospace;
-    }
-    .news-src { font-size:8px; color:#4d9fff; letter-spacing:1px; }
-    .news-title { font-size:11px; color:#ccc; margin:4px 0 2px; line-height:1.4; }
-    .news-time { font-size:9px; color:#333; }
-    .top-mover {
-        background:#080808;
-        border:1px solid #111;
-        border-radius:4px;
-        padding:8px 12px;
-        font-family:'IBM Plex Mono',monospace;
-        display:flex; justify-content:space-between;
-        align-items:center;
-        margin-bottom:4px;
-    }
-    .mover-sym { font-size:12px; color:#fff; font-weight:600; }
-    .mover-name { font-size:8px; color:#555; }
-    .mover-pos { font-size:13px; color:#00C853; font-weight:700; }
-    .mover-neg { font-size:13px; color:#FF3B30; font-weight:700; }
-    .fg-bar {
-        height:8px; border-radius:4px;
-        background:linear-gradient(90deg,#FF3B30,#FF9800,#00C853);
-        margin:8px 0;
-    }
-    .fg-needle {
-        width:2px; height:16px;
-        background:#fff;
-        position:relative; top:-12px;
-        display:inline-block;
-    }
-    .dominance-bar {
-        height:12px; border-radius:3px;
-        background:#1a1a1a; overflow:hidden;
-        margin:4px 0;
-    }
-    .dominance-fill {
-        height:100%; background:#ff6600;
-        display:inline-block;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # ── Header ──
-    now = datetime.datetime.now()
-    st.markdown(f"""
-    <div class="acc-header">AM.TERMINAL</div>
-    <div class="acc-sub">MARKET DASHBOARD — {now.strftime('%A %d %B %Y — %H:%M')} UTC+4</div>
-    """, unsafe_allow_html=True)
-
-    # ── Fetch données ──
-    @st.cache_data(ttl=60)
-    def _fetch_accueil_data():
-        """Prix accueil — Yahoo Finance v2 direct → Binance/CoinGecko → yfinance."""
-        import yfinance as yf, requests as _rq
-        results = {}
-        tickers_map = {
-            "BTC-USD": "BTC", "ETH-USD": "ETH",
-            "^GSPC": "S&P 500", "^IXIC": "NASDAQ",
-            "^FCHI": "CAC 40", "NVDA": "NVDA", "AAPL": "AAPL"
-        }
-        # Batch Yahoo Finance v2 pour actions/indices
-        _hdrs = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36","Accept":"application/json","Referer":"https://finance.yahoo.com"}
-        action_syms = ["^GSPC","^IXIC","^FCHI","NVDA","AAPL"]
-        try:
-            _batch = ",".join(action_syms)
-            _r = _rq.get(f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={_batch}", headers=_hdrs, timeout=6)
-            if _r.status_code == 200:
-                for _q in _r.json().get("quoteResponse",{}).get("result",[]):
-                    sym = _q.get("symbol","")
-                    label = tickers_map.get(sym)
-                    if label:
-                        price = float(_q.get("regularMarketPrice",0))
-                        prev  = float(_q.get("regularMarketPreviousClose", price) or price)
-                        chg   = ((price-prev)/prev*100) if prev else float(_q.get("regularMarketChangePercent",0))
-                        results[label] = {"price": price, "chg": chg, "sym": sym}
-        except:
-            pass
-        # CoinGecko pour BTC et ETH
-        try:
-            _cg = _rq.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", timeout=5).json()
-            if _cg.get("bitcoin",{}).get("usd"):
-                results["BTC"] = {"price": float(_cg["bitcoin"]["usd"]), "chg": float(_cg["bitcoin"].get("usd_24h_change",0)), "sym":"BTC-USD"}
-            if _cg.get("ethereum",{}).get("usd"):
-                results["ETH"] = {"price": float(_cg["ethereum"]["usd"]), "chg": float(_cg["ethereum"].get("usd_24h_change",0)), "sym":"ETH-USD"}
-        except:
-            pass
-        # Fallback yfinance pour les manquants
-        for sym, label in tickers_map.items():
-            if label not in results or results[label]["price"] == 0:
-                try:
-                    h = yf.Ticker(sym).fast_info
-                    price = h.last_price
-                    prev  = h.previous_close
-                    chg   = ((price-prev)/prev*100) if prev else 0
-                    results[label] = {"price": price, "chg": chg, "sym": sym}
-                except:
-                    results[label] = {"price": 0, "chg": 0, "sym": sym}
-        return results
-
-    @st.cache_data(ttl=300)
-    def _fetch_fear_greed():
-        try:
-            r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=5)
-            d = r.json()["data"][0]
-            return int(d["value"]), d["value_classification"]
-        except:
-            return 50, "Neutral"
-
-    @st.cache_data(ttl=300)
-    def _fetch_crypto_dominance():
-        try:
-            r = requests.get("https://api.coingecko.com/api/v3/global", timeout=5)
-            d = r.json()["data"]["market_cap_percentage"]
-            return round(d.get("btc", 0), 1), round(d.get("eth", 0), 1)
-        except:
-            return 0, 0
-
-    @st.cache_data(ttl=180)
-    def _fetch_top_movers():
-        """Top movers — Yahoo Finance v2 batch → yfinance fallback."""
-        import yfinance as yf, requests as _rq
-        watchlist = ["NVDA","AAPL","TSLA","MSFT","GOOGL","META","AMZN","AMD","NFLX","JPM","BTC-USD","ETH-USD"]
-        movers = []
-        _hdrs = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36","Accept":"application/json","Referer":"https://finance.yahoo.com"}
-        # Batch Yahoo Finance pour les actions
-        action_syms = [s for s in watchlist if "-USD" not in s]
-        try:
-            _r = _rq.get(f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={','.join(action_syms)}", headers=_hdrs, timeout=6)
-            if _r.status_code == 200:
-                for _q in _r.json().get("quoteResponse",{}).get("result",[]):
-                    price = float(_q.get("regularMarketPrice",0))
-                    prev  = float(_q.get("regularMarketPreviousClose", price) or price)
-                    chg   = ((price-prev)/prev*100) if prev else float(_q.get("regularMarketChangePercent",0))
-                    movers.append({"sym": _q["symbol"], "price": price, "chg": chg})
-        except:
-            pass
-        # CoinGecko pour crypto
-        try:
-            _cg = _rq.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", timeout=5).json()
-            if _cg.get("bitcoin",{}).get("usd"):
-                movers.append({"sym":"BTC", "price":float(_cg["bitcoin"]["usd"]), "chg":float(_cg["bitcoin"].get("usd_24h_change",0))})
-            if _cg.get("ethereum",{}).get("usd"):
-                movers.append({"sym":"ETH", "price":float(_cg["ethereum"]["usd"]), "chg":float(_cg["ethereum"].get("usd_24h_change",0))})
-        except:
-            pass
-        # Fallback yfinance pour les manquants
-        fetched = {m["sym"] for m in movers}
-        for sym in watchlist:
-            clean = sym.replace("-USD","")
-            if clean not in fetched:
-                try:
-                    h = yf.Ticker(sym).fast_info
-                    price = h.last_price; prev = h.previous_close
-                    movers.append({"sym": clean, "price": price, "chg": ((price-prev)/prev*100) if prev else 0})
-                except:
-                    pass
-        movers.sort(key=lambda x: x["chg"], reverse=True)
-        return movers[:5], movers[-5:][::-1]
-
-    @st.cache_data(ttl=300)
-    def _fetch_news():
-        try:
-            import feedparser
-            feeds = [
-                ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
-                ("Reuters", "https://feeds.reuters.com/reuters/businessNews"),
-                ("Bloomberg", "https://feeds.bloomberg.com/markets/news.rss"),
-            ]
-            items = []
-            for src, url in feeds:
-                try:
-                    f = feedparser.parse(url)
-                    for e in f.entries[:3]:
-                        items.append({
-                            "src": src,
-                            "title": e.get("title","")[:90],
-                            "time": e.get("published","")[:16]
-                        })
-                except:
-                    pass
-            return items[:9]
-        except:
-            return []
-
-    with st.spinner("Chargement des données marché..."):
-        mkt      = _fetch_accueil_data()
-        fg_val, fg_label = _fetch_fear_greed()
-        btc_dom, eth_dom = _fetch_crypto_dominance()
-        gainers, losers  = _fetch_top_movers()
-        news             = _fetch_news()
-
-    # ══════════════════════════
-    # ROW 1 — KPIs CRYPTOS
-    # ══════════════════════════
-    st.markdown('<div class="section-title">CRYPTO</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    crypto_cards = [
-        ("BTC", "BITCOIN"),
-        ("ETH", "ETHEREUM"),
-        ("BTC.D", "BTC DOMINANCE"),
-        ("F&G",  "FEAR & GREED"),
-    ]
-    for col, (sym, lbl) in zip([c1,c2,c3,c4], crypto_cards):
-        with col:
-            if sym == "BTC" and "BTC" in mkt:
-                d = mkt["BTC"]
-                delta_class = "kpi-delta-pos" if d["chg"] >= 0 else "kpi-delta-neg"
-                arrow = "▲" if d["chg"] >= 0 else "▼"
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{lbl}</div>
-                    <div class="kpi-value">${d['price']:,.0f}</div>
-                    <div class="{delta_class}">{arrow} {d['chg']:+.2f}%</div>
-                </div>""", unsafe_allow_html=True)
-            elif sym == "ETH" and "ETH" in mkt:
-                d = mkt["ETH"]
-                delta_class = "kpi-delta-pos" if d["chg"] >= 0 else "kpi-delta-neg"
-                arrow = "▲" if d["chg"] >= 0 else "▼"
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{lbl}</div>
-                    <div class="kpi-value">${d['price']:,.0f}</div>
-                    <div class="{delta_class}">{arrow} {d['chg']:+.2f}%</div>
-                </div>""", unsafe_allow_html=True)
-            elif sym == "BTC.D":
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{lbl}</div>
-                    <div class="kpi-value">{btc_dom}%</div>
-                    <div class="dominance-bar"><div class="dominance-fill" style="width:{btc_dom}%"></div></div>
-                    <div class="kpi-delta-neu">ETH {eth_dom}%</div>
-                </div>""", unsafe_allow_html=True)
-            elif sym == "F&G":
-                if fg_val <= 25:    fg_color, fg_emoji = "#FF3B30", "😱"
-                elif fg_val <= 45:  fg_color, fg_emoji = "#FF9800", "😨"
-                elif fg_val <= 55:  fg_color, fg_emoji = "#aaa",    "😐"
-                elif fg_val <= 75:  fg_color, fg_emoji = "#8BC34A", "😊"
-                else:               fg_color, fg_emoji = "#00C853", "🤑"
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{lbl}</div>
-                    <div class="kpi-value" style="color:{fg_color}">{fg_val} {fg_emoji}</div>
-                    <div class="fg-bar"></div>
-                    <div class="kpi-delta-neu" style="color:{fg_color}">{fg_label.upper()}</div>
-                </div>""", unsafe_allow_html=True)
-
-    # ══════════════════════════
-    # ROW 2 — INDICES BOURSIERS
-    # ══════════════════════════
-    st.markdown('<div class="section-title">INDICES BOURSIERS</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    indices = [
-        ("S&P 500", "^GSPC"),
-        ("NASDAQ",  "^IXIC"),
-        ("CAC 40",  "^FCHI"),
-        ("NVDA",    "NVDA"),
-    ]
-    for col, (label, sym) in zip([c1,c2,c3,c4], indices):
-        with col:
-            key = label.replace("^","")
-            d = mkt.get(label, mkt.get("NVDA" if sym=="NVDA" else label, {}))
-            if not d:
-                d = {"price": 0, "chg": 0}
-            delta_class = "kpi-delta-pos" if d.get("chg",0) >= 0 else "kpi-delta-neg"
-            arrow = "▲" if d.get("chg",0) >= 0 else "▼"
-            price = d.get("price", 0)
-            price_fmt = f"${price:,.0f}" if price > 100 else f"{price:,.2f}"
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-label">{label}</div>
-                <div class="kpi-value">{price_fmt}</div>
-                <div class="{delta_class}">{arrow} {d.get('chg',0):+.2f}%</div>
-            </div>""", unsafe_allow_html=True)
-
-    # ══════════════════════════
-    # ROW 3 — TOP MOVERS + NEWS
-    # ══════════════════════════
-    st.markdown('<div class="section-title">TOP MOVERS DU JOUR</div>', unsafe_allow_html=True)
-    col_g, col_l = st.columns(2)
-
-    with col_g:
-        st.markdown('<div style="font-family:IBM Plex Mono;font-size:9px;color:#00C853;letter-spacing:2px;margin-bottom:6px;">▲ TOP GAINERS</div>', unsafe_allow_html=True)
-        for m in gainers:
-            st.markdown(f"""
-            <div class="top-mover">
-                <div>
-                    <div class="mover-sym">{m['sym']}</div>
-                    <div class="mover-name">${m['price']:,.2f}</div>
-                </div>
-                <div class="mover-pos">+{m['chg']:.2f}%</div>
-            </div>""", unsafe_allow_html=True)
-
-    with col_l:
-        st.markdown('<div style="font-family:IBM Plex Mono;font-size:9px;color:#FF3B30;letter-spacing:2px;margin-bottom:6px;">▼ TOP LOSERS</div>', unsafe_allow_html=True)
-        for m in losers:
-            st.markdown(f"""
-            <div class="top-mover">
-                <div>
-                    <div class="mover-sym">{m['sym']}</div>
-                    <div class="mover-name">${m['price']:,.2f}</div>
-                </div>
-                <div class="mover-neg">{m['chg']:.2f}%</div>
-            </div>""", unsafe_allow_html=True)
-
-    # ══════════════════════════
-    # ROW 4 — ACTUALITÉS
-    # ══════════════════════════
-    st.markdown('<div class="section-title">ACTUALITÉS MARCHÉ</div>', unsafe_allow_html=True)
-    if news:
-        cols = st.columns(3)
-        for i, item in enumerate(news[:9]):
-            with cols[i % 3]:
-                st.markdown(f"""
-                <div class="news-item">
-                    <div class="news-src">{item['src'].upper()}</div>
-                    <div class="news-title">{item['title']}</div>
-                    <div class="news-time">{item['time']}</div>
-                </div>""", unsafe_allow_html=True)
-    else:
-        st.markdown('<div style="font-family:IBM Plex Mono;font-size:11px;color:#333;">Actualités indisponibles</div>', unsafe_allow_html=True)
-
-    st.stop()
-
-if categorie == "AM INTELLIGENCE":
-    interface_am_intelligence.show_am_intelligence()
-    st.stop()
-
-if categorie == "FINANCE DE MARCHÉ":
-    interface_finance_marche.show_finance_marche()
-    st.stop()
 
 if categorie == "TERMINAL":
     terminal_module.show_terminal()
@@ -2673,14 +1832,17 @@ if categorie == "MON ESPACE ANALYSE":
     st.stop()
 
 if categorie == "MARCHÉ CRYPTO":
-    # Toolbar crypto — clés internes fixes + labels traduits
-    _crypto_keys = ["GRAPHIQUE CRYPTO","BITCOIN DOMINANCE","CRYPTO WALLET",
-        "HEATMAP LIQUIDATIONS","ORDER BOOK LIVE","WHALE WATCHER",
-        "ON-CHAIN ANALYTICS","LIQUIDATIONS & FUNDING","STAKING & YIELD"]
-    _crypto_labels = [t("mod_graphique_crypto"),t("mod_btc_dom"),t("mod_wallet"),
-        t("mod_heatmap_liq"),t("mod_orderbook"),t("mod_whale"),
-        t("mod_onchain"),t("mod_liq_funding"),t("mod_staking")]
-    outil = _toolbar("tb_crypto", _crypto_keys, labels=_crypto_labels)
+    outil = st.sidebar.radio("MODULES CRYPTO :", [
+        "GRAPHIQUE CRYPTO",
+        "BITCOIN DOMINANCE",
+        "CRYPTO WALLET",
+        "HEATMAP LIQUIDATIONS",
+        "ORDER BOOK LIVE",
+        "WHALE WATCHER",
+        "ON-CHAIN ANALYTICS",
+        "LIQUIDATIONS & FUNDING",
+        "STAKING & YIELD"
+    ])
 if categorie == "INTERFACE PRO":
     outil = interface_pro.show_interface_pro()
 if categorie == "INTERFACE CRYPTO PRO":
@@ -2695,48 +1857,36 @@ elif categorie == "MATIÈRES PREMIÈRES":
     interface_matieres_premieres.show_matieres_premieres()
     st.stop()
 elif categorie == "ACTIONS & BOURSE":
-    # Toolbar actions — clés internes fixes + labels traduits
-    _actions_keys = ["ANALYSEUR PRO","ANALYSE TECHNIQUE PRO","FIBONACCI CALCULATOR",
-        "BACKTESTING ENGINE","VALORISATION FONDAMENTALE","MULTI-CHARTS",
-        "EXPERT SYSTEM","THE GRAND COUNCIL️","MODE DUEL",
-        "MARKET MONITOR","SCREENER CAC 40","DIVIDEND CALENDAR"]
-    _actions_labels = [t("mod_analyseur"),t("mod_technique"),t("mod_fibonacci"),
-        t("mod_backtest"),t("mod_valorisation"),t("mod_multicharts"),
-        t("mod_expert"),t("mod_council"),t("mod_duel"),
-        t("mod_monitor"),t("mod_screener_cac"),t("mod_dividend")]
-    outil = _toolbar("tb_actions", _actions_keys, labels=_actions_labels)
+    outil = st.sidebar.radio("MODULES ACTIONS :", [
+        "ANALYSEUR PRO",
+        "ANALYSE TECHNIQUE PRO",
+        "FIBONACCI CALCULATOR",
+        "BACKTESTING ENGINE",
+        "VALORISATION FONDAMENTALE",
+        "MULTI-CHARTS",
+        "EXPERT SYSTEM",
+        "THE GRAND COUNCIL️",
+        "MODE DUEL",
+        "MARKET MONITOR",
+        "SCREENER CAC 40",
+        "DIVIDEND CALENDAR"
+    ])
 
 elif categorie == "BOITE À OUTILS":
-    # Toolbar outils — clés internes fixes + labels traduits
-    _outils_keys = ["DAILY BRIEF","CALENDRIER ÉCO","Fear and Gread Index",
-        "CORRÉLATION DASH","INTERETS COMPOSES","HEATMAP MARCHÉ","ALERTS MANAGER"]
-    _outils_labels = [t("mod_daily"),t("mod_calendrier"),t("mod_fear"),
-        t("mod_correlation"),t("mod_interets"),t("mod_heatmap"),t("mod_alerts")]
-    outil = _toolbar("tb_outils", _outils_keys, labels=_outils_labels)
+    outil = st.sidebar.radio("MES OUTILS :", [
+        "DAILY BRIEF",
+        "CALENDRIER ÉCO",
+        "Fear and Gread Index",
+        "CORRÉLATION DASH",
+        "INTERETS COMPOSES",
+        "HEATMAP MARCHÉ",
+        "ALERTS MANAGER"
+    ])
 
 st.sidebar.markdown("---")
-# secteur info removed
+st.sidebar.info(f"Secteur actif : {categorie.split()[-1]}")
 
 # Barre utilisateur (compte + déconnexion)
-# ── Profil utilisateur en bas de sidebar ──
-user_email = st.session_state.get("user_email", "")
-if user_email:
-    initiales = "".join([p[0].upper() for p in user_email.split("@")[0].split(".")[:2]])
-    st.sidebar.markdown(f"""
-<div style='margin:8px 8px 4px;background:#0a0a0a;border:1px solid #1a1a1a;
-     border-radius:6px;padding:10px 12px;font-family:IBM Plex Mono,monospace;'>
-    <div style='display:flex;align-items:center;gap:10px;'>
-        <div style='width:28px;height:28px;border-radius:50%;background:#ff6600;
-             display:flex;align-items:center;justify-content:center;
-             font-size:11px;font-weight:700;color:#000;flex-shrink:0;'>{initiales}</div>
-        <div>
-            <div style='font-size:9px;color:#ff6600;letter-spacing:1px;'>CONNECTÉ</div>
-            <div style='font-size:9px;color:#666;overflow:hidden;text-overflow:ellipsis;
-                 white-space:nowrap;max-width:130px;'>{user_email}</div>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
 render_user_sidebar()
 
 # ── Stats analytics (visible uniquement pour arthur.974.a@gmail.com) ──
@@ -2775,6 +1925,14 @@ if "triggered_alerts" not in st.session_state:
 def _get_marquee_prices(watchlist_tuple):
     """Récupère les prix pour le marquee — multi-sources robuste."""
     result = []
+    # Session curl_cffi partagée pour toute la watchlist
+    curl_session = None
+    try:
+        from curl_cffi.requests import Session as CurlSession
+        curl_session = CurlSession(impersonate="chrome")
+    except Exception:
+        pass
+
     for tkr in watchlist_tuple:
         price, prev = 0.0, 0.0
         try:
@@ -2787,30 +1945,24 @@ def _get_marquee_prices(watchlist_tuple):
                     price = float(d.get("lastPrice", 0))
                     prev  = float(d.get("prevClosePrice", 0))
 
-            # ── Actions : Yahoo Finance v8 (endpoint léger) ──
+            # ── Actions : yfinance + curl_cffi (contourne blocage Yahoo) ──
             if price == 0:
-                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36"}
-                r2 = requests.get(
-                    f"https://query1.finance.yahoo.com/v8/finance/chart/{tkr}",
-                    params={"interval": "1d", "range": "2d"},
-                    headers=headers, timeout=8
-                )
-                if r2.status_code == 200:
-                    data = r2.json()
-                    meta = data["chart"]["result"][0]["meta"]
-                    price = float(meta.get("regularMarketPrice", 0))
-                    prev  = float(meta.get("previousClose", 0) or meta.get("chartPreviousClose", 0))
-
-            # ── Fallback : yfinance fast_info ──
-            if price == 0:
-                fi = yf.Ticker(tkr).fast_info
-                price = float(getattr(fi, "last_price", 0) or 0)
-                prev  = float(getattr(fi, "previous_close", 0) or 0)
+                try:
+                    t = yf.Ticker(tkr, session=curl_session) if curl_session else yf.Ticker(tkr)
+                    fi = t.fast_info
+                    price = float(getattr(fi, "last_price", 0) or 0)
+                    prev  = float(getattr(fi, "previous_close", 0) or 0)
+                except Exception:
+                    pass
 
             if price > 0 and prev > 0:
                 result.append((tkr, price, prev))
         except Exception:
             continue
+
+    if curl_session:
+        try: curl_session.close()
+        except Exception: pass
     return result
 
 ticker_data_string = ""
@@ -2821,20 +1973,24 @@ for tkr, price, prev_close in _get_marquee_prices(tuple(st.session_state.watchli
     ticker_data_string += f'<span style="color: white; font-weight: bold; margin-left: 40px; font-family: monospace;">{tkr.replace("-USD", "")}:</span>'
     ticker_data_string += f'<span style="color: {color}; font-weight: bold; margin-left: 5px; font-family: monospace;">{price:,.2f} ({sign}{change:.2f}%)</span>'
 
-marquee_html = f"""
-<div style="background-color: #000; overflow: hidden; white-space: nowrap; padding: 12px 0; border-top: 2px solid #333; border-bottom: 2px solid #333; margin-bottom: 20px;">
-    <div style="display: inline-block; white-space: nowrap; animation: marquee 30s linear infinite;">
-        {ticker_data_string} {ticker_data_string} {ticker_data_string}
+if ticker_data_string:
+    marquee_html = f"""
+<div style="background-color:#000;overflow:hidden;white-space:nowrap;padding:12px 0;border-top:2px solid #333;border-bottom:2px solid #333;margin-bottom:20px;">
+    <div id="mq" style="display:inline-block;white-space:nowrap;">
+        {ticker_data_string}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ticker_data_string}
     </div>
 </div>
 <style>
-@keyframes marquee {{
-    0% {{ transform: translateX(0); }}
-    100% {{ transform: translateX(-33.33%); }}
+#mq {{
+    animation: marquee_scroll 35s linear infinite;
+}}
+@keyframes marquee_scroll {{
+    0%   {{ transform: translateX(0); }}
+    100% {{ transform: translateX(-50%); }}
 }}
 </style>
 """
-components.html(marquee_html, height=60)
+    components.html(marquee_html, height=60)
 
 
 # ════════════════════════════════════════════════════════════
