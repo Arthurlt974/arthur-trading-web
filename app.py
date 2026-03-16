@@ -1323,183 +1323,162 @@ class ValuationCalculator:
 
 
 @st.cache_data(ttl=600, show_spinner=False)
+def _av_key():
+    """Clé Alpha Vantage depuis secrets Streamlit."""
+    try:
+        return st.secrets.get("AV_API_KEY", "")
+    except Exception:
+        return ""
+
 def get_ticker_info(ticker):
     """
-    Récupère les infos en deux passes PARALLÈLES :
-    - Twelve Data  → prix fiable (fonctionne sur Streamlit Cloud)
-    - yfinance     → fondamentaux (P/E, EPS, secteur, book value...)
-    Les deux sont TOUJOURS tentés, leurs résultats sont fusionnés.
-    Twelve Data gagne sur le prix, yfinance gagne sur les fondamentaux.
+    Récupère les infos — Alpha Vantage en priorité (fonctionne sur Streamlit Cloud),
+    curl_cffi yfinance en fallback, CoinGecko/Binance pour la crypto.
     """
+    import requests as _rq
     info = {}
 
-    # ══ PASSE A : Twelve Data — prix + données marché ══
-    try:
-        _td_key = st.secrets.get("TWELVE_DATA_KEY", "")
-        if _td_key:
-            import requests as _req_td
-            r = _req_td.get("https://api.twelvedata.com/quote",
-                params={"symbol": ticker, "apikey": _td_key}, timeout=10)
-            td = r.json()
-            if td.get("status") != "error" and td.get("close"):
-                info['currentPrice']             = float(td["close"])
-                info['regularMarketPrice']       = float(td["close"])
-                if td.get("previous_close"):
-                    info['previousClose']        = float(td["previous_close"])
-                if td.get("currency"):
-                    info['currency']             = td["currency"]
-                if td.get("name"):
-                    info['longName']             = td["name"]
-                if td.get("percent_change"):
-                    info['regularMarketChangePercent'] = float(td["percent_change"])
-                if td.get("volume"):
-                    info['volume']               = int(float(td["volume"]))
-                if td.get("fifty_two_week"):
-                    fw = td["fifty_two_week"]
-                    if fw.get("high"): info['fiftyTwoWeekHigh'] = float(fw["high"])
-                    if fw.get("low"):  info['fiftyTwoWeekLow']  = float(fw["low"])
-    except Exception:
-        pass
-
-    # ══ PASSE B : yfinance — fondamentaux (toujours tenté) ══
-    # B1 : curl_cffi (meilleure chance de passer le blocage Yahoo)
-    yf_info = {}
-    try:
-        from curl_cffi.requests import Session as CurlSession
-        with CurlSession(impersonate="chrome") as s:
-            full = yf.Ticker(ticker, session=s).info or {}
-            if len(full) > 10:
-                yf_info = full
-    except Exception:
-        pass
-
-    # B2 : yfinance standard avec User-Agent si B1 a échoué
-    if len(yf_info) < 5:
+    # ══ CRYPTO : CoinGecko + Binance (jamais bloqués) ══
+    is_crypto = "-USD" in ticker.upper() or ticker.upper().endswith("USDT")
+    if is_crypto:
         try:
-            import requests as _req
-            s = _req.Session()
-            s.headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
-            full2 = yf.Ticker(ticker, session=s).info or {}
-            if len(full2) > len(yf_info):
-                yf_info = full2
-        except Exception:
-            pass
-
-    # B3 : Yahoo Finance API v8 direct (contourne le blocage yfinance)
-    if len(yf_info) < 5:
-        try:
-            import requests as _rq
-            _hdrs = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
-                "Accept": "application/json",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://finance.yahoo.com",
-            }
-            _url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=price,summaryDetail,defaultKeyStatistics,financialData,assetProfile"
-            _r = _rq.get(_url, headers=_hdrs, timeout=6)
-            if _r.status_code == 200:
-                _d = _r.json().get("quoteSummary", {}).get("result", [{}])[0]
-                _merged = {}
-                for _mod in _d.values():
-                    if isinstance(_mod, dict):
-                        for _k, _v in _mod.items():
-                            if isinstance(_v, dict) and "raw" in _v:
-                                _merged[_k] = _v["raw"]
-                            elif not isinstance(_v, dict):
-                                _merged[_k] = _v
-                if len(_merged) > 5:
-                    yf_info = _merged
-        except Exception:
-            pass
-
-    # B3b : yfinance brut si toujours vide
-    if len(yf_info) < 5:
-        try:
-            yf_info = yf.Ticker(ticker).info or {}
-        except Exception:
-            pass
-
-    # ── Fusion : yfinance remplit TOUT ce qui manque ──
-    FUNDAMENTALS = [
-        'trailingPE','forwardPE','trailingEps','forwardEps',
-        'bookValue','priceToBook','sector','industry',
-        'marketCap','sharesOutstanding','debtToEquity',
-        'dividendRate','dividendYield','payoutRatio',
-        'totalCashPerShare','returnOnEquity','returnOnAssets',
-        'revenueGrowth','earningsGrowth','grossMargins',
-        'operatingMargins','profitMargins','totalRevenue',
-        'freeCashflow','totalDebt','totalCash',
-        'shortName','longName','longBusinessSummary','website','country',
-        'fullTimeEmployees','auditRisk','boardRisk',
-        'currentPrice','regularMarketPrice','previousClose',
-        'currency','fiftyTwoWeekHigh','fiftyTwoWeekLow',
-        'fiftyDayAverage','twoHundredDayAverage','volume',
-    ]
-    for k in FUNDAMENTALS:
-        val = yf_info.get(k)
-        if val not in (None, '', 0) and k not in info:
-            info[k] = val
-        # Forcer les fondamentaux clés même si info a déjà une valeur 0
-        elif val not in (None, '', 0) and info.get(k) in (None, '', 0):
-            info[k] = val
-
-    # B4a : CoinGecko pour la crypto
-    if not info.get('currentPrice') and ("-USD" in ticker.upper() or "USD" == ticker[-3:]):
-        try:
-            sym = ticker.replace("-USD","").replace("USD","").upper()
+            sym = ticker.replace("-USD","").replace("USDT","").upper()
             cg_map = {"BTC":"bitcoin","ETH":"ethereum","SOL":"solana",
                       "BNB":"binancecoin","XRP":"ripple","ADA":"cardano",
-                      "DOGE":"dogecoin","DOT":"polkadot","AVAX":"avalanche-2"}
+                      "DOGE":"dogecoin","DOT":"polkadot","AVAX":"avalanche-2",
+                      "LINK":"chainlink","LTC":"litecoin","UNI":"uniswap"}
             cg_id = cg_map.get(sym, sym.lower())
-            import requests as _rcg
-            _rcg_r = _rcg.get(
+            _cg = _rq.get(
                 f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd&include_24hr_change=true",
-                timeout=5)
-            _rcg_d = _rcg_r.json().get(cg_id, {})
-            if _rcg_d.get("usd"):
-                info['currentPrice'] = info['regularMarketPrice'] = float(_rcg_d["usd"])
+                timeout=5).json().get(cg_id, {})
+            if _cg.get("usd"):
+                info['currentPrice'] = info['regularMarketPrice'] = float(_cg["usd"])
                 info['currency'] = 'USD'
-                if _rcg_d.get("usd_24h_change"):
-                    info['regularMarketChangePercent'] = float(_rcg_d["usd_24h_change"])
+                info['previousClose'] = float(_cg["usd"]) / (1 + float(_cg.get("usd_24h_change", 0)) / 100)
+                info['regularMarketChangePercent'] = float(_cg.get("usd_24h_change", 0))
+                info['shortName'] = sym
+        except Exception:
+            pass
+        # Binance fallback crypto
+        if not info.get('currentPrice'):
+            try:
+                sym = ticker.replace("-USD","").upper()
+                _bn = _rq.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}USDT", timeout=3).json()
+                if _bn.get("lastPrice"):
+                    info['currentPrice'] = info['regularMarketPrice'] = float(_bn["lastPrice"])
+                    info['previousClose'] = float(_bn.get("prevClosePrice", _bn["lastPrice"]))
+                    info['currency'] = 'USD'
+            except Exception:
+                pass
+        return info if info.get('currentPrice') else None
+
+    # ══ ACTIONS — Alpha Vantage (priorité) ══
+    av_key = _av_key()
+    if av_key:
+        # GLOBAL_QUOTE → prix en temps réel
+        try:
+            _r1 = _rq.get("https://www.alphavantage.co/query", params={
+                "function": "GLOBAL_QUOTE", "symbol": ticker, "apikey": av_key
+            }, timeout=10)
+            _q = _r1.json().get("Global Quote", {})
+            if _q.get("05. price"):
+                info['currentPrice']       = float(_q["05. price"])
+                info['regularMarketPrice'] = float(_q["05. price"])
+                info['previousClose']      = float(_q.get("08. previous close") or _q["05. price"])
+                info['volume']             = int(float(_q.get("06. volume") or 0))
+                chg = _q.get("10. change percent", "0%").replace("%","")
+                info['regularMarketChangePercent'] = float(chg) if chg else 0
+                info['fiftyTwoWeekHigh']   = float(_q.get("03. high") or 0) or None
+                info['fiftyTwoWeekLow']    = float(_q.get("04. low") or 0) or None
         except Exception:
             pass
 
-    # B4b : Binance pour la crypto
-    if not info.get('currentPrice') and ("-USD" in ticker.upper() or ticker.upper() in ["BTCUSD","ETHUSD"]):
+        # OVERVIEW → tous les fondamentaux
         try:
-            sym = ticker.replace("-USD","").upper()
-            import requests as _rbn
-            _rbn_r = _rbn.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}USDT", timeout=3)
-            _rbn_d = _rbn_r.json()
-            if _rbn_d.get("lastPrice"):
-                info['currentPrice'] = info['regularMarketPrice'] = float(_rbn_d["lastPrice"])
-                info['previousClose'] = float(_rbn_d.get("prevClosePrice", _rbn_d["lastPrice"]))
-                info['volume'] = float(_rbn_d.get("volume", 0))
-                info['currency'] = 'USD'
+            _r2 = _rq.get("https://www.alphavantage.co/query", params={
+                "function": "OVERVIEW", "symbol": ticker, "apikey": av_key
+            }, timeout=10)
+            _ov = _r2.json()
+            if _ov.get("Symbol"):
+                def _f(k): 
+                    v = _ov.get(k)
+                    try: return float(v) if v and v != "None" else None
+                    except: return None
+                def _s(k): 
+                    v = _ov.get(k)
+                    return v if v and v != "None" else None
+
+                info['shortName']            = _s("Name") or ticker.upper()
+                info['longName']             = _s("Name") or ticker.upper()
+                info['sector']               = _s("Sector")
+                info['industry']             = _s("Industry")
+                info['longBusinessSummary']  = _s("Description")
+                info['country']              = _s("Country")
+                info['currency']             = _s("Currency") or "USD"
+                info['exchange']             = _s("Exchange")
+                info['trailingPE']           = _f("PERatio")
+                info['forwardPE']            = _f("ForwardPE")
+                info['trailingEps']          = _f("EPS")
+                info['bookValue']            = _f("BookValue")
+                info['priceToBook']          = _f("PriceToBookRatio")
+                info['returnOnEquity']       = _f("ReturnOnEquityTTM")
+                info['returnOnAssets']       = _f("ReturnOnAssetsTTM")
+                info['profitMargins']        = _f("ProfitMargin")
+                info['operatingMargins']     = _f("OperatingMarginTTM")
+                info['revenueGrowth']        = _f("RevenueGrowthYOY")
+                info['earningsGrowth']       = _f("EarningsGrowthYOY")
+                info['dividendYield']        = _f("DividendYield")
+                info['dividendRate']         = _f("DividendPerShare")
+                info['marketCap']            = _f("MarketCapitalization")
+                info['beta']                 = _f("Beta")
+                info['fiftyTwoWeekHigh']     = _f("52WeekHigh") or info.get('fiftyTwoWeekHigh')
+                info['fiftyTwoWeekLow']      = _f("52WeekLow")  or info.get('fiftyTwoWeekLow')
+                info['fiftyDayAverage']      = _f("50DayMovingAverage")
+                info['twoHundredDayAverage'] = _f("200DayMovingAverage")
+                info['sharesOutstanding']    = _f("SharesOutstanding")
+                info['debtToEquity']         = _f("DebtToEquityRatio")
+                info['fullTimeEmployees']    = _f("FullTimeEmployees")
+                info['totalRevenue']         = _f("RevenueTTM")
+                info['grossMargins']         = _f("GrossProfitTTM")
+                info['freeCashflow']         = _f("FreeCashFlowTTM")
+                info['analystTargetPrice']   = _f("AnalystTargetPrice")
         except Exception:
             pass
 
-    # B4c : fast_info yfinance
-    if not info.get('currentPrice'):
+    # ══ FALLBACK : curl_cffi + yfinance si Alpha Vantage vide ══
+    if not info.get('currentPrice') or not info.get('trailingPE'):
+        yf_info = {}
+        # curl_cffi
         try:
-            fi = yf.Ticker(ticker).fast_info
-            if getattr(fi, 'last_price', None):
-                info['currentPrice'] = info['regularMarketPrice'] = float(fi.last_price)
-            if getattr(fi, 'previous_close', None):
-                info['previousClose'] = float(fi.previous_close)
+            from curl_cffi.requests import Session as CurlSession
+            with CurlSession(impersonate="chrome") as s:
+                full = yf.Ticker(ticker, session=s).info or {}
+                if len(full) > 10:
+                    yf_info = full
         except Exception:
             pass
-
-    # B5 : historique en dernier recours pour le prix
-    if not info.get('currentPrice'):
-        try:
-            hist = yf.Ticker(ticker).history(period="5d")
-            if not hist.empty:
-                info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
-                if len(hist) > 1:
-                    info['previousClose'] = float(hist['Close'].iloc[-2])
-        except Exception:
-            pass
+        # yfinance brut
+        if len(yf_info) < 5:
+            try:
+                yf_info = yf.Ticker(ticker).info or {}
+            except Exception:
+                pass
+        # Fusion yfinance → combler les trous
+        YF_KEYS = [
+            'currentPrice','regularMarketPrice','previousClose','currency',
+            'trailingPE','forwardPE','trailingEps','bookValue','priceToBook',
+            'sector','industry','shortName','longName','longBusinessSummary',
+            'marketCap','sharesOutstanding','debtToEquity','dividendYield',
+            'dividendRate','returnOnEquity','returnOnAssets','profitMargins',
+            'operatingMargins','grossMargins','revenueGrowth','earningsGrowth',
+            'totalRevenue','freeCashflow','totalDebt','totalCash','beta',
+            'fiftyTwoWeekHigh','fiftyTwoWeekLow','fiftyDayAverage',
+            'twoHundredDayAverage','volume','country','fullTimeEmployees',
+        ]
+        for k in YF_KEYS:
+            val = yf_info.get(k)
+            if val not in (None, '', 0) and info.get(k) in (None, '', 0, None):
+                info[k] = val
 
     # ── Defaults ──
     if not info.get('previousClose') and info.get('currentPrice'):
