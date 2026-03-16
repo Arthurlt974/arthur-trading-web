@@ -1,7 +1,7 @@
 """
 interface_economie.py — AM-Trading Terminal
 Données macro-économiques en TEMPS RÉEL
-Sources : FRED (FED), BCE API, World Bank, OECD, yfinance
+Sources : FED, BCE API, World Bank, OECD, yfinance
 Fallback : données officielles les plus récentes (mars 2026)
 """
 
@@ -106,7 +106,7 @@ def _get(url, timeout=6):
 
 @st.cache_data(ttl=3600)
 def fetch_fred_series(series_id: str):
-    """FRED CSV — sans clé API. Retourne (date_str, valeur_float) de la dernière obs."""
+    """FED CSV — sans clé API. Retourne (date_str, valeur_float) de la dernière obs."""
     r = _get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}")
     if r:
         lines = [l for l in r.text.strip().split('\n') if l and not l.startswith('DATE')]
@@ -122,7 +122,7 @@ def fetch_fred_series(series_id: str):
 
 @st.cache_data(ttl=3600)
 def fetch_fred_series_nth(series_id: str, n: int = -2):
-    """FRED CSV — retourne la N-ième observation (n=-2 = avant-dernière)."""
+    """FED CSV — retourne la N-ième observation (n=-2 = avant-dernière)."""
     r = _get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}")
     if r:
         lines = [l for l in r.text.strip().split('\n') if l and not l.startswith('DATE')]
@@ -199,17 +199,17 @@ def fetch_all_macro():
     sources = {}
 
     # ── CHÔMAGE ──────────────────────────────────────────────
-    # USA : FRED UNRATE
+    # USA : FED UNRATE
     res = fetch_fred_series("UNRATE")
     if res:
         date, val = res
         fb = FALLBACK["chomage"]["🇺🇸 USA"]
         data["chomage"]["🇺🇸 USA"] = {**fb, "actuel": val,
             "precedent": fb["historique"][-2] if fb["historique"] else fb["precedent"]}
-        sources["chomage_usa"] = f"FRED UNRATE ({date})"
+        sources["chomage_usa"] = f"FED UNRATE ({date})"
     else:
         data["chomage"]["🇺🇸 USA"] = FALLBACK["chomage"]["🇺🇸 USA"]
-        sources["chomage_usa"] = "Fallback (FRED indisponible)"
+        sources["chomage_usa"] = "Fallback (FED indisponible)"
 
     # Multi-pays : World Bank SL.UEM.TOTL.ZS
     wb_chomage_map = {
@@ -229,13 +229,13 @@ def fetch_all_macro():
             sources[f"chomage_{code}"] = "Fallback (World Bank indisponible)"
 
     # ── INFLATION ─────────────────────────────────────────────
-    # USA : FRED CPIAUCSL (YoY calculé)
+    # USA : FED CPIAUCSL (YoY calculé)
     res_cpi = fetch_fred_series("CPIAUCSL")
     if res_cpi:
         # CPIAUCSL = index, on veut YoY → chercher il y a 12 obs
         # Simplification : utiliser T5YIE (anticipations) ou CPILFESL YoY
         pass
-    # USA : FRED CPIAUCSL YoY direct
+    # USA : FED CPIAUCSL YoY direct
     res_yoy = fetch_fred_series("CPILFESL")  # Core CPI
     # Préférer l'indicateur tout-inclus
     res_all = fetch_fred_series("FPCPITOTLZGUSA")  # CPI YoY annual
@@ -244,7 +244,7 @@ def fetch_all_macro():
         fb = FALLBACK["inflation"]["🇺🇸 USA"]
         data["inflation"]["🇺🇸 USA"] = {**fb, "actuel": round(val, 1),
             "precedent": fb["historique"][-2]}
-        sources["inflation_usa"] = f"FRED FPCPITOTLZGUSA ({date})"
+        sources["inflation_usa"] = f"FED FPCPITOTLZGUSA ({date})"
     else:
         data["inflation"]["🇺🇸 USA"] = FALLBACK["inflation"]["🇺🇸 USA"]
         sources["inflation_usa"] = "Fallback"
@@ -297,14 +297,14 @@ def fetch_all_macro():
             sources[f"inflation_{code}"] = "Fallback"
 
     # ── PIB ───────────────────────────────────────────────────
-    # USA : FRED A191RL1Q225SBEA (PIB QoQ annualisé)
+    # USA : FED A191RL1Q225SBEA (PIB QoQ annualisé)
     res_gdp = fetch_fred_series("A191RL1Q225SBEA")
     if res_gdp:
         date, val = res_gdp
         fb = FALLBACK["pib"]["🇺🇸 USA"]
         data["pib"]["🇺🇸 USA"] = {**fb, "actuel": round(val, 1),
             "precedent": fb["historique"][-2]}
-        sources["pib_usa"] = f"FRED GDP ({date})"
+        sources["pib_usa"] = f"FED GDP ({date})"
     else:
         data["pib"]["🇺🇸 USA"] = FALLBACK["pib"]["🇺🇸 USA"]
         sources["pib_usa"] = "Fallback"
@@ -327,14 +327,14 @@ def fetch_all_macro():
             sources[f"pib_{code}"] = "Fallback"
 
     # ── TAUX DIRECTEURS ───────────────────────────────────────
-    # USA : FRED FEDFUNDS
+    # USA : FED FEDFUNDS
     res_fed = fetch_fred_series("FEDFUNDS")
     if res_fed:
         date, val = res_fed
         fb = FALLBACK["taux"]["🇺🇸 USA"]
         data["taux"]["🇺🇸 USA"] = {**fb, "actuel": round(val, 2),
             "precedent": round(fb["historique"][-2], 2)}
-        sources["taux_usa"] = f"FRED FEDFUNDS ({date})"
+        sources["taux_usa"] = f"FED FEDFUNDS ({date})"
     else:
         data["taux"]["🇺🇸 USA"] = FALLBACK["taux"]["🇺🇸 USA"]
         sources["taux_usa"] = "Fallback"
@@ -365,7 +365,7 @@ def fetch_all_macro():
         sources[f"taux_{pays}"] = "Fallback (données officielles mars 2026)"
 
     # ── CONFIANCE ─────────────────────────────────────────────
-    # USA : FRED UMCSENT (UMich Consumer Sentiment)
+    # USA : FED UMCSENT (UMich Consumer Sentiment)
     # UMCSENT — charger 2 dernières observations pour calcul variation réelle
     res_conf_curr = fetch_fred_series("UMCSENT")
     res_conf_prev = fetch_fred_series_nth("UMCSENT", -2)  # avant-dernière obs
@@ -377,7 +377,7 @@ def fetch_all_macro():
         hist_updated = fb["historique"][:-1] + [round(val, 1)]
         data["confiance"]["🇺🇸 USA"] = {**fb, "actuel": round(val, 1),
             "precedent": round(prev_val, 1), "historique": hist_updated}
-        sources["confiance_usa"] = f"FRED UMich Sentiment ({date})"
+        sources["confiance_usa"] = f"FED UMich Sentiment ({date})"
     else:
         data["confiance"]["🇺🇸 USA"] = FALLBACK["confiance"]["🇺🇸 USA"]
         sources["confiance_usa"] = "Fallback"
@@ -550,7 +550,7 @@ def badge_source(source_str):
     """Affiche un badge selon la source."""
     if "Fallback" in source_str:
         color, icon = "#555", "📋"
-    elif "FRED" in source_str:
+    elif "FED" in source_str:
         color, icon = "#4fc3f7", "🏦"
     elif "BCE" in source_str:
         color, icon = "#ffb74d", "🇪🇺"
@@ -575,7 +575,7 @@ def show_economie():
              border:2px solid #ff9800; border-radius:12px; margin-bottom:20px;'>
             <h1 style='color:#ff9800; margin:0; font-size:36px;'>🌍 MACRO ÉCONOMIE MONDIALE</h1>
             <p style='color:#ffb84d; margin:8px 0 0 0; font-size:14px;'>
-                Données en temps réel — FRED · BCE · World Bank · yfinance
+                Données en temps réel — FED · BCE · World Bank · yfinance
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -620,7 +620,7 @@ def show_economie():
     nb_total = len(sources)
     st.caption(f"🕐 {datetime.now().strftime('%d/%m/%Y %H:%M')} — "
                f"{nb_live}/{nb_total} indicateurs en temps réel | "
-               f"Sources : FRED · BCE · World Bank · yfinance")
+               f"Sources : FED · BCE · World Bank · yfinance")
     st.markdown("---")
 
     # ══════════════════════════════════════════════════════════════
@@ -745,7 +745,7 @@ def show_economie():
     # ══════════════════════════════════════════════════════════════
     with tab3:
         st.markdown("### 🔥 INFLATION CPI (%)")
-        st.info("💡 Cible des banques centrales : 2%. Source : FRED (USA), BCE (EU/FR), World Bank (autres).")
+        st.info("💡 Cible des banques centrales : 2%. Source : FED (USA), BCE (EU/FR), World Bank (autres).")
         cols = st.columns(len(pays_selectionnes))
         for i, pays in enumerate(pays_selectionnes):
             with cols[i % len(cols)]:
@@ -778,7 +778,7 @@ def show_economie():
     # ══════════════════════════════════════════════════════════════
     with tab4:
         st.markdown("### 📈 CROISSANCE PIB (%)")
-        st.info("💡 > 2% = économie dynamique | < 0% = récession. Source : FRED (USA), World Bank (autres).")
+        st.info("💡 > 2% = économie dynamique | < 0% = récession. Source : FED (USA), World Bank (autres).")
         cols = st.columns(len(pays_selectionnes))
         for i, pays in enumerate(pays_selectionnes):
             with cols[i % len(cols)]:
@@ -812,7 +812,7 @@ def show_economie():
     # ══════════════════════════════════════════════════════════════
     with tab5:
         st.markdown("### 🏦 TAUX DIRECTEURS DES BANQUES CENTRALES (%)")
-        st.info("💡 Des taux élevés freinent l'inflation. Source : FRED (FED), BCE API (BCE).")
+        st.info("💡 Des taux élevés freinent l'inflation. Source : FED, BCE API (BCE).")
         cols = st.columns(len(pays_selectionnes))
         for i, pays in enumerate(pays_selectionnes):
             with cols[i % len(cols)]:
@@ -883,7 +883,7 @@ def show_economie():
     # ══════════════════════════════════════════════════════════════
     with tab6:
         st.markdown("### 😊 INDICE DE CONFIANCE DES CONSOMMATEURS")
-        st.info("💡 USA : UMich Sentiment (FRED UMCSENT). EU : BCE SOI. Autres : données officielles.")
+        st.info("💡 USA : UMich Sentiment (FED UMCSENT). EU : BCE SOI. Autres : données officielles.")
         cols = st.columns(len(pays_selectionnes))
         for i, pays in enumerate(pays_selectionnes):
             with cols[i % len(cols)]:
@@ -1048,6 +1048,6 @@ def show_economie():
     st.markdown("---")
     st.caption(
         f"⏱️ Données actualisées le {datetime.now().strftime('%d/%m/%Y à %H:%M')} | "
-        "Sources primaires : FRED (Federal Reserve) · BCE Statistical Data Warehouse · "
+        "Sources primaires : FED (Federal Reserve) · BCE Statistical Data Warehouse · "
         "World Bank Open Data · yfinance | Fallback : données officielles mars 2026"
     )
