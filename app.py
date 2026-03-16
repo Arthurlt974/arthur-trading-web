@@ -911,17 +911,35 @@ def show_staking():
 # ============================================================
 
 def get_crypto_price(symbol):
+    """Prix crypto — Binance → CoinGecko → yfinance."""
+    # Source 1 : Binance
     try:
         url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}USDT"
-        res = requests.get(url, timeout=2).json()
-        return float(res['price'])
+        res = requests.get(url, timeout=3).json()
+        if res.get('price'):
+            return float(res['price'])
     except:
-        try:
-            tkr = symbol + "-USD"
-            data = yf.Ticker(tkr).fast_info
-            return data['last_price']
-        except:
-            return None
+        pass
+    # Source 2 : CoinGecko (gratuit, pas de clé)
+    try:
+        cg_map = {"BTC":"bitcoin","ETH":"ethereum","SOL":"solana",
+                  "BNB":"binancecoin","XRP":"ripple","ADA":"cardano",
+                  "DOGE":"dogecoin","DOT":"polkadot","MATIC":"matic-network",
+                  "AVAX":"avalanche-2","LINK":"chainlink","UNI":"uniswap"}
+        cg_id = cg_map.get(symbol.upper(), symbol.lower())
+        url2 = f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd"
+        r2 = requests.get(url2, timeout=4).json()
+        if r2.get(cg_id, {}).get("usd"):
+            return float(r2[cg_id]["usd"])
+    except:
+        pass
+    # Source 3 : yfinance fast_info
+    try:
+        tkr = symbol + "-USD"
+        data = yf.Ticker(tkr).fast_info
+        return float(data['last_price'])
+    except:
+        return None
 
 
 # ============================================================
@@ -1367,7 +1385,34 @@ def get_ticker_info(ticker):
         except Exception:
             pass
 
-    # B3 : yfinance brut si toujours vide
+    # B3 : Yahoo Finance API v8 direct (contourne le blocage yfinance)
+    if len(yf_info) < 5:
+        try:
+            import requests as _rq
+            _hdrs = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://finance.yahoo.com",
+            }
+            _url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=price,summaryDetail,defaultKeyStatistics,financialData,assetProfile"
+            _r = _rq.get(_url, headers=_hdrs, timeout=6)
+            if _r.status_code == 200:
+                _d = _r.json().get("quoteSummary", {}).get("result", [{}])[0]
+                _merged = {}
+                for _mod in _d.values():
+                    if isinstance(_mod, dict):
+                        for _k, _v in _mod.items():
+                            if isinstance(_v, dict) and "raw" in _v:
+                                _merged[_k] = _v["raw"]
+                            elif not isinstance(_v, dict):
+                                _merged[_k] = _v
+                if len(_merged) > 5:
+                    yf_info = _merged
+        except Exception:
+            pass
+
+    # B3b : yfinance brut si toujours vide
     if len(yf_info) < 5:
         try:
             yf_info = yf.Ticker(ticker).info or {}
@@ -1398,7 +1443,43 @@ def get_ticker_info(ticker):
             if yf_info.get(k) not in (None, '', 0):
                 info[k] = yf_info[k]
 
-    # B4 : fast_info pour le prix si tout a échoué
+    # B4a : CoinGecko pour la crypto
+    if not info.get('currentPrice') and ("-USD" in ticker.upper() or "USD" == ticker[-3:]):
+        try:
+            sym = ticker.replace("-USD","").replace("USD","").upper()
+            cg_map = {"BTC":"bitcoin","ETH":"ethereum","SOL":"solana",
+                      "BNB":"binancecoin","XRP":"ripple","ADA":"cardano",
+                      "DOGE":"dogecoin","DOT":"polkadot","AVAX":"avalanche-2"}
+            cg_id = cg_map.get(sym, sym.lower())
+            import requests as _rcg
+            _rcg_r = _rcg.get(
+                f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd&include_24hr_change=true",
+                timeout=5)
+            _rcg_d = _rcg_r.json().get(cg_id, {})
+            if _rcg_d.get("usd"):
+                info['currentPrice'] = info['regularMarketPrice'] = float(_rcg_d["usd"])
+                info['currency'] = 'USD'
+                if _rcg_d.get("usd_24h_change"):
+                    info['regularMarketChangePercent'] = float(_rcg_d["usd_24h_change"])
+        except Exception:
+            pass
+
+    # B4b : Binance pour la crypto
+    if not info.get('currentPrice') and ("-USD" in ticker.upper() or ticker.upper() in ["BTCUSD","ETHUSD"]):
+        try:
+            sym = ticker.replace("-USD","").upper()
+            import requests as _rbn
+            _rbn_r = _rbn.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}USDT", timeout=3)
+            _rbn_d = _rbn_r.json()
+            if _rbn_d.get("lastPrice"):
+                info['currentPrice'] = info['regularMarketPrice'] = float(_rbn_d["lastPrice"])
+                info['previousClose'] = float(_rbn_d.get("prevClosePrice", _rbn_d["lastPrice"]))
+                info['volume'] = float(_rbn_d.get("volume", 0))
+                info['currency'] = 'USD'
+        except Exception:
+            pass
+
+    # B4c : fast_info yfinance
     if not info.get('currentPrice'):
         try:
             fi = yf.Ticker(ticker).fast_info
@@ -2292,23 +2373,51 @@ if categorie == "ACCUEIL":
     # ── Fetch données ──
     @st.cache_data(ttl=60)
     def _fetch_accueil_data():
-        import yfinance as yf
+        """Prix accueil — Yahoo Finance v2 direct → Binance/CoinGecko → yfinance."""
+        import yfinance as yf, requests as _rq
         results = {}
         tickers_map = {
             "BTC-USD": "BTC", "ETH-USD": "ETH",
             "^GSPC": "S&P 500", "^IXIC": "NASDAQ",
             "^FCHI": "CAC 40", "NVDA": "NVDA", "AAPL": "AAPL"
         }
+        # Batch Yahoo Finance v2 pour actions/indices
+        _hdrs = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36","Accept":"application/json","Referer":"https://finance.yahoo.com"}
+        action_syms = ["^GSPC","^IXIC","^FCHI","NVDA","AAPL"]
+        try:
+            _batch = ",".join(action_syms)
+            _r = _rq.get(f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={_batch}", headers=_hdrs, timeout=6)
+            if _r.status_code == 200:
+                for _q in _r.json().get("quoteResponse",{}).get("result",[]):
+                    sym = _q.get("symbol","")
+                    label = tickers_map.get(sym)
+                    if label:
+                        price = float(_q.get("regularMarketPrice",0))
+                        prev  = float(_q.get("regularMarketPreviousClose", price) or price)
+                        chg   = ((price-prev)/prev*100) if prev else float(_q.get("regularMarketChangePercent",0))
+                        results[label] = {"price": price, "chg": chg, "sym": sym}
+        except:
+            pass
+        # CoinGecko pour BTC et ETH
+        try:
+            _cg = _rq.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", timeout=5).json()
+            if _cg.get("bitcoin",{}).get("usd"):
+                results["BTC"] = {"price": float(_cg["bitcoin"]["usd"]), "chg": float(_cg["bitcoin"].get("usd_24h_change",0)), "sym":"BTC-USD"}
+            if _cg.get("ethereum",{}).get("usd"):
+                results["ETH"] = {"price": float(_cg["ethereum"]["usd"]), "chg": float(_cg["ethereum"].get("usd_24h_change",0)), "sym":"ETH-USD"}
+        except:
+            pass
+        # Fallback yfinance pour les manquants
         for sym, label in tickers_map.items():
-            try:
-                t = yf.Ticker(sym)
-                h = t.fast_info
-                price = h.last_price
-                prev  = h.previous_close
-                chg   = ((price - prev) / prev * 100) if prev else 0
-                results[label] = {"price": price, "chg": chg, "sym": sym}
-            except:
-                results[label] = {"price": 0, "chg": 0, "sym": sym}
+            if label not in results or results[label]["price"] == 0:
+                try:
+                    h = yf.Ticker(sym).fast_info
+                    price = h.last_price
+                    prev  = h.previous_close
+                    chg   = ((price-prev)/prev*100) if prev else 0
+                    results[label] = {"price": price, "chg": chg, "sym": sym}
+                except:
+                    results[label] = {"price": 0, "chg": 0, "sym": sym}
         return results
 
     @st.cache_data(ttl=300)
@@ -2331,19 +2440,43 @@ if categorie == "ACCUEIL":
 
     @st.cache_data(ttl=180)
     def _fetch_top_movers():
-        import yfinance as yf
-        watchlist = ["NVDA","AAPL","TSLA","MSFT","GOOGL","META","AMZN","BTC-USD","ETH-USD","AMD","NFLX","JPM"]
+        """Top movers — Yahoo Finance v2 batch → yfinance fallback."""
+        import yfinance as yf, requests as _rq
+        watchlist = ["NVDA","AAPL","TSLA","MSFT","GOOGL","META","AMZN","AMD","NFLX","JPM","BTC-USD","ETH-USD"]
         movers = []
+        _hdrs = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36","Accept":"application/json","Referer":"https://finance.yahoo.com"}
+        # Batch Yahoo Finance pour les actions
+        action_syms = [s for s in watchlist if "-USD" not in s]
+        try:
+            _r = _rq.get(f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={','.join(action_syms)}", headers=_hdrs, timeout=6)
+            if _r.status_code == 200:
+                for _q in _r.json().get("quoteResponse",{}).get("result",[]):
+                    price = float(_q.get("regularMarketPrice",0))
+                    prev  = float(_q.get("regularMarketPreviousClose", price) or price)
+                    chg   = ((price-prev)/prev*100) if prev else float(_q.get("regularMarketChangePercent",0))
+                    movers.append({"sym": _q["symbol"], "price": price, "chg": chg})
+        except:
+            pass
+        # CoinGecko pour crypto
+        try:
+            _cg = _rq.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", timeout=5).json()
+            if _cg.get("bitcoin",{}).get("usd"):
+                movers.append({"sym":"BTC", "price":float(_cg["bitcoin"]["usd"]), "chg":float(_cg["bitcoin"].get("usd_24h_change",0))})
+            if _cg.get("ethereum",{}).get("usd"):
+                movers.append({"sym":"ETH", "price":float(_cg["ethereum"]["usd"]), "chg":float(_cg["ethereum"].get("usd_24h_change",0))})
+        except:
+            pass
+        # Fallback yfinance pour les manquants
+        fetched = {m["sym"] for m in movers}
         for sym in watchlist:
-            try:
-                t = yf.Ticker(sym)
-                h = t.fast_info
-                price = h.last_price
-                prev  = h.previous_close
-                chg   = ((price - prev) / prev * 100) if prev else 0
-                movers.append({"sym": sym.replace("-USD",""), "price": price, "chg": chg})
-            except:
-                pass
+            clean = sym.replace("-USD","")
+            if clean not in fetched:
+                try:
+                    h = yf.Ticker(sym).fast_info
+                    price = h.last_price; prev = h.previous_close
+                    movers.append({"sym": clean, "price": price, "chg": ((price-prev)/prev*100) if prev else 0})
+                except:
+                    pass
         movers.sort(key=lambda x: x["chg"], reverse=True)
         return movers[:5], movers[-5:][::-1]
 
