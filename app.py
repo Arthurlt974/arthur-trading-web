@@ -1416,17 +1416,17 @@ def get_ticker_info(ticker):
                 info['country']              = _s("Country")
                 info['currency']             = _s("Currency") or "USD"
                 info['exchange']             = _s("Exchange")
-                info['trailingPE']           = _f("PERatio")
+                info['trailingPE']           = _f("TrailingPE") or _f("PERatio")
                 info['forwardPE']            = _f("ForwardPE")
-                info['trailingEps']          = _f("EPS")
+                info['trailingEps']          = _f("EPS") or _f("DilutedEPSTTM")
                 info['bookValue']            = _f("BookValue")
                 info['priceToBook']          = _f("PriceToBookRatio")
                 info['returnOnEquity']       = _f("ReturnOnEquityTTM")
                 info['returnOnAssets']       = _f("ReturnOnAssetsTTM")
                 info['profitMargins']        = _f("ProfitMargin")
                 info['operatingMargins']     = _f("OperatingMarginTTM")
-                info['revenueGrowth']        = _f("RevenueGrowthYOY")
-                info['earningsGrowth']       = _f("EarningsGrowthYOY")
+                info['revenueGrowth']        = _f("QuarterlyRevenueGrowthYOY")
+                info['earningsGrowth']       = _f("QuarterlyEarningsGrowthYOY")
                 info['dividendYield']        = _f("DividendYield")
                 info['dividendRate']         = _f("DividendPerShare")
                 info['marketCap']            = _f("MarketCapitalization")
@@ -1442,6 +1442,9 @@ def get_ticker_info(ticker):
                 info['grossMargins']         = _f("GrossProfitTTM")
                 info['freeCashflow']         = _f("FreeCashFlowTTM")
                 info['analystTargetPrice']   = _f("AnalystTargetPrice")
+                info['pegRatio']             = _f("PEGRatio")
+                info['priceToSales']         = _f("PriceToSalesRatioTTM")
+                info['ebitda']               = _f("EBITDA")
         except Exception:
             pass
 
