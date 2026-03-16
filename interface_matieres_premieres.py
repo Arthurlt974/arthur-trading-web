@@ -54,6 +54,30 @@ COMMODITIES = {
 
 @st.cache_data(ttl=120)
 def get_commodity_price(ticker):
+    """Prix matière première — Yahoo Finance v2 direct → fast_info fallback."""
+    # Source 1 : Yahoo Finance v2 API directe (contourne le blocage yfinance)
+    try:
+        import requests as _rq
+        _hdrs = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Referer": "https://finance.yahoo.com",
+        }
+        _r = _rq.get(
+            f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={ticker}",
+            headers=_hdrs, timeout=6)
+        if _r.status_code == 200:
+            _results = _r.json().get("quoteResponse", {}).get("result", [])
+            if _results:
+                _q = _results[0]
+                price      = float(_q.get("regularMarketPrice", 0))
+                prev_close = float(_q.get("regularMarketPreviousClose", price) or price)
+                change     = ((price - prev_close) / prev_close * 100) if prev_close else float(_q.get("regularMarketChangePercent", 0))
+                if price > 0:
+                    return {"price": price, "change": change, "prev": prev_close, "ok": True}
+    except:
+        pass
+    # Source 2 : yfinance fast_info fallback
     try:
         t = yf.Ticker(ticker)
         info = t.fast_info
@@ -66,6 +90,44 @@ def get_commodity_price(ticker):
 
 @st.cache_data(ttl=300)
 def get_commodity_history(ticker, period="3mo"):
+    """Historique — Yahoo Finance v2 chart API → yf.download fallback."""
+    # Source 1 : Yahoo Finance chart API directe
+    try:
+        import requests as _rq
+        period_map = {"1mo":"1mo","3mo":"3mo","6mo":"6mo","1y":"1y","2y":"2y","5y":"5y"}
+        _range = period_map.get(period, "3mo")
+        _hdrs = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Referer": "https://finance.yahoo.com",
+        }
+        _r = _rq.get(
+            f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range={_range}&interval=1d&includeAdjustedClose=true",
+            headers=_hdrs, timeout=8)
+        if _r.status_code == 200:
+            _data = _r.json().get("chart", {}).get("result", [{}])[0]
+            _ts   = _data.get("timestamp", [])
+            _ohlcv = _data.get("indicators", {}).get("quote", [{}])[0]
+            _adj   = _data.get("indicators", {}).get("adjclose", [{}])
+            if _ts and _ohlcv.get("close"):
+                import pandas as pd
+                from datetime import datetime
+                df = pd.DataFrame({
+                    "Date":   [datetime.utcfromtimestamp(t) for t in _ts],
+                    "Open":   _ohlcv.get("open", []),
+                    "High":   _ohlcv.get("high", []),
+                    "Low":    _ohlcv.get("low", []),
+                    "Close":  _ohlcv.get("close", []),
+                    "Volume": _ohlcv.get("volume", []),
+                })
+                if _adj:
+                    df["Adj Close"] = _adj[0].get("adjclose", df["Close"])
+                df = df.dropna(subset=["Close"])
+                if not df.empty:
+                    return df
+    except:
+        pass
+    # Source 2 : yf.download fallback
     try:
         df = yf.download(ticker, period=period, interval="1d",
                          progress=False, auto_adjust=True)
@@ -546,16 +608,12 @@ def _show_category(category):
 
 
 @st.cache_data(ttl=300)
-@st.cache_data(ttl=300)
 def _fetch_candles(ticker: str, period: str = "6mo", interval: str = "1d") -> list:
-    """Fetch OHLCV via yfinance."""
-    try:
-        df = yf.download(ticker, period=period, interval=interval,
-                         progress=False, auto_adjust=True)
-        if df.empty:
-            return []
-        if hasattr(df.columns, 'get_level_values'):
-            df.columns = df.columns.get_level_values(0)
+    """Fetch OHLCV — Yahoo Finance chart API directe → yf.download fallback."""
+    import requests as _rq
+    from datetime import datetime as _dt
+
+    def _parse_df(df):
         df = df.tail(300).reset_index()
         ts_col = "Datetime" if "Datetime" in df.columns else "Date"
         out = []
@@ -567,13 +625,53 @@ def _fetch_candles(ticker: str, period: str = "6mo", interval: str = "1d") -> li
                     "h": float(row["High"]),
                     "l": float(row["Low"]),
                     "c": float(row["Close"]),
-                    "v": float(row.get(t("volume"), 0) or 0),
+                    "v": float(row.get("Volume", 0) or 0),
                 })
             except Exception:
                 continue
         return out
+
+    # Source 1 : Yahoo Finance chart API directe
+    try:
+        _hdrs = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+            "Referer": "https://finance.yahoo.com",
+        }
+        _r = _rq.get(
+            f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?range={period}&interval={interval}&includeAdjustedClose=true",
+            headers=_hdrs, timeout=8)
+        if _r.status_code == 200:
+            _d   = _r.json().get("chart", {}).get("result", [{}])[0]
+            _ts  = _d.get("timestamp", [])
+            _q   = _d.get("indicators", {}).get("quote", [{}])[0]
+            if _ts and _q.get("close"):
+                import pandas as pd
+                df = pd.DataFrame({
+                    "Date":   [_dt.utcfromtimestamp(t) for t in _ts],
+                    "Open":   _q.get("open", []),
+                    "High":   _q.get("high", []),
+                    "Low":    _q.get("low", []),
+                    "Close":  _q.get("close", []),
+                    "Volume": _q.get("volume", []),
+                })
+                df = df.dropna(subset=["Close"])
+                if not df.empty:
+                    return _parse_df(df)
     except Exception as e:
-        print(f"[MP chart] {ticker}: {e}")
+        print(f"[MP chart YFv2] {ticker}: {e}")
+
+    # Source 2 : yf.download fallback
+    try:
+        df = yf.download(ticker, period=period, interval=interval,
+                         progress=False, auto_adjust=True)
+        if df.empty:
+            return []
+        if hasattr(df.columns, 'get_level_values'):
+            df.columns = df.columns.get_level_values(0)
+        return _parse_df(df)
+    except Exception as e:
+        print(f"[MP chart yf] {ticker}: {e}")
         return []
 
 
