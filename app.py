@@ -955,19 +955,26 @@ class ValuationCalculator:
         self.info = self._get_safe_info()
 
     def _get_safe_info(self):
-        """Utilise FMP en priorité, yfinance en fallback."""
-        # Réutilise get_ticker_info qui gère déjà FMP + fallbacks
+        """Cascade complète : get_ticker_info (AV+curl_cffi) → history fallback."""
+        # get_ticker_info contient déjà tous les fallbacks + yf.history garanti
         cached = get_ticker_info(self.symbol)
-        if cached:
+        if cached and cached.get('currentPrice'):
             return cached
-        # Fallback minimal yfinance
-        info = {}
+        # Dernier recours : history direct sans session
+        info = cached or {}
         try:
             hist = self.ticker.history(period="5d")
             if not hist.empty:
-                info['currentPrice'] = info['regularMarketPrice'] = float(hist['Close'].iloc[-1])
-                if len(hist) > 1: info['previousClose'] = float(hist['Close'].iloc[-2])
-        except Exception: pass
+                if isinstance(hist.columns, __import__('pandas').MultiIndex):
+                    hist.columns = hist.columns.get_level_values(0)
+                price = float(hist['Close'].iloc[-1])
+                info.setdefault('currentPrice', price)
+                info.setdefault('regularMarketPrice', price)
+                if len(hist) > 1:
+                    info.setdefault('previousClose', float(hist['Close'].iloc[-2]))
+                info.setdefault('currency', 'USD' if '.' not in self.symbol else 'EUR')
+        except Exception:
+            pass
         return info
 
     def dcf_valuation(self, growth_rate=0.05, discount_rate=0.10, years=5):
@@ -1349,6 +1356,7 @@ def _av_key():
     except Exception:
         return ""
 
+@st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
     """
     Récupère les infos — Alpha Vantage en priorité (fonctionne sur Streamlit Cloud),
@@ -1529,7 +1537,54 @@ def get_ticker_info(ticker):
     if not info.get('longName') and not info.get('shortName'):
         info['shortName'] = ticker.upper()
 
+    # ── Fallback garanti : yf.history() si toujours pas de prix ──
+    if not info.get('currentPrice') and not info.get('previousClose'):
+        try:
+            hist = yf.Ticker(ticker).history(period="5d")
+            if not hist.empty:
+                if isinstance(hist.columns, pd.MultiIndex):
+                    hist.columns = hist.columns.get_level_values(0)
+                price = float(hist['Close'].iloc[-1])
+                info['currentPrice']       = price
+                info['regularMarketPrice'] = price
+                if len(hist) > 1:
+                    info['previousClose'] = float(hist['Close'].iloc[-2])
+                    pct = (price / info['previousClose'] - 1) * 100
+                    info['regularMarketChangePercent'] = round(pct, 2)
+                info.setdefault('currency', 'USD' if '.' not in ticker else 'EUR')
+                # Récupérer les fondamentaux via income_stmt / balance_sheet
+                t_obj = yf.Ticker(ticker)
+                try:
+                    inc = t_obj.income_stmt
+                    bs  = t_obj.balance_sheet
+                    fi  = t_obj.fast_info
+                    shares = getattr(fi, 'shares', None)
+                    if inc is not None and not inc.empty and shares:
+                        for lbl in ['Net Income', 'NetIncome', 'Net Income Common Stockholders']:
+                            if lbl in inc.index:
+                                ni = float(inc.loc[lbl].iloc[0])
+                                info.setdefault('trailingEps', round(ni / float(shares), 3))
+                                info.setdefault('trailingPE', round(price / (ni / float(shares)), 1) if ni > 0 else None)
+                                break
+                    if bs is not None and not bs.empty and shares:
+                        for lbl in ['Stockholders Equity', 'Total Stockholders Equity', 'Common Stock Equity']:
+                            if lbl in bs.index:
+                                bv = float(bs.loc[lbl].iloc[0])
+                                info.setdefault('bookValue', round(bv / float(shares), 2))
+                                info.setdefault('priceToBook', round(price / (bv / float(shares)), 2))
+                                break
+                    mktcap = getattr(fi, 'market_cap', None)
+                    if mktcap: info.setdefault('marketCap', float(mktcap))
+                    info.setdefault('sharesOutstanding', float(shares) if shares else None)
+                    info.setdefault('sector', getattr(fi, 'sector', None))
+                    info.setdefault('shortName', getattr(fi, 'display_name', ticker.upper()))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     return info if info.get('currentPrice') or info.get('previousClose') else None
+
 @st.cache_data(ttl=900, show_spinner=False)
 def get_valuation_cached(ticker: str) -> dict:
     """Wrapper cached autour de ValuationCalculator — évite les appels yfinance répétés."""
@@ -1932,53 +1987,15 @@ if "multi_charts" not in st.session_state:
 
 st.markdown("""
     <style>
-    /* ── Transitions fluides entre pages ── */
-
-    /* Fade-in du contenu principal à chaque rerun */
-    [data-testid="stAppViewContainer"] {
-        animation: amFadeIn 0.25s ease-out !important;
-    }
-    @keyframes amFadeIn {
-        from { opacity: 0; transform: translateY(6px); }
-        to   { opacity: 1; transform: translateY(0);   }
-    }
-
-    /* Sidebar — slide-in depuis la gauche */
-    [data-testid="stSidebar"] > div:first-child {
-        animation: amSlideIn 0.2s ease-out !important;
-    }
-    @keyframes amSlideIn {
-        from { opacity: 0; transform: translateX(-8px); }
-        to   { opacity: 1; transform: translateX(0);    }
-    }
-
-    /* Boutons nav — transition hover fluide */
-    .stButton > button {
-        transition: background-color 0.15s ease, color 0.15s ease,
-                    border-color 0.15s ease, box-shadow 0.15s ease !important;
-    }
-    .stButton > button:hover {
-        box-shadow: 0 0 12px rgba(255,152,0,0.25) !important;
-        transform: translateY(-1px) !important;
-        transition: all 0.15s ease !important;
-    }
-
-    /* Metrics — fade-in décalé */
-    [data-testid="stMetric"] {
-        animation: amFadeIn 0.3s ease-out !important;
-    }
-
-    /* Tabs — transition douce */
-    button[data-baseweb="tab"] {
-        transition: color 0.15s ease, border-color 0.15s ease !important;
-    }
-
-    /* Supprimer le flash blanc au chargement */
+    /* Supprimer le flash/assombrissement au rerun */
     [data-testid="stApp"] {
-        background-color: #0d0d0d !important;
+        transition: none !important;
     }
-
-    /* Masquer l'overlay de chargement natif Streamlit */
+    [data-testid="stAppViewContainer"] > div {
+        animation: none !important;
+        transition: none !important;
+    }
+    /* Masquer l'overlay de chargement */
     .stSpinner, [data-testid="stStatusWidget"] {
         display: none !important;
     }
