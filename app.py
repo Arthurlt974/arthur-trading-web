@@ -1359,13 +1359,13 @@ def _av_key():
 @st.cache_data(ttl=600, show_spinner=False)
 def get_ticker_info(ticker):
     """
-    Récupère les infos — Alpha Vantage en priorité (fonctionne sur Streamlit Cloud),
-    curl_cffi yfinance en fallback, CoinGecko/Binance pour la crypto.
+    Récupère les infos — yfinance en priorité, Alpha Vantage en complément.
+    Cascade : yfinance.info → income_stmt/balance_sheet → history → Alpha Vantage
     """
     import requests as _rq
     info = {}
 
-    # ══ CRYPTO : CoinGecko + Binance (jamais bloqués) ══
+    # ══ CRYPTO : CoinGecko + Binance ══
     is_crypto = "-USD" in ticker.upper() or ticker.upper().endswith("USDT")
     if is_crypto:
         try:
@@ -1386,7 +1386,6 @@ def get_ticker_info(ticker):
                 info['shortName'] = sym
         except Exception:
             pass
-        # Binance fallback crypto
         if not info.get('currentPrice'):
             try:
                 sym = ticker.replace("-USD","").upper()
@@ -1399,148 +1398,87 @@ def get_ticker_info(ticker):
                 pass
         return info if info.get('currentPrice') else None
 
-    # ══ ACTIONS — Alpha Vantage pour US, curl_cffi yfinance pour les autres ══
-    is_us = '.' not in ticker and not ticker.endswith('=F')  # MC.PA, TTE.PA = non-US
-    av_key = _av_key()
-    if av_key and is_us:
-        # GLOBAL_QUOTE → prix en temps réel
+    # ══ ACTIONS — yfinance EN PREMIER ══
+    t_obj = yf.Ticker(ticker)
+
+    # Étape 1 : yfinance.info via curl_cffi (contourne le blocage Yahoo)
+    yf_info = {}
+    try:
+        from curl_cffi.requests import Session as CurlSession
+        with CurlSession(impersonate="chrome") as s:
+            full = yf.Ticker(ticker, session=s).info or {}
+            if len(full) > 10:
+                yf_info = full
+    except Exception:
+        pass
+
+    # Étape 2 : yfinance.info brut si curl_cffi a échoué
+    if len(yf_info) < 5:
         try:
-            _r1 = _rq.get("https://www.alphavantage.co/query", params={
-                "function": "GLOBAL_QUOTE", "symbol": ticker, "apikey": av_key
-            }, timeout=10)
-            _q = _r1.json().get("Global Quote", {})
-            if _q.get("05. price"):
-                info['currentPrice']       = float(_q["05. price"])
-                info['regularMarketPrice'] = float(_q["05. price"])
-                info['previousClose']      = float(_q.get("08. previous close") or _q["05. price"])
-                info['volume']             = int(float(_q.get("06. volume") or 0))
-                chg = _q.get("10. change percent", "0%").replace("%","")
-                info['regularMarketChangePercent'] = float(chg) if chg else 0
-                info['fiftyTwoWeekHigh']   = float(_q.get("03. high") or 0) or None
-                info['fiftyTwoWeekLow']    = float(_q.get("04. low") or 0) or None
+            yf_info = t_obj.info or {}
         except Exception:
             pass
 
-        # OVERVIEW → tous les fondamentaux
-        try:
-            _r2 = _rq.get("https://www.alphavantage.co/query", params={
-                "function": "OVERVIEW", "symbol": ticker, "apikey": av_key
-            }, timeout=10)
-            _ov = _r2.json()
-            if _ov.get("Symbol"):
-                def _f(k): 
-                    v = _ov.get(k)
-                    try: return float(v) if v and v != "None" else None
-                    except: return None
-                def _s(k): 
-                    v = _ov.get(k)
-                    return v if v and v != "None" else None
+    # Copier toutes les clés yfinance dans info
+    YF_KEYS = [
+        'currentPrice','regularMarketPrice','previousClose','currency',
+        'trailingPE','forwardPE','trailingEps','bookValue','priceToBook',
+        'sector','industry','shortName','longName','longBusinessSummary',
+        'marketCap','sharesOutstanding','debtToEquity','dividendYield',
+        'dividendRate','payoutRatio','returnOnEquity','returnOnAssets',
+        'profitMargins','operatingMargins','grossMargins','revenueGrowth',
+        'earningsGrowth','totalRevenue','freeCashflow','totalDebt','totalCash',
+        'beta','fiftyTwoWeekHigh','fiftyTwoWeekLow','fiftyDayAverage',
+        'twoHundredDayAverage','volume','country','fullTimeEmployees',
+        'analystTargetPrice','pegRatio','priceToSales','ebitda',
+        'totalCashPerShare','exchange',
+    ]
+    for k in YF_KEYS:
+        val = yf_info.get(k)
+        if val not in (None, '', 0):
+            info[k] = val
 
-                info['shortName']            = _s("Name") or ticker.upper()
-                info['longName']             = _s("Name") or ticker.upper()
-                info['sector']               = _s("Sector")
-                info['industry']             = _s("Industry")
-                info['longBusinessSummary']  = _s("Description")
-                info['country']              = _s("Country")
-                info['currency']             = _s("Currency") or "USD"
-                info['exchange']             = _s("Exchange")
-                info['trailingPE']           = _f("TrailingPE") or _f("PERatio")
-                info['forwardPE']            = _f("ForwardPE")
-                info['trailingEps']          = _f("EPS") or _f("DilutedEPSTTM")
-                info['bookValue']            = _f("BookValue")
-                info['priceToBook']          = _f("PriceToBookRatio")
-                info['returnOnEquity']       = _f("ReturnOnEquityTTM")
-                info['returnOnAssets']       = _f("ReturnOnAssetsTTM")
-                info['profitMargins']        = _f("ProfitMargin")
-                info['operatingMargins']     = _f("OperatingMarginTTM")
-                info['revenueGrowth']        = _f("QuarterlyRevenueGrowthYOY")
-                info['earningsGrowth']       = _f("QuarterlyEarningsGrowthYOY")
-                info['dividendYield']        = _f("DividendYield")
-                info['dividendRate']         = _f("DividendPerShare")
-                info['marketCap']            = _f("MarketCapitalization")
-                info['beta']                 = _f("Beta")
-                info['fiftyTwoWeekHigh']     = _f("52WeekHigh") or info.get('fiftyTwoWeekHigh')
-                info['fiftyTwoWeekLow']      = _f("52WeekLow")  or info.get('fiftyTwoWeekLow')
-                info['fiftyDayAverage']      = _f("50DayMovingAverage")
-                info['twoHundredDayAverage'] = _f("200DayMovingAverage")
-                info['sharesOutstanding']    = _f("SharesOutstanding")
-                info['debtToEquity']         = _f("DebtToEquityRatio")
-                info['fullTimeEmployees']    = _f("FullTimeEmployees")
-                info['totalRevenue']         = _f("RevenueTTM")
-                info['grossMargins']         = _f("GrossProfitTTM")
-                info['freeCashflow']         = _f("FreeCashFlowTTM")
-                info['analystTargetPrice']   = _f("AnalystTargetPrice")
-                info['pegRatio']             = _f("PEGRatio")
-                info['priceToSales']         = _f("PriceToSalesRatioTTM")
-                info['ebitda']               = _f("EBITDA")
-                # Calculs dérivés — AV ne les fournit pas directement
-                _eps    = _f("EPS") or _f("DilutedEPSTTM") or 0
-                _div    = _f("DividendPerShare") or 0
-                _rev    = _f("RevenueTTM") or 0
-                _shares = _f("SharesOutstanding") or 0
-                _cash   = _f("CashAndCashEquivalentsBalanceSheet") or _f("CashAndShortTermInvestments") or 0
-                # Payout Ratio = Dividende / EPS
-                if _eps and _eps > 0 and _div:
-                    info['payoutRatio'] = round(_div / _eps, 4)
-                # Cash per Share = Cash total / Nombre d'actions
-                if _cash and _shares and _shares > 0:
-                    info['totalCashPerShare'] = round(_cash / _shares, 4)
-                # Données supplémentaires DCF
-                info['totalCash']  = _f("CashAndCashEquivalentsBalanceSheet") or _f("CashAndShortTermInvestments")
-                info['totalDebt']  = _f("LongTermDebtBalanceSheet") or _f("ShortLongTermDebtTotal")
-                info['freeCashflow'] = _f("FreeCashFlowTTM") or _f("OperatingCashflowTTM")
+    # Étape 3 : income_stmt + balance_sheet si manque fondamentaux
+    if not info.get('trailingEps') or not info.get('trailingPE'):
+        try:
+            fi     = t_obj.fast_info
+            shares = getattr(fi, 'shares', None)
+            price  = info.get('currentPrice') or getattr(fi, 'last_price', None)
+
+            inc = t_obj.income_stmt
+            if inc is not None and not inc.empty and shares and float(shares) > 0:
+                for lbl in ['Net Income', 'NetIncome', 'Net Income Common Stockholders']:
+                    if lbl in inc.index:
+                        ni  = float(inc.loc[lbl].iloc[0])
+                        eps = round(ni / float(shares), 3)
+                        info.setdefault('trailingEps', eps)
+                        if price and price > 0 and ni > 0:
+                            info.setdefault('trailingPE', round(float(price) / eps, 1))
+                        break
+
+            bs = t_obj.balance_sheet
+            if bs is not None and not bs.empty and shares and float(shares) > 0:
+                for lbl in ['Stockholders Equity','Total Stockholders Equity','Common Stock Equity']:
+                    if lbl in bs.index:
+                        bv = float(bs.loc[lbl].iloc[0])
+                        bvps = round(bv / float(shares), 2)
+                        info.setdefault('bookValue', bvps)
+                        if price and price > 0:
+                            info.setdefault('priceToBook', round(float(price) / bvps, 2))
+                        break
+
+            if not info.get('marketCap'):
+                mc = getattr(fi, 'market_cap', None)
+                if mc: info['marketCap'] = float(mc)
+            if not info.get('sharesOutstanding') and shares:
+                info['sharesOutstanding'] = float(shares)
         except Exception:
             pass
 
-    # ══ Non-US ou fallback : curl_cffi + yfinance ══
-    if not is_us or not info.get('currentPrice') or not info.get('trailingPE'):
-        yf_info = {}
-        # curl_cffi
+    # Étape 4 : history pour le prix si toujours absent
+    if not info.get('currentPrice'):
         try:
-            from curl_cffi.requests import Session as CurlSession
-            with CurlSession(impersonate="chrome") as s:
-                full = yf.Ticker(ticker, session=s).info or {}
-                if len(full) > 10:
-                    yf_info = full
-        except Exception:
-            pass
-        # yfinance brut
-        if len(yf_info) < 5:
-            try:
-                yf_info = yf.Ticker(ticker).info or {}
-            except Exception:
-                pass
-        # Fusion yfinance → combler les trous
-        YF_KEYS = [
-            'currentPrice','regularMarketPrice','previousClose','currency',
-            'trailingPE','forwardPE','trailingEps','bookValue','priceToBook',
-            'sector','industry','shortName','longName','longBusinessSummary',
-            'marketCap','sharesOutstanding','debtToEquity','dividendYield',
-            'dividendRate','returnOnEquity','returnOnAssets','profitMargins',
-            'operatingMargins','grossMargins','revenueGrowth','earningsGrowth',
-            'totalRevenue','freeCashflow','totalDebt','totalCash','beta',
-            'fiftyTwoWeekHigh','fiftyTwoWeekLow','fiftyDayAverage',
-            'twoHundredDayAverage','volume','country','fullTimeEmployees',
-        ]
-        for k in YF_KEYS:
-            val = yf_info.get(k)
-            if val not in (None, '', 0) and info.get(k) in (None, '', 0, None):
-                info[k] = val
-
-    # ── Defaults ──
-    if not info.get('previousClose') and info.get('currentPrice'):
-        info['previousClose'] = info['currentPrice']
-    if not info.get('regularMarketPrice') and info.get('currentPrice'):
-        info['regularMarketPrice'] = info['currentPrice']
-    if not info.get('currency'):
-        info['currency'] = 'USD' if '.' not in ticker else 'EUR'
-    if not info.get('longName') and not info.get('shortName'):
-        info['shortName'] = ticker.upper()
-
-    # ── Fallback garanti : yf.history() si toujours pas de prix ──
-    if not info.get('currentPrice') and not info.get('previousClose'):
-        try:
-            hist = yf.Ticker(ticker).history(period="5d")
+            hist = t_obj.history(period="5d")
             if not hist.empty:
                 if isinstance(hist.columns, pd.MultiIndex):
                     hist.columns = hist.columns.get_level_values(0)
@@ -1548,40 +1486,59 @@ def get_ticker_info(ticker):
                 info['currentPrice']       = price
                 info['regularMarketPrice'] = price
                 if len(hist) > 1:
-                    info['previousClose'] = float(hist['Close'].iloc[-2])
-                    pct = (price / info['previousClose'] - 1) * 100
-                    info['regularMarketChangePercent'] = round(pct, 2)
-                info.setdefault('currency', 'USD' if '.' not in ticker else 'EUR')
-                # Récupérer les fondamentaux via income_stmt / balance_sheet
-                t_obj = yf.Ticker(ticker)
-                try:
-                    inc = t_obj.income_stmt
-                    bs  = t_obj.balance_sheet
-                    fi  = t_obj.fast_info
-                    shares = getattr(fi, 'shares', None)
-                    if inc is not None and not inc.empty and shares:
-                        for lbl in ['Net Income', 'NetIncome', 'Net Income Common Stockholders']:
-                            if lbl in inc.index:
-                                ni = float(inc.loc[lbl].iloc[0])
-                                info.setdefault('trailingEps', round(ni / float(shares), 3))
-                                info.setdefault('trailingPE', round(price / (ni / float(shares)), 1) if ni > 0 else None)
-                                break
-                    if bs is not None and not bs.empty and shares:
-                        for lbl in ['Stockholders Equity', 'Total Stockholders Equity', 'Common Stock Equity']:
-                            if lbl in bs.index:
-                                bv = float(bs.loc[lbl].iloc[0])
-                                info.setdefault('bookValue', round(bv / float(shares), 2))
-                                info.setdefault('priceToBook', round(price / (bv / float(shares)), 2))
-                                break
-                    mktcap = getattr(fi, 'market_cap', None)
-                    if mktcap: info.setdefault('marketCap', float(mktcap))
-                    info.setdefault('sharesOutstanding', float(shares) if shares else None)
-                    info.setdefault('sector', getattr(fi, 'sector', None))
-                    info.setdefault('shortName', getattr(fi, 'display_name', ticker.upper()))
-                except Exception:
-                    pass
+                    prev = float(hist['Close'].iloc[-2])
+                    info['previousClose'] = prev
+                    info['regularMarketChangePercent'] = round((price / prev - 1) * 100, 2)
         except Exception:
             pass
+
+    # Étape 5 : Alpha Vantage pour compléter les trous (si clé configurée)
+    av_key = _av_key()
+    is_us  = '.' not in ticker and not ticker.endswith('=F')
+    if av_key and is_us and info.get('currentPrice'):
+        try:
+            _r2 = _rq.get("https://www.alphavantage.co/query", params={
+                "function": "OVERVIEW", "symbol": ticker, "apikey": av_key
+            }, timeout=8)
+            _ov = _r2.json()
+            if _ov.get("Symbol"):
+                def _f(k):
+                    v = _ov.get(k)
+                    try: return float(v) if v and v != "None" else None
+                    except: return None
+                def _s(k):
+                    v = _ov.get(k)
+                    return v if v and v != "None" else None
+                # Compléter seulement les champs manquants
+                for dst, src in [
+                    ('sector',_s("Sector")),('industry',_s("Industry")),
+                    ('longBusinessSummary',_s("Description")),
+                    ('trailingPE',_f("TrailingPE") or _f("PERatio")),
+                    ('forwardPE',_f("ForwardPE")),
+                    ('trailingEps',_f("EPS") or _f("DilutedEPSTTM")),
+                    ('bookValue',_f("BookValue")),('priceToBook',_f("PriceToBookRatio")),
+                    ('returnOnEquity',_f("ReturnOnEquityTTM")),
+                    ('beta',_f("Beta")),('analystTargetPrice',_f("AnalystTargetPrice")),
+                    ('pegRatio',_f("PEGRatio")),('ebitda',_f("EBITDA")),
+                    ('totalRevenue',_f("RevenueTTM")),
+                    ('freeCashflow',_f("FreeCashFlowTTM") or _f("OperatingCashflowTTM")),
+                    ('totalDebt',_f("LongTermDebtBalanceSheet") or _f("ShortLongTermDebtTotal")),
+                    ('dividendYield',_f("DividendYield")),
+                    ('fiftyTwoWeekHigh',_f("52WeekHigh")),('fiftyTwoWeekLow',_f("52WeekLow")),
+                ]:
+                    if src and not info.get(dst):
+                        info[dst] = src
+        except Exception:
+            pass
+
+    # ── Defaults finaux ──
+    if not info.get('previousClose') and info.get('currentPrice'):
+        info['previousClose'] = info['currentPrice']
+    if not info.get('regularMarketPrice') and info.get('currentPrice'):
+        info['regularMarketPrice'] = info['currentPrice']
+    info.setdefault('currency', 'USD' if '.' not in ticker else 'EUR')
+    if not info.get('longName') and not info.get('shortName'):
+        info['shortName'] = ticker.upper()
 
     return info if info.get('currentPrice') or info.get('previousClose') else None
 
