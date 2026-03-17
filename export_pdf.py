@@ -77,7 +77,7 @@ def _styles():
 # ══════════════════════════════════════════
 def _chart_image(ticker: str, width_mm=170, height_mm=70) -> RLImage | None:
     try:
-        df = yf.download(ticker, period="6mo", progress=False, auto_adjust=True)
+        df = yf.download(ticker, period="6mo", auto_adjust=True)
         if df.empty:
             return None
         if isinstance(df.columns, pd.MultiIndex):
