@@ -1728,7 +1728,7 @@ def _plotly_candle_pro(symbol, height=600):
         # Fallback Plotly si render_chart échoue
         try:
             from plotly.subplots import make_subplots
-            df = yf.download(symbol, period="6mo", auto_adjust=True)
+            df = yf.download(symbol, period="6mo", progress=False, auto_adjust=True)
             if df.empty:
                 st.warning(f"Pas de données pour {symbol}")
                 return
@@ -1799,7 +1799,7 @@ def afficher_mini_graphique(symbol, chart_id):
     if _is_european(symbol):
         # Plotly mini pour EU
         try:
-            df = yf.download(symbol, period="3mo", auto_adjust=True)
+            df = yf.download(symbol, period="3mo", progress=False, auto_adjust=True)
             if df.empty:
                 st.warning(f"Pas de données pour {symbol}")
                 return
@@ -1932,15 +1932,53 @@ if "multi_charts" not in st.session_state:
 
 st.markdown("""
     <style>
-    /* Supprimer le flash/assombrissement au rerun */
+    /* ── Transitions fluides entre pages ── */
+
+    /* Fade-in du contenu principal à chaque rerun */
+    [data-testid="stAppViewContainer"] {
+        animation: amFadeIn 0.25s ease-out !important;
+    }
+    @keyframes amFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0);   }
+    }
+
+    /* Sidebar — slide-in depuis la gauche */
+    [data-testid="stSidebar"] > div:first-child {
+        animation: amSlideIn 0.2s ease-out !important;
+    }
+    @keyframes amSlideIn {
+        from { opacity: 0; transform: translateX(-8px); }
+        to   { opacity: 1; transform: translateX(0);    }
+    }
+
+    /* Boutons nav — transition hover fluide */
+    .stButton > button {
+        transition: background-color 0.15s ease, color 0.15s ease,
+                    border-color 0.15s ease, box-shadow 0.15s ease !important;
+    }
+    .stButton > button:hover {
+        box-shadow: 0 0 12px rgba(255,152,0,0.25) !important;
+        transform: translateY(-1px) !important;
+        transition: all 0.15s ease !important;
+    }
+
+    /* Metrics — fade-in décalé */
+    [data-testid="stMetric"] {
+        animation: amFadeIn 0.3s ease-out !important;
+    }
+
+    /* Tabs — transition douce */
+    button[data-baseweb="tab"] {
+        transition: color 0.15s ease, border-color 0.15s ease !important;
+    }
+
+    /* Supprimer le flash blanc au chargement */
     [data-testid="stApp"] {
-        transition: none !important;
+        background-color: #0d0d0d !important;
     }
-    [data-testid="stAppViewContainer"] > div {
-        animation: none !important;
-        transition: none !important;
-    }
-    /* Masquer l'overlay de chargement */
+
+    /* Masquer l'overlay de chargement natif Streamlit */
     .stSpinner, [data-testid="stStatusWidget"] {
         display: none !important;
     }
@@ -2884,10 +2922,7 @@ components.html(marquee_html, height=60)
 # OUTIL : GRAPHIQUE CRYPTO (AM.TERMINAL)
 # ==========================================
 if outil == "GRAPHIQUE CRYPTO":
-    try:
-        from chart_module import render_chart
-    except ImportError:
-        render_chart = None
+    from chart_module import render_chart
     import time as _t
 
     st.markdown("""
@@ -2920,10 +2955,7 @@ if outil == "GRAPHIQUE CRYPTO":
 
     symbol, pair_label = CRYPTOS_DISPO[choix]
 
-    if render_chart is None:
-        st.error("❌ chart_module.py manquant — contactez l'administrateur.")
-    else:
-        _html = render_chart(
+    _html = render_chart(
         symbol=symbol,
         interval=tf_choix,
         limit=200,
@@ -3500,7 +3532,7 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                     safe_period = "3mo"
                     st.warning("⚠️ Période ajustée à 3mo — SMA50 nécessite au moins 50 jours de données.")
 
-                df = yf.download(ticker_tech, period=safe_period, auto_adjust=True)
+                df = yf.download(ticker_tech, period=safe_period, progress=False, auto_adjust=True)
                 if df.empty:
                     st.error("Aucune donnée disponible pour ce ticker.")
                 else:
@@ -3761,7 +3793,7 @@ elif outil == "FIBONACCI CALCULATOR":
     if st.button("🚀 CALCULER FIBONACCI", key="fib_calc"):
         try:
             with st.spinner("Calcul des niveaux Fibonacci..."):
-                df_fib = yf.download(ticker_fib, period=period_fib)
+                df_fib = yf.download(ticker_fib, period=period_fib, progress=False)
                 if df_fib.empty:
                     st.error("Aucune donnée disponible")
                 else:
@@ -3961,7 +3993,7 @@ elif outil == "BACKTESTING ENGINE":
     if st.button("🚀 LANCER LE BACKTEST", key="bt_launch"):
         try:
             with st.spinner("Backtesting en cours..."):
-                df_bt = yf.download(ticker_bt, period=period_bt)
+                df_bt = yf.download(ticker_bt, period=period_bt, progress=False)
                 if df_bt.empty:
                     st.error("Aucune donnée disponible")
                 else:
@@ -5506,10 +5538,7 @@ elif outil == "CORRÉLATION DASH":
     }
     with st.spinner('Calculating correlations...'):
         try:
-            _raw_corr = yf.download(list(assets.keys()), period="60d", interval="1d")
-            if isinstance(_raw_corr.columns, pd.MultiIndex):
-                _raw_corr.columns = _raw_corr.columns.get_level_values(0)
-            data = _raw_corr['Close'] if 'Close' in _raw_corr.columns else _raw_corr
+            data = yf.download(list(assets.keys()), period="60d", interval="1d")['Close']
             returns = data.pct_change().dropna()
             corr_matrix = returns.corr()
             corr_matrix.columns = [assets[c] for c in corr_matrix.columns]
@@ -5613,7 +5642,7 @@ elif outil == "HEATMAP MARCHÉ":
 
                 for ticker_item, sector in tickers_list:
                     try:
-                        df = yf.download(ticker_item, period=period)
+                        df = yf.download(ticker_item, period=period, progress=False)
                         if not df.empty:
                             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
                             # Variation : dernière clôture vs avant-dernière (J0 vs J-1)
