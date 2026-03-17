@@ -122,7 +122,7 @@ def _get_price(ticker_yf: str) -> float | None:
 @st.cache_data(ttl=60, show_spinner=False)
 def _get_price_history(ticker_yf: str, period: str = "1y") -> pd.DataFrame:
     try:
-        df = yf.download(ticker_yf, period=period, progress=False, auto_adjust=True)
+        df = yf.download(ticker_yf, period=period, auto_adjust=True)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         return df[["Close"]].dropna()
