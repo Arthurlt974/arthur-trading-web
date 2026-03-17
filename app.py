@@ -1728,7 +1728,7 @@ def _plotly_candle_pro(symbol, height=600):
         # Fallback Plotly si render_chart échoue
         try:
             from plotly.subplots import make_subplots
-            df = yf.download(symbol, period="6mo", progress=False, auto_adjust=True)
+            df = yf.download(symbol, period="6mo", auto_adjust=True)
             if df.empty:
                 st.warning(f"Pas de données pour {symbol}")
                 return
@@ -1799,7 +1799,7 @@ def afficher_mini_graphique(symbol, chart_id):
     if _is_european(symbol):
         # Plotly mini pour EU
         try:
-            df = yf.download(symbol, period="3mo", progress=False, auto_adjust=True)
+            df = yf.download(symbol, period="3mo", auto_adjust=True)
             if df.empty:
                 st.warning(f"Pas de données pour {symbol}")
                 return
@@ -2884,7 +2884,10 @@ components.html(marquee_html, height=60)
 # OUTIL : GRAPHIQUE CRYPTO (AM.TERMINAL)
 # ==========================================
 if outil == "GRAPHIQUE CRYPTO":
-    from chart_module import render_chart
+    try:
+        from chart_module import render_chart
+    except ImportError:
+        render_chart = None
     import time as _t
 
     st.markdown("""
@@ -2917,7 +2920,10 @@ if outil == "GRAPHIQUE CRYPTO":
 
     symbol, pair_label = CRYPTOS_DISPO[choix]
 
-    _html = render_chart(
+    if render_chart is None:
+        st.error("❌ chart_module.py manquant — contactez l'administrateur.")
+    else:
+        _html = render_chart(
         symbol=symbol,
         interval=tf_choix,
         limit=200,
@@ -3494,7 +3500,7 @@ elif outil == "ANALYSE TECHNIQUE PRO":
                     safe_period = "3mo"
                     st.warning("⚠️ Période ajustée à 3mo — SMA50 nécessite au moins 50 jours de données.")
 
-                df = yf.download(ticker_tech, period=safe_period, progress=False, auto_adjust=True)
+                df = yf.download(ticker_tech, period=safe_period, auto_adjust=True)
                 if df.empty:
                     st.error("Aucune donnée disponible pour ce ticker.")
                 else:
@@ -3755,7 +3761,7 @@ elif outil == "FIBONACCI CALCULATOR":
     if st.button("🚀 CALCULER FIBONACCI", key="fib_calc"):
         try:
             with st.spinner("Calcul des niveaux Fibonacci..."):
-                df_fib = yf.download(ticker_fib, period=period_fib, progress=False)
+                df_fib = yf.download(ticker_fib, period=period_fib)
                 if df_fib.empty:
                     st.error("Aucune donnée disponible")
                 else:
@@ -3955,7 +3961,7 @@ elif outil == "BACKTESTING ENGINE":
     if st.button("🚀 LANCER LE BACKTEST", key="bt_launch"):
         try:
             with st.spinner("Backtesting en cours..."):
-                df_bt = yf.download(ticker_bt, period=period_bt, progress=False)
+                df_bt = yf.download(ticker_bt, period=period_bt)
                 if df_bt.empty:
                     st.error("Aucune donnée disponible")
                 else:
@@ -5500,7 +5506,10 @@ elif outil == "CORRÉLATION DASH":
     }
     with st.spinner('Calculating correlations...'):
         try:
-            data = yf.download(list(assets.keys()), period="60d", interval="1d")['Close']
+            _raw_corr = yf.download(list(assets.keys()), period="60d", interval="1d")
+            if isinstance(_raw_corr.columns, pd.MultiIndex):
+                _raw_corr.columns = _raw_corr.columns.get_level_values(0)
+            data = _raw_corr['Close'] if 'Close' in _raw_corr.columns else _raw_corr
             returns = data.pct_change().dropna()
             corr_matrix = returns.corr()
             corr_matrix.columns = [assets[c] for c in corr_matrix.columns]
@@ -5604,7 +5613,7 @@ elif outil == "HEATMAP MARCHÉ":
 
                 for ticker_item, sector in tickers_list:
                     try:
-                        df = yf.download(ticker_item, period=period, progress=False)
+                        df = yf.download(ticker_item, period=period)
                         if not df.empty:
                             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
                             # Variation : dernière clôture vs avant-dernière (J0 vs J-1)
