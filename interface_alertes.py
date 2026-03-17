@@ -322,7 +322,7 @@ def show_alertes():
                 for i, alert in enumerate(active):
                     progress.progress((i + 1) / len(active), text=f"Vérification {alert['ticker']}...")
                     try:
-                        df = yf.download(alert["ticker"], period="60d", progress=False, auto_adjust=True)
+                        df = yf.download(alert["ticker"], period="60d", auto_adjust=True)
                         if df.empty: continue
                         if isinstance(df.columns, pd.MultiIndex):
                             df.columns = df.columns.get_level_values(0)
