@@ -303,45 +303,135 @@ def _generate_pdf(analyste_nom: str, donnees: dict, rapport: str) -> bytes:
 def show_am_intelligence():
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+
+    /* ── Reset & Base ── */
+    .block-container { padding-top: 1rem !important; }
+
+    /* ── Header ── */
     .ai-header { font-family:'IBM Plex Mono',monospace; font-size:26px; font-weight:700; color:#ff6600; letter-spacing:3px; margin-bottom:4px; }
     .ai-sub { font-family:'IBM Plex Mono',monospace; font-size:10px; color:#444; letter-spacing:2px; margin-bottom:20px; }
-    .chat-container { background:#050505; border:1px solid #1a1a1a; border-radius:10px; padding:16px; max-height:520px; overflow-y:auto; margin-bottom:12px; }
-    .chat-msg-user { background:#0d1f0d; border:1px solid #00c853; border-radius:10px 10px 2px 10px; padding:10px 14px; margin:8px 0 8px 60px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#e0e0e0; }
-    .chat-msg-ai { background:#0a0a1a; border:1px solid #2d6abf; border-radius:10px 10px 10px 2px; padding:10px 14px; margin:8px 60px 8px 0; font-family:'IBM Plex Mono',monospace; font-size:12px; color:#e0e0e0; line-height:1.7; }
-    .chat-role-user { font-size:9px; color:#00c853; letter-spacing:1px; margin-bottom:4px; font-weight:700; }
-    .chat-role-ai { font-size:9px; color:#4d9fff; letter-spacing:1px; margin-bottom:4px; font-weight:700; }
-    .chat-time { font-size:8px; color:#333; text-align:right; margin-top:4px; }
-    .stMarkdown p, .stMarkdown li, .stMarkdown td, .stMarkdown th { font-family:'IBM Plex Mono',monospace !important; font-size:12px !important; color:#ccc !important; }
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { font-family:'IBM Plex Mono',monospace !important; color:#ff6600 !important; letter-spacing:1px !important; }
-    .stMarkdown table { background:#080808 !important; border:1px solid #1a1a1a !important; width:100% !important; }
-    .stMarkdown th { background:#0d0800 !important; color:#ff6600 !important; border:1px solid #333 !important; padding:6px 10px !important; }
-    .stMarkdown td { border:1px solid #1a1a1a !important; padding:5px 10px !important; }
-    .stMarkdown strong { color:#ff6600 !important; }
-    .disclaimer-ai { font-family:'IBM Plex Mono',monospace; font-size:9px; color:#333; border-top:1px solid #111; padding-top:8px; margin-top:16px; }
+
+    /* ── Mode tabs ── */
+    .mode-tabs {
+        display: flex; gap: 0; margin-bottom: 24px;
+        background: #0a0a0a; border: 1px solid #1a1a1a;
+        border-radius: 10px; padding: 4px; width: fit-content;
+    }
+    .mode-tab-btn {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 11px; font-weight: 700; letter-spacing: 1px;
+        padding: 8px 20px; border-radius: 7px; cursor: pointer;
+        border: none; transition: all 0.2s;
+    }
+    .mode-tab-active { background: #ff6600; color: #000; }
+    .mode-tab-inactive { background: transparent; color: #444; }
+
+    /* ── Chat container ── */
+    .chat-container {
+        background: #030303;
+        border: 1px solid #111;
+        border-radius: 16px;
+        padding: 20px 16px;
+        min-height: 300px;
+        max-height: 540px;
+        overflow-y: auto;
+        margin-bottom: 16px;
+        scrollbar-width: thin;
+        scrollbar-color: #222 transparent;
+    }
+    .chat-container::-webkit-scrollbar { width: 4px; }
+    .chat-container::-webkit-scrollbar-track { background: transparent; }
+    .chat-container::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
+
+    /* ── Messages ── */
+    .chat-msg-user {
+        display: flex; justify-content: flex-end; margin: 12px 0;
+    }
+    .chat-bubble-user {
+        background: linear-gradient(135deg, #ff6600, #ff8c00);
+        color: #000; font-weight: 600;
+        border-radius: 18px 18px 4px 18px;
+        padding: 12px 16px; max-width: 75%;
+        font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.5;
+        box-shadow: 0 2px 12px rgba(255,102,0,0.2);
+    }
+    .chat-msg-ai {
+        display: flex; align-items: flex-start; gap: 10px; margin: 12px 0;
+    }
+    .chat-avatar {
+        width: 32px; height: 32px; border-radius: 50%;
+        background: linear-gradient(135deg, #1a1a2e, #0a0a1a);
+        border: 1.5px solid #2d6abf;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; flex-shrink: 0; margin-top: 2px;
+    }
+    .chat-bubble-ai {
+        background: #0d0d0d;
+        border: 1px solid #1a1a1a;
+        border-radius: 4px 18px 18px 18px;
+        padding: 14px 18px; max-width: 85%;
+        font-family: 'Inter', sans-serif; font-size: 13px;
+        color: #ddd; line-height: 1.7;
+    }
+    .chat-bubble-ai strong { color: #ff6600; }
+    .chat-meta {
+        font-size: 9px; color: #333; margin-top: 6px;
+        font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.5px;
+    }
+
+    /* ── Input zone ── */
+    .input-zone {
+        background: #080808;
+        border: 1.5px solid #1a1a1a;
+        border-radius: 14px;
+        padding: 4px 4px 4px 16px;
+        display: flex; align-items: center; gap: 8px;
+        transition: border-color 0.2s;
+    }
+    .input-zone:focus-within { border-color: #ff6600; }
+
+    /* ── Markdown dans résultats ── */
+    .stMarkdown p, .stMarkdown li, .stMarkdown td, .stMarkdown th {
+        font-family: 'Inter', sans-serif !important; font-size: 13px !important; color: #ccc !important;
+    }
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+        font-family: 'IBM Plex Mono', monospace !important; color: #ff6600 !important; letter-spacing: 1px !important;
+    }
+    .stMarkdown table { background: #080808 !important; border: 1px solid #1a1a1a !important; width: 100% !important; }
+    .stMarkdown th { background: #0d0800 !important; color: #ff6600 !important; border: 1px solid #333 !important; padding: 8px 12px !important; }
+    .stMarkdown td { border: 1px solid #1a1a1a !important; padding: 7px 12px !important; }
+    .stMarkdown strong { color: #ff6600 !important; }
+
+    .disclaimer-ai {
+        font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #2a2a2a;
+        border-top: 1px solid #0f0f0f; padding-top: 10px; margin-top: 20px; text-align: center;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="ai-header">🤖 AM INTELLIGENCE</div>', unsafe_allow_html=True)
-    st.markdown('<div class="ai-sub">CHAT IA · 6 EXPERTS WALL STREET · ANALYSES FINANCIÈRES</div>', unsafe_allow_html=True)
-
-    # ── Sélecteur de mode ──
+    # ── Init mode ──
     if "ai_mode" not in st.session_state:
         st.session_state.ai_mode = "chat"
 
-    col_m1, col_m2, col_m3 = st.columns([1, 1, 4])
-    with col_m1:
-        if st.button("💬 CHAT IA", key="mode_chat",
-                     type="primary" if st.session_state.ai_mode == "chat" else "secondary",
-                     use_container_width=True):
-            st.session_state.ai_mode = "chat"
-            st.rerun()
-    with col_m2:
-        if st.button("🏛️ EXPERTS", key="mode_experts",
-                     type="primary" if st.session_state.ai_mode == "experts" else "secondary",
-                     use_container_width=True):
-            st.session_state.ai_mode = "experts"
-            st.rerun()
+    # ── Header + tabs inline ──
+    col_hdr, col_tabs, _ = st.columns([3, 2, 3])
+    with col_hdr:
+        st.markdown('<div class="ai-header">🤖 AM INTELLIGENCE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-sub">ANALYSES FINANCIÈRES IA · NIVEAU INSTITUTIONNEL</div>', unsafe_allow_html=True)
+    with col_tabs:
+        st.markdown("<br>", unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("💬 Chat", key="mode_chat",
+                         type="primary" if st.session_state.ai_mode == "chat" else "secondary",
+                         use_container_width=True):
+                st.session_state.ai_mode = "chat"; st.rerun()
+        with c2:
+            if st.button("🏛️ Experts", key="mode_experts",
+                         type="primary" if st.session_state.ai_mode == "experts" else "secondary",
+                         use_container_width=True):
+                st.session_state.ai_mode = "experts"; st.rerun()
 
     st.markdown("---")
 
@@ -355,40 +445,53 @@ def show_am_intelligence():
         if "chat_pending" not in st.session_state:
             st.session_state.chat_pending = None
 
-        # Suggestions si chat vide
+        # Écran d'accueil style ChatGPT si chat vide
         if not st.session_state.chat_history:
             st.markdown("""
-            <div style='text-align:center;padding:20px 0 12px;'>
-                <div style='font-family:IBM Plex Mono;font-size:14px;color:#ff6600;margin-bottom:6px;'>💬 Pose-moi n'importe quelle question financière</div>
-                <div style='font-family:IBM Plex Mono;font-size:10px;color:#444;'>Actions · Crypto · Forex · Macro · Portefeuille · Trading</div>
+            <div style='text-align:center;padding:60px 20px 40px;'>
+                <div style='font-size:48px;margin-bottom:16px;'>🤖</div>
+                <div style='font-family:IBM Plex Mono,monospace;font-size:22px;font-weight:700;
+                            color:#ff6600;letter-spacing:2px;margin-bottom:10px;'>
+                    AM INTELLIGENCE
+                </div>
+                <div style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;
+                            letter-spacing:2px;max-width:500px;margin:0 auto;line-height:1.8;'>
+                    Analyste financier IA · Niveau institutionnel<br>
+                    Actions · Crypto · Forex · Macro · Portefeuille
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-            suggestions = [
-                "📈 Analyse NVIDIA", "₿ Bitcoin va-t-il remonter ?",
-                "🏆 Meilleurs ETF 2025", "💹 Impact inflation marchés",
-                "🌍 Analyse macro USA", "💰 Top dividendes France",
-                "🥇 Stratégie sur l'or", "💱 EUR/USD analyse",
-            ]
-            cols = st.columns(4)
-            for i, sug in enumerate(suggestions):
-                with cols[i % 4]:
-                    if st.button(sug, key=f"sug_{i}", use_container_width=True):
-                        st.session_state.chat_pending = sug.split(" ", 1)[1] if " " in sug else sug
-                        st.rerun()
-
-        # Affichage historique
+        # Affichage historique — style moderne
         if st.session_state.chat_history:
             chat_html = '<div class="chat-container">'
             for msg in st.session_state.chat_history:
                 if msg["role"] == "user":
-                    chat_html += f'<div class="chat-msg-user"><div class="chat-role-user">▶ VOUS</div>{msg["content"].replace(chr(10),"<br>")}<div class="chat-time">{msg.get("time","")}</div></div>'
+                    safe = msg["content"].replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace(chr(10),"<br>")
+                    chat_html += f'''
+                    <div class="chat-msg-user">
+                        <div>
+                            <div class="chat-bubble-user">{safe}</div>
+                            <div class="chat-meta" style="text-align:right;">{msg.get("time","")}</div>
+                        </div>
+                    </div>'''
                 else:
-                    content = msg["content"]
-                    content = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color:#ff6600">\1</strong>', content)
-                    content = re.sub(r'\*(.*?)\*', r'<em>\1</em>', content)
-                    content = content.replace("\n", "<br>")
-                    chat_html += f'<div class="chat-msg-ai"><div class="chat-role-ai">🤖 AM INTELLIGENCE</div>{content}<div class="chat-time">{msg.get("time","")}</div></div>'
+                    c = msg["content"]
+                    c = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', c)
+                    c = re.sub(r'\*(.*?)\*', r'<em>\1</em>', c)
+                    c = re.sub(r'^### (.*?)$', r'<div style="color:#ff6600;font-weight:700;font-size:13px;margin:8px 0 4px;">\1</div>', c, flags=re.MULTILINE)
+                    c = re.sub(r'^## (.*?)$', r'<div style="color:#ff6600;font-weight:700;font-size:14px;margin:10px 0 4px;">\1</div>', c, flags=re.MULTILINE)
+                    c = re.sub(r'^# (.*?)$', r'<div style="color:#ff6600;font-weight:700;font-size:16px;margin:12px 0 6px;">\1</div>', c, flags=re.MULTILINE)
+                    c = re.sub(r'^- (.*?)$', r'<div style="margin:2px 0;padding-left:12px;">• \1</div>', c, flags=re.MULTILINE)
+                    c = c.replace("\n\n","<br>").replace("\n","<br>")
+                    chat_html += f'''
+                    <div class="chat-msg-ai">
+                        <div class="chat-avatar">🤖</div>
+                        <div>
+                            <div class="chat-bubble-ai">{c}</div>
+                            <div class="chat-meta">{msg.get("time","")}</div>
+                        </div>
+                    </div>'''
             chat_html += '</div>'
             st.markdown(chat_html, unsafe_allow_html=True)
 
