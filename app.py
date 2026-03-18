@@ -2388,6 +2388,69 @@ if categorie == "ACCUEIL":
     <div class="acc-sub">MARKET DASHBOARD — {now.strftime('%A %d %B %Y — %H:%M')} UTC+4</div>
     """, unsafe_allow_html=True)
 
+    # ── Boutons téléchargement app desktop ──
+    st.markdown("""
+    <style>
+    .dl-section {
+        background: linear-gradient(135deg, #0a0a0a, #111);
+        border: 1px solid #ff6600;
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 24px;
+        font-family: 'IBM Plex Mono', monospace;
+    }
+    .dl-title {
+        font-size: 13px; font-weight: 700;
+        color: #ff6600; letter-spacing: 2px;
+        margin-bottom: 6px;
+    }
+    .dl-sub {
+        font-size: 10px; color: #555;
+        letter-spacing: 1px; margin-bottom: 16px;
+    }
+    .dl-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+    .dl-btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 11px; font-weight: 700;
+        letter-spacing: 1px;
+        text-decoration: none;
+        transition: all 0.15s;
+    }
+    .dl-btn-mac {
+        background: linear-gradient(135deg, #1a1a1a, #222);
+        color: #ff6600;
+        border: 1.5px solid #ff6600;
+    }
+    .dl-btn-mac:hover { background: #ff6600; color: #000; }
+    .dl-btn-win {
+        background: linear-gradient(135deg, #1a1a1a, #222);
+        color: #4d9fff;
+        border: 1.5px solid #4d9fff;
+    }
+    .dl-btn-win:hover { background: #4d9fff; color: #000; }
+    .dl-size { font-size: 9px; color: #444; margin-left: 4px; }
+    </style>
+    <div class="dl-section">
+        <div class="dl-title">⬇ TÉLÉCHARGER AM TERMINAL — APPLICATION DESKTOP</div>
+        <div class="dl-sub">VERSION 1.0.0 — FONCTIONNE SANS NAVIGATEUR</div>
+        <div class="dl-buttons">
+            <a class="dl-btn dl-btn-mac"
+               href="https://github.com/ArthurIt974/arthur-trading-web/releases/download/v1.0.0/AM-Terminal-1.0.0.dmg">
+                🍎 TÉLÉCHARGER POUR MAC
+                <span class="dl-size">285 MB</span>
+            </a>
+            <a class="dl-btn dl-btn-win"
+               href="https://github.com/ArthurIt974/arthur-trading-web/releases/download/v1.0.0/AM-Terminal-Setup-1.0.0.exe">
+                🪟 TÉLÉCHARGER POUR WINDOWS
+                <span class="dl-size">366 MB</span>
+            </a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     # ── Fetch données ──
     @st.cache_data(ttl=60)
     def _fetch_accueil_data():
