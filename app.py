@@ -2288,188 +2288,246 @@ categorie = st.session_state.categorie
 st.sidebar.markdown("---")
 
 if categorie == "ACCUEIL":
-    # ══════════════════════════════════════════════════════
-    #  PAGE D'ACCUEIL — AM.TERMINAL DASHBOARD
-    # ══════════════════════════════════════════════════════
-    import datetime, requests
+    import datetime, requests as _rq
 
-    st.markdown("""
+    # ── Theme toggle ──
+    if "theme_mode" not in st.session_state:
+        st.session_state.theme_mode = "dark"
+
+    # ── CSS dynamique selon theme ──
+    is_dark = st.session_state.theme_mode == "dark"
+    BG       = "#0a0a0a"   if is_dark else "#f5f5f5"
+    BG2      = "#111111"   if is_dark else "#ffffff"
+    BG3      = "#080808"   if is_dark else "#fafafa"
+    BORDER   = "#1a1a1a"   if is_dark else "#e0e0e0"
+    BORDER2  = "#222222"   if is_dark else "#d0d0d0"
+    TEXT     = "#ffffff"   if is_dark else "#111111"
+    TEXT2    = "#aaaaaa"   if is_dark else "#555555"
+    TEXT3    = "#555555"   if is_dark else "#999999"
+    ACCENT   = "#ff6600"
+    GREEN    = "#00C853"
+    RED      = "#FF3B30"
+    BLUE     = "#4d9fff"
+
+    st.markdown(f"""
     <style>
-    .acc-header {
-        font-family:'IBM Plex Mono',monospace;
-        font-size:28px; font-weight:700;
-        color:#ff6600; letter-spacing:3px;
-        margin-bottom:2px;
-    }
-    .acc-sub {
-        font-family:'IBM Plex Mono',monospace;
-        font-size:10px; color:#333;
-        letter-spacing:3px; margin-bottom:24px;
-    }
-    .kpi-card {
-        background:#080808;
-        border:1px solid #1a1a1a;
-        border-radius:6px;
-        padding:14px 16px;
-        font-family:'IBM Plex Mono',monospace;
-        transition: border-color .2s;
-    }
-    .kpi-card:hover { border-color:#ff6600; }
-    .kpi-label {
-        font-size:8px; color:#4d9fff;
-        letter-spacing:2px; margin-bottom:6px;
-    }
-    .kpi-value {
-        font-size:22px; font-weight:700; color:#ff6600;
-    }
-    .kpi-delta-pos { font-size:11px; color:#00C853; margin-top:2px; }
-    .kpi-delta-neg { font-size:11px; color:#FF3B30; margin-top:2px; }
-    .kpi-delta-neu { font-size:11px; color:#555; margin-top:2px; }
-    .section-title {
-        font-family:'IBM Plex Mono',monospace;
-        font-size:10px; color:#333;
-        letter-spacing:3px;
-        border-left:2px solid #ff6600;
-        padding-left:10px;
-        margin:24px 0 12px;
-    }
-    .news-item {
-        background:#080808;
-        border:1px solid #111;
-        border-radius:4px;
-        padding:10px 14px;
-        margin-bottom:6px;
-        font-family:'IBM Plex Mono',monospace;
-    }
-    .news-src { font-size:8px; color:#4d9fff; letter-spacing:1px; }
-    .news-title { font-size:11px; color:#ccc; margin:4px 0 2px; line-height:1.4; }
-    .news-time { font-size:9px; color:#333; }
-    .top-mover {
-        background:#080808;
-        border:1px solid #111;
-        border-radius:4px;
-        padding:8px 12px;
-        font-family:'IBM Plex Mono',monospace;
-        display:flex; justify-content:space-between;
-        align-items:center;
-        margin-bottom:4px;
-    }
-    .mover-sym { font-size:12px; color:#fff; font-weight:600; }
-    .mover-name { font-size:8px; color:#555; }
-    .mover-pos { font-size:13px; color:#00C853; font-weight:700; }
-    .mover-neg { font-size:13px; color:#FF3B30; font-weight:700; }
-    .fg-bar {
-        height:8px; border-radius:4px;
-        background:linear-gradient(90deg,#FF3B30,#FF9800,#00C853);
-        margin:8px 0;
-    }
-    .fg-needle {
-        width:2px; height:16px;
-        background:#fff;
-        position:relative; top:-12px;
-        display:inline-block;
-    }
-    .dominance-bar {
-        height:12px; border-radius:3px;
-        background:#1a1a1a; overflow:hidden;
-        margin:4px 0;
-    }
-    .dominance-fill {
-        height:100%; background:#ff6600;
-        display:inline-block;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+
+    /* ── Base ── */
+    .stApp {{ background-color: {BG} !important; }}
+    .block-container {{ padding-top: 1.5rem !important; max-width: 1400px; }}
+
+    /* ── Header ── */
+    .acc-logo {{
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 32px; font-weight: 700;
+        color: {ACCENT}; letter-spacing: 4px;
+        text-shadow: 0 0 30px rgba(255,102,0,0.3);
+    }}
+    .acc-date {{
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 10px; color: {TEXT3}; letter-spacing: 2px;
+        margin-top: 4px;
+    }}
+
+    /* ── Section titles ── */
+    .sec-title {{
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 9px; color: {TEXT3}; letter-spacing: 3px;
+        border-left: 2px solid {ACCENT}; padding-left: 10px;
+        margin: 28px 0 14px;
+    }}
+
+    /* ── KPI Cards ── */
+    .kpi-card {{
+        background: {BG2};
+        border: 1px solid {BORDER};
+        border-radius: 12px;
+        padding: 18px 20px;
+        font-family: 'IBM Plex Mono', monospace;
+        transition: all 0.2s;
+        position: relative; overflow: hidden;
+    }}
+    .kpi-card:hover {{
+        border-color: {ACCENT};
+        box-shadow: 0 4px 20px rgba(255,102,0,0.1);
+        transform: translateY(-2px);
+    }}
+    .kpi-card::before {{
+        content: ''; position: absolute;
+        top: 0; left: 0; right: 0; height: 2px;
+        background: linear-gradient(90deg, {ACCENT}, transparent);
+        opacity: 0;
+        transition: opacity 0.2s;
+    }}
+    .kpi-card:hover::before {{ opacity: 1; }}
+    .kpi-label {{ font-size: 9px; color: {BLUE}; letter-spacing: 2px; margin-bottom: 8px; }}
+    .kpi-value {{ font-size: 24px; font-weight: 700; color: {ACCENT}; }}
+    .kpi-pos {{ font-size: 12px; color: {GREEN}; margin-top: 4px; font-weight: 600; }}
+    .kpi-neg {{ font-size: 12px; color: {RED}; margin-top: 4px; font-weight: 600; }}
+    .kpi-neu {{ font-size: 12px; color: {TEXT3}; margin-top: 4px; }}
+
+    /* ── Mover cards ── */
+    .mover-card {{
+        background: {BG2}; border: 1px solid {BORDER};
+        border-radius: 10px; padding: 12px 16px;
+        font-family: 'IBM Plex Mono', monospace;
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 6px; transition: all 0.15s;
+    }}
+    .mover-card:hover {{ border-color: {BORDER2}; }}
+    .mover-sym {{ font-size: 13px; color: {TEXT}; font-weight: 700; }}
+    .mover-price {{ font-size: 10px; color: {TEXT3}; margin-top: 2px; }}
+    .mover-pos {{ font-size: 14px; color: {GREEN}; font-weight: 700; }}
+    .mover-neg {{ font-size: 14px; color: {RED}; font-weight: 700; }}
+
+    /* ── News cards ── */
+    .news-card {{
+        background: {BG2}; border: 1px solid {BORDER};
+        border-radius: 10px; padding: 14px 16px;
+        font-family: 'Inter', sans-serif; margin-bottom: 8px;
+        transition: all 0.15s; cursor: pointer;
+    }}
+    .news-card:hover {{ border-color: {BORDER2}; transform: translateX(3px); }}
+    .news-src {{ font-size: 9px; color: {BLUE}; letter-spacing: 1px; font-family: 'IBM Plex Mono', monospace; margin-bottom: 6px; font-weight: 600; }}
+    .news-title {{ font-size: 12px; color: {TEXT}; line-height: 1.5; font-weight: 500; }}
+    .news-time {{ font-size: 9px; color: {TEXT3}; margin-top: 6px; }}
+
+    /* ── Fear & Greed gauge ── */
+    .fg-track {{
+        height: 6px; border-radius: 3px;
+        background: linear-gradient(90deg, {RED}, #FF9800, {GREEN});
+        margin: 10px 0 4px; position: relative;
+    }}
+
+    /* ── Dominance bar ── */
+    .dom-bar {{ height: 8px; border-radius: 4px; background: {BORDER}; overflow: hidden; margin: 6px 0; }}
+    .dom-fill {{ height: 100%; background: {ACCENT}; border-radius: 4px; }}
+
+    /* ── Download banner ── */
+    .dl-banner {{
+        background: linear-gradient(135deg, {BG2}, {BG3});
+        border: 1.5px solid {ACCENT};
+        border-radius: 14px; padding: 20px 24px;
+        margin-bottom: 28px; display: flex;
+        justify-content: space-between; align-items: center;
+        font-family: 'IBM Plex Mono', monospace;
+    }}
+    .dl-title {{ font-size: 13px; font-weight: 700; color: {ACCENT}; letter-spacing: 1px; margin-bottom: 4px; }}
+    .dl-sub {{ font-size: 10px; color: {TEXT3}; letter-spacing: 1px; }}
+    .dl-btns {{ display: flex; gap: 10px; flex-shrink: 0; }}
+    .dl-btn {{
+        padding: 9px 18px; border-radius: 8px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 11px; font-weight: 700; letter-spacing: 1px;
+        text-decoration: none; transition: all 0.15s; display: inline-block;
+    }}
+    .dl-mac {{ background: transparent; color: {ACCENT}; border: 1.5px solid {ACCENT}; }}
+    .dl-mac:hover {{ background: {ACCENT}; color: #000; }}
+    .dl-win {{ background: transparent; color: {BLUE}; border: 1.5px solid {BLUE}; }}
+    .dl-win:hover {{ background: {BLUE}; color: #000; }}
+
+    /* ── Theme toggle btn ── */
+    .theme-badge {{
+        display: inline-flex; align-items: center; gap: 6px;
+        background: {BG2}; border: 1px solid {BORDER};
+        border-radius: 20px; padding: 4px 12px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 10px; color: {TEXT3}; cursor: pointer;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
-    # ── Header ──
+    # ── Top bar : header + theme toggle ──
     now = datetime.datetime.now()
-    st.markdown(f"""
-    <div class="acc-header">AM.TERMINAL</div>
-    <div class="acc-sub">MARKET DASHBOARD — {now.strftime('%A %d %B %Y — %H:%M')} UTC+4</div>
+    col_logo, col_right = st.columns([4, 1])
+    with col_logo:
+        st.markdown(f'''
+        <div class="acc-logo">⚡ AM.TERMINAL</div>
+        <div class="acc-date">MARKET DASHBOARD — {now.strftime("%A %d %B %Y — %H:%M").upper()}</div>
+        ''', unsafe_allow_html=True)
+    with col_right:
+        st.markdown("<br>", unsafe_allow_html=True)
+        theme_label = "☀️ Light" if is_dark else "🌙 Dark"
+        if st.button(theme_label, key="theme_toggle", use_container_width=True):
+            st.session_state.theme_mode = "light" if is_dark else "dark"
+            st.rerun()
+
+    # ── Download banner ──
+    st.markdown("""
+    <div class="dl-banner">
+        <div>
+            <div class="dl-title">⬇ AM TERMINAL — APPLICATION DESKTOP</div>
+            <div class="dl-sub">VERSION 1.0.0 · WINDOWS & MAC · SANS NAVIGATEUR</div>
+        </div>
+        <div class="dl-btns">
+            <a class="dl-btn dl-mac" href="https://github.com/ArthurIt974/arthur-trading-web/releases/download/v1.0.0/AM-Terminal-1.0.0.dmg">🍎 MAC</a>
+            <a class="dl-btn dl-win" href="https://github.com/ArthurIt974/arthur-trading-web/releases/download/v1.0.0/AM-Terminal-Setup-1.0.0.exe">🪟 WINDOWS</a>
+        </div>
+    </div>
     """, unsafe_allow_html=True)
 
     # ── Fetch données ──
     @st.cache_data(ttl=60)
     def _fetch_accueil_data():
-        """Prix accueil — curl_cffi yfinance (contourne Yahoo) + CoinGecko crypto."""
-        import yfinance as yf, requests as _rq
+        import yfinance as yf
         results = {}
-        tickers_map = {
-            "BTC-USD": "BTC", "ETH-USD": "ETH",
-            "^GSPC": "S&P 500", "^IXIC": "NASDAQ",
-            "^FCHI": "CAC 40", "NVDA": "NVDA", "AAPL": "AAPL"
-        }
-        # ── CoinGecko pour BTC et ETH (jamais bloqué) ──
+        tickers_map = {"BTC-USD":"BTC","ETH-USD":"ETH","^GSPC":"S&P 500","^IXIC":"NASDAQ","^FCHI":"CAC 40","NVDA":"NVDA","AAPL":"AAPL"}
         try:
             _cg = _rq.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", timeout=5).json()
             if _cg.get("bitcoin",{}).get("usd"):
-                results["BTC"] = {"price": float(_cg["bitcoin"]["usd"]), "chg": float(_cg["bitcoin"].get("usd_24h_change",0)), "sym":"BTC-USD"}
+                results["BTC"] = {"price": float(_cg["bitcoin"]["usd"]), "chg": float(_cg["bitcoin"].get("usd_24h_change",0))}
             if _cg.get("ethereum",{}).get("usd"):
-                results["ETH"] = {"price": float(_cg["ethereum"]["usd"]), "chg": float(_cg["ethereum"].get("usd_24h_change",0)), "sym":"ETH-USD"}
-        except:
-            pass
-        # ── curl_cffi pour actions et indices (contourne Yahoo) ──
+                results["ETH"] = {"price": float(_cg["ethereum"]["usd"]), "chg": float(_cg["ethereum"].get("usd_24h_change",0))}
+        except: pass
         action_syms = ["^GSPC","^IXIC","^FCHI","NVDA","AAPL"]
-        curl_ok = False
         try:
             from curl_cffi.requests import Session as CurlSession
             with CurlSession(impersonate="chrome") as _cs:
                 for sym in action_syms:
                     label = tickers_map.get(sym)
-                    if not label or (label in results and results[label].get("price",0) > 0):
-                        continue
+                    if not label: continue
                     try:
                         fi = yf.Ticker(sym, session=_cs).fast_info
                         price = float(fi.last_price or 0)
                         prev  = float(fi.previous_close or price)
                         chg   = ((price-prev)/prev*100) if prev else 0
-                        if price > 0:
-                            results[label] = {"price": price, "chg": chg, "sym": sym}
-                            curl_ok = True
-                    except:
-                        pass
-        except:
-            pass
-        # ── Fallback yfinance standard pour les manquants ──
+                        if price > 0: results[label] = {"price": price, "chg": chg}
+                    except: pass
+        except: pass
         for sym, label in tickers_map.items():
-            if label not in results or results[label].get("price",0) == 0:
+            if label not in results:
                 try:
                     fi = yf.Ticker(sym).fast_info
                     price = float(fi.last_price or 0)
                     prev  = float(fi.previous_close or price)
                     chg   = ((price-prev)/prev*100) if prev else 0
-                    if price > 0:
-                        results[label] = {"price": price, "chg": chg, "sym": sym}
-                except:
-                    results[label] = {"price": 0, "chg": 0, "sym": sym}
+                    if price > 0: results[label] = {"price": price, "chg": chg}
+                except: results[label] = {"price": 0, "chg": 0}
         return results
 
     @st.cache_data(ttl=300)
     def _fetch_fear_greed():
         try:
-            r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=5)
+            r = _rq.get("https://api.alternative.me/fng/?limit=1", timeout=5)
             d = r.json()["data"][0]
             return int(d["value"]), d["value_classification"]
-        except:
-            return 50, "Neutral"
+        except: return 50, "Neutral"
 
     @st.cache_data(ttl=300)
     def _fetch_crypto_dominance():
         try:
-            r = requests.get("https://api.coingecko.com/api/v3/global", timeout=5)
+            r = _rq.get("https://api.coingecko.com/api/v3/global", timeout=5)
             d = r.json()["data"]["market_cap_percentage"]
-            return round(d.get("btc", 0), 1), round(d.get("eth", 0), 1)
-        except:
-            return 0, 0
+            return round(d.get("btc",0),1), round(d.get("eth",0),1)
+        except: return 0, 0
 
     @st.cache_data(ttl=180)
     def _fetch_top_movers():
-        """Top movers — Yahoo Finance v2 batch → yfinance fallback."""
-        import yfinance as yf, requests as _rq
+        import yfinance as yf
         watchlist = ["NVDA","AAPL","TSLA","MSFT","GOOGL","META","AMZN","AMD","NFLX","JPM","BTC-USD","ETH-USD"]
         movers = []
-        _hdrs = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36","Accept":"application/json","Referer":"https://finance.yahoo.com"}
-        # Batch Yahoo Finance pour les actions
+        _hdrs = {"User-Agent":"Mozilla/5.0 Chrome/122.0.0.0","Accept":"application/json","Referer":"https://finance.yahoo.com"}
         action_syms = [s for s in watchlist if "-USD" not in s]
         try:
             _r = _rq.get(f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={','.join(action_syms)}", headers=_hdrs, timeout=6)
@@ -2477,20 +2535,16 @@ if categorie == "ACCUEIL":
                 for _q in _r.json().get("quoteResponse",{}).get("result",[]):
                     price = float(_q.get("regularMarketPrice",0))
                     prev  = float(_q.get("regularMarketPreviousClose", price) or price)
-                    chg   = ((price-prev)/prev*100) if prev else float(_q.get("regularMarketChangePercent",0))
+                    chg   = ((price-prev)/prev*100) if prev else 0
                     movers.append({"sym": _q["symbol"], "price": price, "chg": chg})
-        except:
-            pass
-        # CoinGecko pour crypto
+        except: pass
         try:
             _cg = _rq.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", timeout=5).json()
             if _cg.get("bitcoin",{}).get("usd"):
-                movers.append({"sym":"BTC", "price":float(_cg["bitcoin"]["usd"]), "chg":float(_cg["bitcoin"].get("usd_24h_change",0))})
+                movers.append({"sym":"BTC","price":float(_cg["bitcoin"]["usd"]),"chg":float(_cg["bitcoin"].get("usd_24h_change",0))})
             if _cg.get("ethereum",{}).get("usd"):
-                movers.append({"sym":"ETH", "price":float(_cg["ethereum"]["usd"]), "chg":float(_cg["ethereum"].get("usd_24h_change",0))})
-        except:
-            pass
-        # Fallback yfinance pour les manquants
+                movers.append({"sym":"ETH","price":float(_cg["ethereum"]["usd"]),"chg":float(_cg["ethereum"].get("usd_24h_change",0))})
+        except: pass
         fetched = {m["sym"] for m in movers}
         for sym in watchlist:
             clean = sym.replace("-USD","")
@@ -2499,8 +2553,7 @@ if categorie == "ACCUEIL":
                     h = yf.Ticker(sym).fast_info
                     price = h.last_price; prev = h.previous_close
                     movers.append({"sym": clean, "price": price, "chg": ((price-prev)/prev*100) if prev else 0})
-                except:
-                    pass
+                except: pass
         movers.sort(key=lambda x: x["chg"], reverse=True)
         return movers[:5], movers[-5:][::-1]
 
@@ -2508,163 +2561,117 @@ if categorie == "ACCUEIL":
     def _fetch_news():
         try:
             import feedparser
-            feeds = [
-                ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
-                ("Reuters", "https://feeds.reuters.com/reuters/businessNews"),
-                ("Bloomberg", "https://feeds.bloomberg.com/markets/news.rss"),
-            ]
+            feeds = [("CoinDesk","https://www.coindesk.com/arc/outboundfeeds/rss/"),("Reuters","https://feeds.reuters.com/reuters/businessNews"),("Investing","https://www.investing.com/rss/news.rss")]
             items = []
             for src, url in feeds:
                 try:
                     f = feedparser.parse(url)
                     for e in f.entries[:3]:
-                        items.append({
-                            "src": src,
-                            "title": e.get("title","")[:90],
-                            "time": e.get("published","")[:16]
-                        })
-                except:
-                    pass
+                        items.append({"src": src, "title": e.get("title","")[:85], "time": e.get("published","")[:16]})
+                except: pass
             return items[:9]
-        except:
-            return []
+        except: return []
 
-    with st.spinner("Chargement des données marché..."):
-        mkt      = _fetch_accueil_data()
-        fg_val, fg_label = _fetch_fear_greed()
-        btc_dom, eth_dom = _fetch_crypto_dominance()
-        gainers, losers  = _fetch_top_movers()
-        news             = _fetch_news()
+    with st.spinner(""):
+        mkt               = _fetch_accueil_data()
+        fg_val, fg_label  = _fetch_fear_greed()
+        btc_dom, eth_dom  = _fetch_crypto_dominance()
+        gainers, losers   = _fetch_top_movers()
+        news              = _fetch_news()
 
-    # ══════════════════════════
-    # ROW 1 — KPIs CRYPTOS
-    # ══════════════════════════
-    st.markdown('<div class="section-title">CRYPTO</div>', unsafe_allow_html=True)
+    # ══════════════════════════════════════
+    #  ROW 1 — KPI CARDS CRYPTO + INDICES
+    # ══════════════════════════════════════
+    st.markdown('<div class="sec-title">CRYPTO MARKETS</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    crypto_cards = [
-        ("BTC", "BITCOIN"),
-        ("ETH", "ETHEREUM"),
-        ("BTC.D", "BTC DOMINANCE"),
-        ("F&G",  "FEAR & GREED"),
-    ]
-    for col, (sym, lbl) in zip([c1,c2,c3,c4], crypto_cards):
-        with col:
-            if sym == "BTC" and "BTC" in mkt:
-                d = mkt["BTC"]
-                delta_class = "kpi-delta-pos" if d["chg"] >= 0 else "kpi-delta-neg"
-                arrow = "▲" if d["chg"] >= 0 else "▼"
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{lbl}</div>
-                    <div class="kpi-value">${d['price']:,.0f}</div>
-                    <div class="{delta_class}">{arrow} {d['chg']:+.2f}%</div>
-                </div>""", unsafe_allow_html=True)
-            elif sym == "ETH" and "ETH" in mkt:
-                d = mkt["ETH"]
-                delta_class = "kpi-delta-pos" if d["chg"] >= 0 else "kpi-delta-neg"
-                arrow = "▲" if d["chg"] >= 0 else "▼"
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{lbl}</div>
-                    <div class="kpi-value">${d['price']:,.0f}</div>
-                    <div class="{delta_class}">{arrow} {d['chg']:+.2f}%</div>
-                </div>""", unsafe_allow_html=True)
-            elif sym == "BTC.D":
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{lbl}</div>
-                    <div class="kpi-value">{btc_dom}%</div>
-                    <div class="dominance-bar"><div class="dominance-fill" style="width:{btc_dom}%"></div></div>
-                    <div class="kpi-delta-neu">ETH {eth_dom}%</div>
-                </div>""", unsafe_allow_html=True)
-            elif sym == "F&G":
-                if fg_val <= 25:    fg_color, fg_emoji = "#FF3B30", "😱"
-                elif fg_val <= 45:  fg_color, fg_emoji = "#FF9800", "😨"
-                elif fg_val <= 55:  fg_color, fg_emoji = "#aaa",    "😐"
-                elif fg_val <= 75:  fg_color, fg_emoji = "#8BC34A", "😊"
-                else:               fg_color, fg_emoji = "#00C853", "🤑"
-                st.markdown(f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">{lbl}</div>
-                    <div class="kpi-value" style="color:{fg_color}">{fg_val} {fg_emoji}</div>
-                    <div class="fg-bar"></div>
-                    <div class="kpi-delta-neu" style="color:{fg_color}">{fg_label.upper()}</div>
-                </div>""", unsafe_allow_html=True)
 
-    # ══════════════════════════
-    # ROW 2 — INDICES BOURSIERS
-    # ══════════════════════════
-    st.markdown('<div class="section-title">INDICES BOURSIERS</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    indices = [
-        ("S&P 500", "^GSPC"),
-        ("NASDAQ",  "^IXIC"),
-        ("CAC 40",  "^FCHI"),
-        ("NVDA",    "NVDA"),
-    ]
-    for col, (label, sym) in zip([c1,c2,c3,c4], indices):
+    def _kpi(col, label, value, chg=None, extra=None):
         with col:
-            key = label.replace("^","")
-            d = mkt.get(label, mkt.get("NVDA" if sym=="NVDA" else label, {}))
-            if not d:
-                d = {"price": 0, "chg": 0}
-            delta_class = "kpi-delta-pos" if d.get("chg",0) >= 0 else "kpi-delta-neg"
-            arrow = "▲" if d.get("chg",0) >= 0 else "▼"
-            price = d.get("price", 0)
-            price_fmt = f"${price:,.0f}" if price > 100 else f"{price:,.2f}"
-            st.markdown(f"""
+            arrow = "▲" if (chg or 0) >= 0 else "▼"
+            cls   = "kpi-pos" if (chg or 0) >= 0 else "kpi-neg"
+            delta = f'<div class="{cls}">{arrow} {chg:+.2f}%</div>' if chg is not None else ""
+            xtra  = f'<div class="kpi-neu">{extra}</div>' if extra else ""
+            st.markdown(f'''
             <div class="kpi-card">
                 <div class="kpi-label">{label}</div>
-                <div class="kpi-value">{price_fmt}</div>
-                <div class="{delta_class}">{arrow} {d.get('chg',0):+.2f}%</div>
-            </div>""", unsafe_allow_html=True)
+                <div class="kpi-value">{value}</div>
+                {delta}{xtra}
+            </div>''', unsafe_allow_html=True)
 
-    # ══════════════════════════
-    # ROW 3 — TOP MOVERS + NEWS
-    # ══════════════════════════
-    st.markdown('<div class="section-title">TOP MOVERS DU JOUR</div>', unsafe_allow_html=True)
-    col_g, col_l = st.columns(2)
+    btc = mkt.get("BTC", {})
+    eth = mkt.get("ETH", {})
+    _kpi(c1, "BITCOIN", f"${btc.get('price',0):,.0f}", btc.get("chg"))
+    _kpi(c2, "ETHEREUM", f"${eth.get('price',0):,.0f}", eth.get("chg"))
+    _kpi(c3, "BTC DOMINANCE", f"{btc_dom}%", extra=f"ETH {eth_dom}%")
 
-    with col_g:
-        st.markdown('<div style="font-family:IBM Plex Mono;font-size:9px;color:#00C853;letter-spacing:2px;margin-bottom:6px;">▲ TOP GAINERS</div>', unsafe_allow_html=True)
+    # Fear & Greed
+    with c4:
+        if   fg_val <= 25:  fg_color, fg_emoji = RED,     "😱 EXTREME FEAR"
+        elif fg_val <= 45:  fg_color, fg_emoji = "#FF9800","😨 FEAR"
+        elif fg_val <= 55:  fg_color, fg_emoji = TEXT2,    "😐 NEUTRAL"
+        elif fg_val <= 75:  fg_color, fg_emoji = "#8BC34A","😊 GREED"
+        else:               fg_color, fg_emoji = GREEN,    "🤑 EXTREME GREED"
+        st.markdown(f'''
+        <div class="kpi-card">
+            <div class="kpi-label">FEAR & GREED INDEX</div>
+            <div class="kpi-value" style="color:{fg_color}">{fg_val}</div>
+            <div class="fg-track"></div>
+            <div class="kpi-neu" style="color:{fg_color};font-size:11px;">{fg_emoji}</div>
+        </div>''', unsafe_allow_html=True)
+
+    st.markdown('<div class="sec-title">INDICES BOURSIERS</div>', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    indices = [("S&P 500","S&P 500"), ("NASDAQ","NASDAQ"), ("CAC 40","CAC 40"), ("NVIDIA","NVDA")]
+    for col, (label, key) in zip([c1,c2,c3,c4], indices):
+        d = mkt.get(key, mkt.get(label, {"price":0,"chg":0}))
+        p = d.get("price",0)
+        _kpi(col, label, f"${p:,.0f}" if p > 100 else f"{p:,.2f}", d.get("chg"))
+
+    # ══════════════════════════════════════
+    #  ROW 2 — TOP MOVERS + NEWS
+    # ══════════════════════════════════════
+    col_mv, col_nw = st.columns([1, 2])
+
+    with col_mv:
+        st.markdown('<div class="sec-title">TOP MOVERS</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-family:IBM Plex Mono;font-size:9px;color:' + GREEN + ';letter-spacing:2px;margin-bottom:8px;">▲ GAINERS</div>', unsafe_allow_html=True)
         for m in gainers:
-            st.markdown(f"""
-            <div class="top-mover">
+            p = m.get("price", 0)
+            p_fmt = f"${p:,.2f}" if p < 10000 else f"${p:,.0f}"
+            st.markdown(f'''
+            <div class="mover-card">
                 <div>
-                    <div class="mover-sym">{m['sym']}</div>
-                    <div class="mover-name">${m['price']:,.2f}</div>
+                    <div class="mover-sym">{m["sym"]}</div>
+                    <div class="mover-price">{p_fmt}</div>
                 </div>
-                <div class="mover-pos">+{m['chg']:.2f}%</div>
-            </div>""", unsafe_allow_html=True)
+                <div class="mover-pos">+{m["chg"]:.2f}%</div>
+            </div>''', unsafe_allow_html=True)
 
-    with col_l:
-        st.markdown('<div style="font-family:IBM Plex Mono;font-size:9px;color:#FF3B30;letter-spacing:2px;margin-bottom:6px;">▼ TOP LOSERS</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-family:IBM Plex Mono;font-size:9px;color:' + RED + ';letter-spacing:2px;margin:14px 0 8px;">▼ LOSERS</div>', unsafe_allow_html=True)
         for m in losers:
-            st.markdown(f"""
-            <div class="top-mover">
+            p = m.get("price", 0)
+            p_fmt = f"${p:,.2f}" if p < 10000 else f"${p:,.0f}"
+            st.markdown(f'''
+            <div class="mover-card">
                 <div>
-                    <div class="mover-sym">{m['sym']}</div>
-                    <div class="mover-name">${m['price']:,.2f}</div>
+                    <div class="mover-sym">{m["sym"]}</div>
+                    <div class="mover-price">{p_fmt}</div>
                 </div>
-                <div class="mover-neg">{m['chg']:.2f}%</div>
-            </div>""", unsafe_allow_html=True)
+                <div class="mover-neg">{m["chg"]:.2f}%</div>
+            </div>''', unsafe_allow_html=True)
 
-    # ══════════════════════════
-    # ROW 4 — ACTUALITÉS
-    # ══════════════════════════
-    st.markdown('<div class="section-title">ACTUALITÉS MARCHÉ</div>', unsafe_allow_html=True)
-    if news:
-        cols = st.columns(3)
-        for i, item in enumerate(news[:9]):
-            with cols[i % 3]:
-                st.markdown(f"""
-                <div class="news-item">
-                    <div class="news-src">{item['src'].upper()}</div>
-                    <div class="news-title">{item['title']}</div>
-                    <div class="news-time">{item['time']}</div>
-                </div>""", unsafe_allow_html=True)
-    else:
-        st.markdown('<div style="font-family:IBM Plex Mono;font-size:11px;color:#333;">Actualités indisponibles</div>', unsafe_allow_html=True)
+    with col_nw:
+        st.markdown('<div class="sec-title">ACTUALITÉS MARCHÉ</div>', unsafe_allow_html=True)
+        if news:
+            for item in news[:9]:
+                st.markdown(f'''
+                <div class="news-card">
+                    <div class="news-src">{item["src"].upper()}</div>
+                    <div class="news-title">{item["title"]}</div>
+                    <div class="news-time">{item["time"]}</div>
+                </div>''', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div style="font-family:IBM Plex Mono;font-size:11px;color:{TEXT3};">Actualités indisponibles</div>', unsafe_allow_html=True)
 
     st.stop()
 
