@@ -2461,8 +2461,8 @@ if categorie == "ACCUEIL":
             <div class="dl-sub">VERSION 1.0.0 · WINDOWS & MAC · SANS NAVIGATEUR</div>
         </div>
         <div class="dl-btns">
-            <a class="dl-btn dl-mac" href="https://github.com/ArthurIt974/arthur-trading-web/releases/download/v1.0.0/AM-Terminal-1.0.0.dmg">🍎 MAC</a>
-            <a class="dl-btn dl-win" href="https://github.com/ArthurIt974/arthur-trading-web/releases/download/v1.0.0/AM-Terminal-Setup-1.0.0.exe">🪟 WINDOWS</a>
+            <a class="dl-btn dl-mac" href="https://github.com/Arthurlt974/arthur-trading-web/releases/download/v1.0.0/AM-Terminal-1.0.0.dmg">🍎 MAC</a>
+            <a class="dl-btn dl-win" href="https://github.com/Arthurlt974/arthur-trading-web/releases/download/v1.0.0/AM-Terminal-Setup-1.0.0.exe">🪟 WINDOWS</a>
         </div>
     </div>
     """, unsafe_allow_html=True)
