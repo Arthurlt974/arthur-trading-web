@@ -10,3 +10,8 @@ fastReruns = true
 
 [browser]
 gatherUsageStats = false
+
+[server]
+enableCORS = false
+enableXsrfProtection = false
+headless = true
