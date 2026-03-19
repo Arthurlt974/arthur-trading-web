@@ -2733,6 +2733,7 @@ elif categorie == "ACTIONS & BOURSE":
         "EXPERT SYSTEM","THE GRAND COUNCIL️","MODE DUEL",
         "MARKET MONITOR","SCREENER CAC 40","DIVIDEND CALENDAR"]
     _actions_labels = [t("mod_analyseur"),t("mod_technique"),t("mod_fibonacci"),
+        "📊 BAROMÈTRES",
         t("mod_backtest"),t("mod_valorisation"),t("mod_multicharts"),
         t("mod_expert"),t("mod_council"),t("mod_duel"),
         t("mod_monitor"),t("mod_screener_cac"),t("mod_dividend")]
