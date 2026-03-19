@@ -469,24 +469,47 @@ def _ecart_journalier(ticker: str):
     </div>
     """, unsafe_allow_html=True)
 
-    # Graphique range 30j
-    df30 = df.tail(30).copy()
-    fig = go.Figure()
-    colors_bar = ["#00C853" if c >= o else "#FF3B30" for c, o in zip(df30["Close"].squeeze(), df30["Open"].squeeze())]
-    fig.add_trace(go.Candlestick(
-        x=df30.index, open=df30["Open"].squeeze(), high=df30["High"].squeeze(),
-        low=df30["Low"].squeeze(), close=df30["Close"].squeeze(),
-        increasing_line_color="#00C853", decreasing_line_color="#FF3B30",
-        name="Prix"
-    ))
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#050505",
-        margin=dict(l=10,r=10,t=30,b=10), height=200,
-        xaxis=dict(showgrid=False, color="#444"), yaxis=dict(showgrid=True, gridcolor="#111", color="#444"),
-        showlegend=False, title=dict(text="RANGE 30 DERNIERS JOURS", font=dict(size=10,color="#555",family="IBM Plex Mono")),
-        xaxis_rangeslider_visible=False
-    )
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    # Graphique chart perso AM.Terminal
+    st.markdown('<div style="font-family:IBM Plex Mono;font-size:9px;color:#555;letter-spacing:3px;margin:16px 0 8px;border-left:2px solid #ff6600;padding-left:10px;">GRAPHIQUE AM.TERMINAL</div>', unsafe_allow_html=True)
+    try:
+        from chart_module import render_chart
+        from chart_module import config as _cm_cfg
+        _old_src = _cm_cfg.DATA_SOURCE
+        _cm_cfg.DATA_SOURCE = "yfinance"
+        html = render_chart(
+            symbol=ticker,
+            height=420,
+            show_header=True,
+            show_volume=True,
+            show_bottom=False,
+            pair_label=ticker.upper(),
+            exchange="Yahoo Finance",
+            live_sim=False,
+            show_ma=True,
+            show_bb=True,
+            default_tf="1D",
+        )
+        _cm_cfg.DATA_SOURCE = _old_src
+        import streamlit.components.v1 as _components
+        _components.html(html, height=470, scrolling=False)
+    except Exception:
+        # Fallback candlestick Plotly
+        df30 = df.tail(30).copy()
+        fig = go.Figure()
+        fig.add_trace(go.Candlestick(
+            x=df30.index, open=df30["Open"].squeeze(), high=df30["High"].squeeze(),
+            low=df30["Low"].squeeze(), close=df30["Close"].squeeze(),
+            increasing_line_color="#00C853", decreasing_line_color="#FF3B30",
+            name="Prix"
+        ))
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#050505",
+            margin=dict(l=10,r=10,t=30,b=10), height=250,
+            xaxis=dict(showgrid=False, color="#444"),
+            yaxis=dict(showgrid=True, gridcolor="#111", color="#444"),
+            showlegend=False, xaxis_rangeslider_visible=False
+        )
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 # ══════════════════════════════════════════
 #  5. ÉCART 52 SEMAINES
