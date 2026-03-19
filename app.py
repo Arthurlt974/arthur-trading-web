@@ -23,6 +23,7 @@ import interface_analyse_perso
 import interface_portfolio
 import interface_alertes
 import interface_screener
+import interface_barometres
 import Terminal as terminal_module
 from translations import t, get_lang, render_lang_toggle
 import interface_finance_marche
@@ -2727,7 +2728,7 @@ elif categorie == "MATIÈRES PREMIÈRES":
     st.stop()
 elif categorie == "ACTIONS & BOURSE":
     # Toolbar actions — clés internes fixes + labels traduits
-    _actions_keys = ["ANALYSEUR PRO","ANALYSE TECHNIQUE PRO","FIBONACCI CALCULATOR",
+    _actions_keys = ["ANALYSEUR PRO","ANALYSE TECHNIQUE PRO","FIBONACCI CALCULATOR","BAROMÈTRES",
         "BACKTESTING ENGINE","VALORISATION FONDAMENTALE","MULTI-CHARTS",
         "EXPERT SYSTEM","THE GRAND COUNCIL️","MODE DUEL",
         "MARKET MONITOR","SCREENER CAC 40","DIVIDEND CALENDAR"]
@@ -3536,6 +3537,9 @@ elif outil == "ANALYSEUR PRO":
 # ==========================================
 # OUTIL : ANALYSE TECHNIQUE PRO
 # ==========================================
+elif outil == "BAROMÈTRES":
+    interface_barometres.show_barometres()
+
 elif outil == "ANALYSE TECHNIQUE PRO":
     st.markdown("## 📈 ANALYSE TECHNIQUE AVANCÉE")
     st.info("Analyse complète avec RSI, MACD, Bollinger Bands et plus")
