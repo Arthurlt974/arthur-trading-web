@@ -48,27 +48,30 @@ def _gauge(score: float, title: str, max_val: float = 100) -> go.Figure:
         mode="gauge+number",
         value=score,
         domain={"x": [0, 1], "y": [0, 1]},
-        title={"text": title, "font": {"size": 13, "color": "#aaa", "family": "IBM Plex Mono"}},
-        number={"font": {"size": 32, "color": color, "family": "IBM Plex Mono"}, "suffix": f"/{max_val:.0f}"},
+        title={"text": title, "font": {"size": 12, "color": "#666", "family": "IBM Plex Mono"}},
+        number={"font": {"size": 36, "color": color, "family": "IBM Plex Mono"}, "suffix": "%"},
         gauge={
-            "axis": {"range": [0, max_val], "tickfont": {"size": 9, "color": "#444"}, "tickwidth": 1, "tickcolor": "#333"},
-            "bar": {"color": color, "thickness": 0.3},
-            "bgcolor": "#111",
-            "borderwidth": 0,
+            "axis": {"range": [0, max_val], "tickfont": {"size": 8, "color": "#333"},
+                     "tickwidth": 1, "tickcolor": "#222",
+                     "nticks": 6},
+            "bar": {"color": color, "thickness": 0.25},
+            "bgcolor": "#0a0a0a",
+            "borderwidth": 1,
+            "bordercolor": "#1a1a1a",
             "steps": [
-                {"range": [0, max_val*0.3],  "color": "#1a0000"},
-                {"range": [max_val*0.3, max_val*0.45], "color": "#1a0800"},
-                {"range": [max_val*0.45, max_val*0.55], "color": "#1a1a00"},
-                {"range": [max_val*0.55, max_val*0.7],  "color": "#001a00"},
-                {"range": [max_val*0.7, max_val],       "color": "#002000"},
+                {"range": [0, max_val*0.3],           "color": "#150000"},
+                {"range": [max_val*0.3,  max_val*0.45],"color": "#151000"},
+                {"range": [max_val*0.45, max_val*0.55],"color": "#151500"},
+                {"range": [max_val*0.55, max_val*0.7], "color": "#001500"},
+                {"range": [max_val*0.7,  max_val],     "color": "#001f00"},
             ],
-            "threshold": {"line": {"color": color, "width": 3}, "thickness": 0.8, "value": score},
+            "threshold": {"line": {"color": color, "width": 4}, "thickness": 0.85, "value": score},
         }
     ))
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=20, r=20, t=40, b=20), height=200,
-        font=dict(family="IBM Plex Mono")
+        margin=dict(l=10, r=10, t=50, b=10), height=220,
+        font=dict(family="IBM Plex Mono", color="#aaa")
     )
     return fig
 
@@ -284,16 +287,18 @@ def _barometre_indicateurs(ticker: str):
     neut = sum(1 for _, _, _, s, _ in indicateurs if s == "neutral")
     total = bull + bear + neut
 
-    score_tech = (bull / total * 100) if total > 0 else 50
+    score_tech = round(bull / total * 100) if total > 0 else 50
 
     # Gauges
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.plotly_chart(_gauge(bull, f"ACHATS ({bull}/{total})", total), use_container_width=True, config={"displayModeBar": False})
+        bull_pct = round(bull / total * 100) if total > 0 else 0
+        st.plotly_chart(_gauge(bull_pct, f"ACHATS {bull}/{total}", 100), use_container_width=True, config={"displayModeBar": False})
     with col2:
         st.plotly_chart(_gauge(score_tech, "SCORE TECHNIQUE", 100), use_container_width=True, config={"displayModeBar": False})
     with col3:
-        st.plotly_chart(_gauge(bear, f"VENTES ({bear}/{total})", total), use_container_width=True, config={"displayModeBar": False})
+        bear_pct = round(bear / total * 100) if total > 0 else 0
+        st.plotly_chart(_gauge(bear_pct, f"VENTES {bear}/{total}", 100), use_container_width=True, config={"displayModeBar": False})
 
     # Tableau des indicateurs
     st.markdown("**Détail des indicateurs :**")
@@ -357,12 +362,12 @@ def _barometre_mm(ticker: str):
     bull = sum(1 for _, _, _, s in results if s == "bullish")
     bear = sum(1 for _, _, _, s in results if s == "bearish")
     total = bull + bear
-    score = (bull / total * 100) if total > 0 else 50
+    score = round(bull / total * 100) if total > 0 else 50
 
     # Gauge
     col_g, col_r = st.columns([1, 2])
     with col_g:
-        st.plotly_chart(_gauge(score, f"MM HAUSSIÈRES ({bull}/{total})", 100), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(_gauge(score, f"MM HAUSSIÈRES {bull}/{total}", 100), use_container_width=True, config={"displayModeBar": False})
         if score >= 70:   verdict, vc = "🚀 TENDANCE HAUSSIÈRE FORTE", "#00C853"
         elif score >= 55: verdict, vc = "📈 LÉGÈREMENT HAUSSIER",       "#8BC34A"
         elif score >= 45: verdict, vc = "⚖️ INDÉCIS",                   "#FF9800"
