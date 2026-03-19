@@ -33,6 +33,14 @@ from utils import (
     save_alerts_firebase, load_alerts_firebase,
     init_session_from_firebase,
 )
+import streamlit as st
+
+# Autoriser l'iframe
+st.markdown("""
+<style>
+iframe { border: none; }
+</style>
+""", unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════
